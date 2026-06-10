@@ -67,7 +67,7 @@ function loadState() {
 }
 
 function checkDailyReset(state) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' });
   if (state.dailyDate !== today) {
     state.dailyDate  = today;
     state.dailyLoss  = 0;
@@ -116,7 +116,7 @@ async function checkSymbol(symbol, state) {
   if (result.error) { console.log(`[${symbol}]`, result.error); return; }
 
   const { price, signal, htfTrend, session, scoreLong, scoreShort, rsi } = result;
-  const t = new Date().toLocaleTimeString('ar-DZ');
+  const t = new Date().toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' });
   console.log(`[${t}] ${symbol} @ ${price} | ${htfTrend} L:${scoreLong}/9 S:${scoreShort}/9 RSI:${rsi}`);
 
   if (!signal) return;
