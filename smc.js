@@ -117,11 +117,13 @@ export function analyze(bars5m, bars1h) {
   // ── ② Session ─────────────────────────────
   const sessionOk = inSession(last);
 
-  // ── ATR & RSI ─────────────────────────────
-  const atrArr = atr(bars5m, 14);
-  const rsiArr = rsi(bars5m, 14);
-  const curATR = atrArr[n - 1] || 0;
-  const curRSI = rsiArr[n - 1] || 50;
+  // ── ATR على 5M للتحليل، و1H للـ SL/TP ────
+  const atrArr   = atr(bars5m, 14);
+  const atr1hArr = atr(bars1h, 14);
+  const rsiArr   = rsi(bars5m, 14);
+  const curATR   = atrArr[n - 1] || 0;
+  const atr1h    = atr1hArr[atr1hArr.length - 1] || curATR * 3;
+  const curRSI   = rsiArr[n - 1] || 50;
 
   // ── Swing H/L ─────────────────────────────
   const sHighs = swingHighs(bars5m, 10);
@@ -215,32 +217,38 @@ export function analyze(bars5m, bars1h) {
   let signal = null;
 
   if (scoreLong >= 5 && scoreLong > scoreShort) {
-    const sl  = bullOB_bot ? bullOB_bot - curATR : price - curATR * 2;
+    // SL: أسفل OB أو ATR 1H كاملة
+    const sl   = bullOB_bot ? bullOB_bot - atr1h * 0.5 : price - atr1h;
     const risk = Math.abs(price - sl);
     signal = {
       type:   'LONG',
       score:  scoreLong,
       price,
       sl:     +sl.toFixed(2),
-      tp1:    +(price + risk * 2).toFixed(2),
-      tp2:    +(price + risk * 4).toFixed(2),
-      rr:     '2:1',
+      tp1:    +(price + risk * 2).toFixed(2),   // 100-150 نقطة
+      tp2:    +(price + risk * 4).toFixed(2),   // 200-300 نقطة
+      tp3:    +(price + risk * 6).toFixed(2),   // هدف كبير Swing
+      rr:     '2:1 / 4:1',
       atr:    +curATR.toFixed(2),
+      atr1h:  +atr1h.toFixed(2),
       rsi:    +curRSI.toFixed(1),
       conditions: { htfBull, sessionOk, recentSweepDown, inBullOB, recentBullFVG, fibOTE_bull, rsiOversold }
     };
   } else if (scoreShort >= 5 && scoreShort > scoreLong) {
-    const sl  = bearOB_top ? bearOB_top + curATR : price + curATR * 2;
+    // SL: فوق OB أو ATR 1H كاملة
+    const sl   = bearOB_top ? bearOB_top + atr1h * 0.5 : price + atr1h;
     const risk = Math.abs(sl - price);
     signal = {
       type:   'SHORT',
       score:  scoreShort,
       price,
       sl:     +sl.toFixed(2),
-      tp1:    +(price - risk * 2).toFixed(2),
-      tp2:    +(price - risk * 4).toFixed(2),
-      rr:     '2:1',
+      tp1:    +(price - risk * 2).toFixed(2),   // 100-150 نقطة
+      tp2:    +(price - risk * 4).toFixed(2),   // 200-300 نقطة
+      tp3:    +(price - risk * 6).toFixed(2),   // هدف كبير Swing
+      rr:     '2:1 / 4:1',
       atr:    +curATR.toFixed(2),
+      atr1h:  +atr1h.toFixed(2),
       rsi:    +curRSI.toFixed(1),
       conditions: { htfBear, sessionOk, recentSweepUp, inBearOB, recentBearFVG, fibOTE_bear, rsiOverbought }
     };

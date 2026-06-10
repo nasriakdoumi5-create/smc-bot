@@ -4,8 +4,9 @@
  */
 
 const SYMBOLS = {
-  MNQ: 'NQ=F',   // Micro Nasdaq → نستخدم NQ=F (نفس الحركة)
-  MGC: 'GC=F',   // Gold Futures
+  MNQ: 'NQ=F',   // Micro Nasdaq
+  MGC: 'GC=F',   // Micro Gold
+  MCL: 'CL=F',   // Micro Crude Oil
   MES: 'ES=F',   // S&P 500
 };
 

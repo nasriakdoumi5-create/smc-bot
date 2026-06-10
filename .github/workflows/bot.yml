@@ -1,0 +1,49 @@
+name: SMC Elite Bot
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # كل 5 دقائق — داخله نفحص كل دقيقة
+  workflow_dispatch:          # تشغيل يدوي من GitHub
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # استرجاع آخر حالة (لتجنب إشارات مكررة)
+      - name: Restore state cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/smc_state.json
+          key: smc-state-${{ github.run_id }}
+          restore-keys: |
+            smc-state-
+
+      - name: Install dependencies
+        run: npm install --omit=dev
+
+      # فحص كل دقيقة × 5 مرات = تغطية كاملة للـ 5 دقائق
+      - name: Run SMC checks
+        env:
+          TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SYMBOL: MNQ
+        run: |
+          for i in 1 2 3 4 5; do
+            echo "══════════════════════════════════"
+            echo "  فحص رقم $i من 5"
+            echo "══════════════════════════════════"
+            node run.js || true
+            if [ $i -lt 5 ]; then
+              echo "⏳ انتظار 60 ثانية..."
+              sleep 60
+            fi
+          done
+          echo "✅ انتهى الدور — ننتظر الدور القادم"
