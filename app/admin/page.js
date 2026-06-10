@@ -1,302 +1,288 @@
 'use client';
+import { useSession } from 'next-auth/react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
-import { PRODUCTS, CATEGORIES } from '../../data/products';
-import { useState } from 'react';
-import Image from 'next/image';
-
-const MOCK_ORDERS = [
-  { id: 'ORD-001', customer: 'أحمد محمد', total: 849, status: 'delivered', date: '2024-01-10', items: 3 },
-  { id: 'ORD-002', customer: 'سارة أحمد',  total: 299,  status: 'shipped',   date: '2024-01-11', items: 1 },
-  { id: 'ORD-003', customer: 'خالد العتيبي', total: 1449, status: 'pending',  date: '2024-01-12', items: 2 },
-  { id: 'ORD-004', customer: 'نورة السالم',  total: 655,  status: 'processing', date: '2024-01-12', items: 4 },
-  { id: 'ORD-005', customer: 'عمر الزهراني', total: 3599, status: 'delivered', date: '2024-01-09', items: 1 },
-];
-
-const STATUS_CONFIG = {
-  pending:    { label: 'قيد الانتظار', color: 'bg-yellow-100 text-yellow-700' },
-  processing: { label: 'قيد المعالجة', color: 'bg-blue-100 text-blue-700' },
-  shipped:    { label: 'تم الشحن',     color: 'bg-purple-100 text-purple-700' },
-  delivered:  { label: 'تم التسليم',   color: 'bg-green-100 text-green-700' },
-  cancelled:  { label: 'ملغي',          color: 'bg-red-100 text-red-700' },
+const STATUS_LABELS = {
+  PENDING: { label: 'قيد الانتظار', color: 'bg-yellow-100 text-yellow-700' },
+  PROCESSING: { label: 'قيد التجهيز', color: 'bg-blue-100 text-blue-700' },
+  SHIPPED: { label: 'تم الشحن', color: 'bg-indigo-100 text-indigo-700' },
+  DELIVERED: { label: 'تم التوصيل', color: 'bg-green-100 text-green-700' },
+  CANCELLED: { label: 'ملغي', color: 'bg-red-100 text-red-700' },
 };
 
 export default function AdminPage() {
-  const [tab, setTab]             = useState('dashboard');
-  const [products, setProducts]   = useState(PRODUCTS);
-  const [editProduct, setEdit]    = useState(null);
-  const [showModal, setModal]     = useState(false);
-  const [newProduct, setNew]      = useState({
-    name: '', price: '', originalPrice: '', category: 'electronics',
-    description: '', stock: '', image: '',
-  });
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [tab, setTab]       = useState('stats');
+  const [stats, setStats]   = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [newProduct, setNewProduct] = useState({ name:'', slug:'', description:'', price:'', originalPrice:'', stock:'', categorySlug:'', featured:false });
+  const [saving, setSaving] = useState(false);
 
-  const totalRevenue  = MOCK_ORDERS.filter(o => o.status === 'delivered').reduce((s, o) => s + o.total, 0);
-  const totalOrders   = MOCK_ORDERS.length;
-  const pendingOrders = MOCK_ORDERS.filter(o => o.status === 'pending').length;
-  const totalProducts = products.length;
+  useEffect(() => {
+    if (status === 'unauthenticated') router.push('/login');
+    if (status === 'authenticated' && session?.user?.role !== 'ADMIN') router.push('/');
+  }, [status, session]);
 
-  function handleDelete(id) {
-    if (confirm('هل تريد حذف هذا المنتج؟')) {
-      setProducts(p => p.filter(x => x.id !== id));
+  useEffect(() => {
+    if (session?.user?.role === 'ADMIN') loadData();
+  }, [session]);
+
+  async function loadData() {
+    setLoading(true);
+    const [s, o, p] = await Promise.all([
+      fetch('/api/admin/stats').then(r => r.json()),
+      fetch('/api/orders').then(r => r.json()),
+      fetch('/api/products').then(r => r.json()),
+    ]);
+    setStats(s);
+    setOrders(Array.isArray(o) ? o : []);
+    setProducts(Array.isArray(p) ? p : []);
+    setLoading(false);
+  }
+
+  async function updateOrderStatus(id, status) {
+    const res = await fetch(`/api/orders/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    if (res.ok) {
+      setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
+      toast.success('تم تحديث حالة الطلب');
     }
   }
 
-  function handleSave() {
-    if (!newProduct.name || !newProduct.price) return;
-    const id = Math.max(...products.map(p => p.id)) + 1;
-    setProducts(p => [...p, {
-      ...newProduct,
-      id,
-      price:         Number(newProduct.price),
-      originalPrice: Number(newProduct.originalPrice) || Number(newProduct.price),
-      stock:         Number(newProduct.stock) || 0,
-      rating: 0, reviews: 0, featured: false, tags: [],
-      image: newProduct.image || `https://picsum.photos/seed/${id}/400/400`,
-    }]);
-    setModal(false);
-    setNew({ name: '', price: '', originalPrice: '', category: 'electronics', description: '', stock: '', image: '' });
+  async function deleteProduct(slug) {
+    if (!confirm('هل أنت متأكد من حذف هذا المنتج؟')) return;
+    const res = await fetch(`/api/products/${slug}`, { method: 'DELETE' });
+    if (res.ok) {
+      setProducts(products.filter(p => p.slug !== slug));
+      toast.success('تم حذف المنتج');
+    }
   }
+
+  async function handleAddProduct(e) {
+    e.preventDefault();
+    setSaving(true);
+    const categories = { electronics: null, clothing: null, home: null, sports: null, books: null };
+    // Fetch category id
+    const catRes = await fetch(`/api/products?category=${newProduct.categorySlug}`);
+    const catProducts = await catRes.json();
+    const categoryId = catProducts[0]?.categoryId || catProducts[0]?.category?.id;
+
+    if (!categoryId) {
+      toast.error('الفئة غير موجودة');
+      setSaving(false);
+      return;
+    }
+
+    const res = await fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: newProduct.name,
+        slug: newProduct.slug || newProduct.name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, ''),
+        description: newProduct.description,
+        price: parseFloat(newProduct.price),
+        originalPrice: newProduct.originalPrice ? parseFloat(newProduct.originalPrice) : null,
+        stock: parseInt(newProduct.stock),
+        categoryId,
+        featured: newProduct.featured,
+        images: [`https://picsum.photos/seed/${Date.now()}/600/600`],
+      }),
+    });
+    if (res.ok) {
+      toast.success('تم إضافة المنتج بنجاح ✓');
+      setNewProduct({ name:'', slug:'', description:'', price:'', originalPrice:'', stock:'', categorySlug:'', featured:false });
+      await loadData();
+      setTab('products');
+    } else {
+      const err = await res.json();
+      toast.error(err.error || 'حدث خطأ');
+    }
+    setSaving(false);
+  }
+
+  if (status === 'loading' || loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" /></div>;
+  if (!session || session.user.role !== 'ADMIN') return null;
+
+  const TABS = [
+    { id:'stats', label:'الإحصائيات', icon:'📊' },
+    { id:'orders', label:'الطلبات', icon:'📦' },
+    { id:'products', label:'المنتجات', icon:'🛍️' },
+    { id:'add-product', label:'إضافة منتج', icon:'➕' },
+  ];
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">⚙️ لوحة التحكم</h1>
-          <p className="text-gray-400 text-sm mt-1">إدارة المتجر والمنتجات والطلبات</p>
-        </div>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">⚙️ لوحة التحكم</h1>
+        <span className="badge bg-primary-100 text-primary-700">مدير النظام</span>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-2xl p-1 mb-8 w-fit">
-        {[
-          { id: 'dashboard', label: 'الإحصائيات', icon: '📊' },
-          { id: 'products',  label: 'المنتجات',    icon: '📦' },
-          { id: 'orders',    label: 'الطلبات',     icon: '🛒' },
-        ].map(t => (
+      <div className="flex gap-2 mb-6 overflow-x-auto">
+        {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-              tab === t.id ? 'bg-white shadow-sm text-primary-600' : 'text-gray-500 hover:text-gray-700'
-            }`}>
-            {t.icon} {t.label}
+            className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${tab === t.id ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}>
+            <span>{t.icon}</span>{t.label}
           </button>
         ))}
       </div>
 
-      {/* Dashboard */}
-      {tab === 'dashboard' && (
+      {/* Stats Tab */}
+      {tab === 'stats' && stats && (
         <div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             {[
-              { label: 'إيرادات هذا الشهر', value: `${totalRevenue.toLocaleString()} ر.س`, icon: '💰', color: 'text-green-600', bg: 'bg-green-50' },
-              { label: 'إجمالي الطلبات',    value: totalOrders,                             icon: '📋', color: 'text-blue-600',  bg: 'bg-blue-50' },
-              { label: 'طلبات معلقة',        value: pendingOrders,                          icon: '⏳', color: 'text-yellow-600', bg: 'bg-yellow-50' },
-              { label: 'إجمالي المنتجات',   value: totalProducts,                          icon: '📦', color: 'text-purple-600', bg: 'bg-purple-50' },
+              { icon:'📦', label:'الطلبات', value: stats.totalOrders, color:'bg-blue-50 text-blue-700' },
+              { icon:'🛍️', label:'المنتجات', value: stats.totalProducts, color:'bg-purple-50 text-purple-700' },
+              { icon:'👤', label:'المستخدمون', value: stats.totalUsers, color:'bg-pink-50 text-pink-700' },
+              { icon:'💰', label:'الإيرادات', value: `${stats.revenue} ر.س`, color:'bg-green-50 text-green-700' },
             ].map(s => (
-              <div key={s.label} className="card p-5">
-                <div className={`w-12 h-12 ${s.bg} rounded-xl flex items-center justify-center text-2xl mb-3`}>
-                  {s.icon}
-                </div>
-                <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
-                <div className="text-sm text-gray-400 mt-1">{s.label}</div>
+              <div key={s.label} className={`card p-5 ${s.color}`}>
+                <div className="text-3xl mb-2">{s.icon}</div>
+                <p className="text-2xl font-extrabold">{s.value}</p>
+                <p className="text-sm font-medium opacity-80">{s.label}</p>
               </div>
             ))}
           </div>
-
-          {/* Top Products */}
           <div className="card p-6">
-            <h2 className="font-bold text-gray-800 text-lg mb-4">المنتجات الأكثر مبيعاً</h2>
-            <div className="space-y-3">
-              {products.sort((a, b) => b.reviews - a.reviews).slice(0, 5).map((p, i) => (
-                <div key={p.id} className="flex items-center gap-3">
-                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                    i === 0 ? 'bg-yellow-400 text-white' :
-                    i === 1 ? 'bg-gray-300 text-white' :
-                    i === 2 ? 'bg-orange-400 text-white' :
-                              'bg-gray-100 text-gray-500'
-                  }`}>{i + 1}</span>
-                  <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                    <Image src={p.image} alt={p.name} fill className="object-cover" sizes="40px" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-700 line-clamp-1">{p.name}</p>
-                    <p className="text-xs text-gray-400">{p.reviews} تقييم</p>
-                  </div>
-                  <span className="text-sm font-bold text-primary-600">{p.price} ر.س</span>
+            <h3 className="font-bold text-gray-700 mb-4">آخر الطلبات</h3>
+            {stats.recentOrders?.map(o => (
+              <div key={o.id} className="flex justify-between items-center py-3 border-b last:border-0 text-sm">
+                <div>
+                  <p className="font-mono font-bold">#{o.id.slice(-8).toUpperCase()}</p>
+                  <p className="text-gray-400 text-xs">{new Date(o.createdAt).toLocaleDateString('ar-SA')} — {o.items?.length} منتج</p>
                 </div>
-              ))}
-            </div>
+                <div className="text-left">
+                  <span className={`badge ${STATUS_LABELS[o.status]?.color || 'bg-gray-100 text-gray-700'}`}>{STATUS_LABELS[o.status]?.label || o.status}</span>
+                  <p className="font-bold text-primary-600 text-xs mt-1">{o.total} ر.س</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Products */}
-      {tab === 'products' && (
-        <div>
-          <div className="flex justify-between items-center mb-5">
-            <h2 className="text-xl font-bold text-gray-700">إدارة المنتجات ({products.length})</h2>
-            <button onClick={() => setModal(true)} className="btn-primary flex items-center gap-2">
-              + إضافة منتج
-            </button>
-          </div>
-
-          <div className="card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-100">
-                  <tr>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-600">المنتج</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-600">الفئة</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-600">السعر</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-600">المخزون</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-600">التقييم</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-600">الإجراءات</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {products.map(p => (
-                    <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                            <Image src={p.image} alt={p.name} fill className="object-cover" sizes="40px" />
-                          </div>
-                          <span className="font-medium text-gray-700 line-clamp-1 max-w-[200px]">{p.name}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-gray-500">
-                        {CATEGORIES.find(c => c.id === p.category)?.label}
-                      </td>
-                      <td className="py-3 px-4 font-bold text-primary-600">{p.price} ر.س</td>
-                      <td className="py-3 px-4">
-                        <span className={`badge text-xs ${
-                          p.stock > 10 ? 'bg-green-100 text-green-700' :
-                          p.stock > 0  ? 'bg-orange-100 text-orange-700' :
-                                         'bg-red-100 text-red-700'
-                        }`}>
-                          {p.stock} قطعة
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="text-yellow-500">★</span>
-                        <span className="text-gray-600 font-medium">{p.rating}</span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleDelete(p.id)}
-                            className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
-                            title="حذف"
-                          >
-                            🗑
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Orders */}
+      {/* Orders Tab */}
       {tab === 'orders' && (
-        <div>
-          <h2 className="text-xl font-bold text-gray-700 mb-5">إدارة الطلبات ({MOCK_ORDERS.length})</h2>
-          <div className="card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-100">
-                  <tr>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-600">رقم الطلب</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-600">العميل</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-600">التاريخ</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-600">المنتجات</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-600">المجموع</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-600">الحالة</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {MOCK_ORDERS.map(o => (
-                    <tr key={o.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-3 px-4 font-mono font-medium text-gray-700">{o.id}</td>
-                      <td className="py-3 px-4 text-gray-700">{o.customer}</td>
-                      <td className="py-3 px-4 text-gray-400">{o.date}</td>
-                      <td className="py-3 px-4 text-gray-500">{o.items} منتج</td>
-                      <td className="py-3 px-4 font-bold text-primary-600">{o.total.toLocaleString()} ر.س</td>
-                      <td className="py-3 px-4">
-                        <span className={`badge text-xs ${STATUS_CONFIG[o.status].color}`}>
-                          {STATUS_CONFIG[o.status].label}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+        <div className="space-y-4">
+          {orders.length === 0 ? <p className="text-center text-gray-400 py-10">لا توجد طلبات</p> : orders.map(order => {
+            const s = STATUS_LABELS[order.status] || STATUS_LABELS.PENDING;
+            return (
+              <div key={order.id} className="card p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+                  <div>
+                    <p className="font-mono font-bold text-gray-700">#{order.id.slice(-8).toUpperCase()}</p>
+                    <p className="text-sm text-gray-500">{order.name} — {order.phone}</p>
+                    <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleDateString('ar-SA')}</p>
+                    {order.user && <p className="text-xs text-gray-400">العميل: {order.user.name} ({order.user.email})</p>}
+                  </div>
+                  <div className="text-left">
+                    <p className="font-bold text-primary-600 text-lg">{order.total} ر.س</p>
+                    <select value={order.status} onChange={e => updateOrderStatus(order.id, e.target.value)}
+                      className={`mt-1 text-xs font-semibold rounded-lg px-2 py-1 border-0 cursor-pointer ${s.color}`}>
+                      {Object.entries(STATUS_LABELS).map(([v, {label}]) => <option key={v} value={v}>{label}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                  {order.items?.map(i => <span key={i.id} className="bg-gray-100 rounded-lg px-2 py-1">{i.name} × {i.qty}</span>)}
+                </div>
+                <p className="text-xs text-gray-400 mt-2">📍 {order.city} — {order.address}</p>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Add Product Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-5">
-              <h3 className="text-xl font-bold text-gray-800">إضافة منتج جديد</h3>
-              <button onClick={() => setModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
-            </div>
-            <div className="space-y-4">
+      {/* Products Tab */}
+      {tab === 'products' && (
+        <div className="overflow-x-auto">
+          <table className="w-full bg-white rounded-2xl shadow-sm overflow-hidden text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="text-right px-4 py-3 font-semibold text-gray-600">المنتج</th>
+                <th className="text-right px-4 py-3 font-semibold text-gray-600">الفئة</th>
+                <th className="text-right px-4 py-3 font-semibold text-gray-600">السعر</th>
+                <th className="text-right px-4 py-3 font-semibold text-gray-600">المخزون</th>
+                <th className="text-right px-4 py-3 font-semibold text-gray-600">إجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map(p => (
+                <tr key={p.id} className="border-t border-gray-100 hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-gray-700 line-clamp-1">{p.name}</p>
+                    {p.featured && <span className="badge bg-primary-100 text-primary-700 text-xs">مميز</span>}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">{p.category?.name}</td>
+                  <td className="px-4 py-3 font-bold text-primary-600">{p.price} ر.س</td>
+                  <td className="px-4 py-3">
+                    <span className={`badge ${p.stock > 5 ? 'bg-green-100 text-green-700' : p.stock > 0 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>{p.stock}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button onClick={() => deleteProduct(p.slug)} className="text-red-400 hover:text-red-600 text-xs font-medium hover:bg-red-50 px-2 py-1 rounded-lg transition-colors">حذف</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Add Product Tab */}
+      {tab === 'add-product' && (
+        <div className="card p-6 max-w-2xl">
+          <h2 className="font-bold text-gray-700 text-lg mb-6">إضافة منتج جديد</h2>
+          <form onSubmit={handleAddProduct} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">اسم المنتج *</label>
+                <input value={newProduct.name} onChange={e => setNewProduct(p => ({...p, name:e.target.value}))} required className="input-field" placeholder="مثال: سماعات لاسلكية" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">الوصف *</label>
+                <textarea value={newProduct.description} onChange={e => setNewProduct(p => ({...p, description:e.target.value}))} required className="input-field h-24 resize-none" />
+              </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">اسم المنتج *</label>
-                <input value={newProduct.name} onChange={e => setNew(n => ({...n, name: e.target.value}))}
-                  className="input-field" placeholder="اسم المنتج" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">السعر *</label>
-                  <input value={newProduct.price} onChange={e => setNew(n => ({...n, price: e.target.value}))}
-                    className="input-field" placeholder="0" type="number" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">السعر الأصلي</label>
-                  <input value={newProduct.originalPrice} onChange={e => setNew(n => ({...n, originalPrice: e.target.value}))}
-                    className="input-field" placeholder="0" type="number" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">الفئة</label>
-                  <select value={newProduct.category} onChange={e => setNew(n => ({...n, category: e.target.value}))}
-                    className="input-field">
-                    {CATEGORIES.filter(c => c.id !== 'all').map(c => (
-                      <option key={c.id} value={c.id}>{c.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">الكمية</label>
-                  <input value={newProduct.stock} onChange={e => setNew(n => ({...n, stock: e.target.value}))}
-                    className="input-field" placeholder="0" type="number" />
-                </div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">السعر *</label>
+                <input type="number" value={newProduct.price} onChange={e => setNewProduct(p => ({...p, price:e.target.value}))} required className="input-field" placeholder="299" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">الوصف</label>
-                <textarea value={newProduct.description} onChange={e => setNew(n => ({...n, description: e.target.value}))}
-                  className="input-field resize-none" rows={3} placeholder="وصف المنتج..." />
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">السعر الأصلي</label>
+                <input type="number" value={newProduct.originalPrice} onChange={e => setNewProduct(p => ({...p, originalPrice:e.target.value}))} className="input-field" placeholder="399" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">رابط الصورة</label>
-                <input value={newProduct.image} onChange={e => setNew(n => ({...n, image: e.target.value}))}
-                  className="input-field" placeholder="https://..." />
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">المخزون *</label>
+                <input type="number" value={newProduct.stock} onChange={e => setNewProduct(p => ({...p, stock:e.target.value}))} required className="input-field" placeholder="10" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">الفئة *</label>
+                <select value={newProduct.categorySlug} onChange={e => setNewProduct(p => ({...p, categorySlug:e.target.value}))} required className="input-field">
+                  <option value="">اختر الفئة</option>
+                  <option value="electronics">إلكترونيات</option>
+                  <option value="clothing">ملابس</option>
+                  <option value="home">المنزل</option>
+                  <option value="sports">رياضة</option>
+                  <option value="books">كتب</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-3">
+                <input type="checkbox" id="featured" checked={newProduct.featured} onChange={e => setNewProduct(p => ({...p, featured:e.target.checked}))} className="w-5 h-5 rounded text-primary-600" />
+                <label htmlFor="featured" className="text-sm font-medium text-gray-700">منتج مميز</label>
               </div>
             </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={handleSave} className="btn-primary flex-1">حفظ المنتج</button>
-              <button onClick={() => setModal(false)} className="btn-outline flex-1">إلغاء</button>
-            </div>
-          </div>
+            <button type="submit" disabled={saving} className="btn-primary w-full py-3">
+              {saving ? '⏳ جاري الحفظ...' : '+ إضافة المنتج'}
+            </button>
+          </form>
         </div>
       )}
     </div>

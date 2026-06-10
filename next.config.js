@@ -1,10 +1,5 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+module.exports = {
   images: {
-    remotePatterns: [
-      { protocol: 'https', hostname: 'picsum.photos' },
-    ],
+    remotePatterns: [{ protocol:'https', hostname:'picsum.photos' }],
   },
 };
-
-module.exports = nextConfig;

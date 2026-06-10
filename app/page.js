@@ -1,95 +1,123 @@
 import Link from 'next/link';
-import { PRODUCTS, CATEGORIES } from '../data/products';
+import Image from 'next/image';
+import { db } from '../lib/db';
 import ProductCard from '../components/ProductCard';
 
-export default function HomePage() {
-  const featured = PRODUCTS.filter(p => p.featured);
-  const categories = CATEGORIES.filter(c => c.id !== 'all');
+const CATEGORIES = [
+  {slug:'electronics',name:'إلكترونيات',icon:'💻',color:'bg-blue-50 text-blue-600'},
+  {slug:'clothing',name:'ملابس',icon:'👕',color:'bg-pink-50 text-pink-600'},
+  {slug:'home',name:'المنزل',icon:'🏠',color:'bg-amber-50 text-amber-600'},
+  {slug:'sports',name:'رياضة',icon:'⚽',color:'bg-green-50 text-green-600'},
+  {slug:'books',name:'كتب',icon:'📚',color:'bg-purple-50 text-purple-600'},
+];
+
+export default async function HomePage() {
+  const featuredProducts = await db.product.findMany({
+    where: { featured: true },
+    include: {
+      category: true,
+      reviews: { select: { rating: true } },
+      _count: { select: { reviews: true } },
+    },
+    take: 8,
+  });
+
+  const products = featuredProducts.map(p => ({
+    ...p,
+    images: JSON.parse(p.images),
+    avgRating: p.reviews.length ? (p.reviews.reduce((s, r) => s + r.rating, 0) / p.reviews.length).toFixed(1) : 0,
+    reviewCount: p._count.reviews,
+  }));
 
   return (
     <div>
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-primary-700 to-primary-900 text-white py-20 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
-            🛍️ تسوق بذكاء، وفّر أكثر
-          </h1>
-          <p className="text-primary-100 text-lg mb-8 max-w-2xl mx-auto">
-            آلاف المنتجات بأسعار منافسة، توصيل سريع، وضمان استرجاع خلال 14 يوم
-          </p>
-          <Link href="/products" className="inline-block bg-white text-primary-700 font-bold px-8 py-3.5 rounded-2xl hover:bg-primary-50 transition-colors text-lg shadow-lg">
-            تصفح المنتجات →
-          </Link>
+      {/* Hero Banner */}
+      <section className="bg-gradient-to-l from-slate-800 to-slate-900 text-white py-16 px-4">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-8">
+          <div className="flex-1 text-center md:text-right">
+            <span className="badge bg-primary-600 text-white mb-4 text-sm px-3 py-1">🎉 عروض حصرية</span>
+            <h1 className="text-4xl md:text-5xl font-extrabold mb-4 leading-tight">
+              تسوق بذكاء<br />
+              <span className="text-primary-400">وفّر أكثر</span>
+            </h1>
+            <p className="text-gray-300 text-lg mb-8">آلاف المنتجات بأفضل الأسعار مع توصيل سريع لباب منزلك</p>
+            <div className="flex gap-3 justify-center md:justify-start flex-wrap">
+              <Link href="/products" className="btn-primary text-base px-8 py-3">تسوق الآن</Link>
+              <Link href="/products?featured=true" className="btn-outline border-white text-white hover:bg-white/10 text-base px-8 py-3">العروض المميزة</Link>
+            </div>
+          </div>
+          <div className="flex-1 flex justify-center">
+            <div className="relative w-72 h-72 md:w-96 md:h-96">
+              <div className="absolute inset-0 bg-primary-600/20 rounded-full blur-3xl" />
+              <div className="relative grid grid-cols-2 gap-4 p-4">
+                {products.slice(0,4).map((p, i) => (
+                  <div key={p.id} className={`relative rounded-2xl overflow-hidden bg-white/10 backdrop-blur aspect-square ${i === 0 ? 'col-span-2 row-span-1' : ''}`}>
+                    <Image src={p.images[0]} alt={p.name} fill className="object-cover opacity-80" sizes="200px" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="bg-white py-8 shadow-sm">
+      {/* Stats bar */}
+      <section className="bg-primary-600 text-white py-4">
         <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
           {[
-            { icon: '📦', value: '+500', label: 'منتج متاح' },
-            { icon: '🚀', value: '24h', label: 'توصيل سريع' },
-            { icon: '⭐', value: '4.8', label: 'تقييم العملاء' },
-            { icon: '🔄', value: '14 يوم', label: 'ضمان الاسترجاع' },
+            {icon:'🚚', text:'شحن مجاني فوق 500 ر.س'},
+            {icon:'🔒', text:'دفع آمن 100%'},
+            {icon:'↩️', text:'إرجاع خلال 14 يوم'},
+            {icon:'🎧', text:'دعم 24/7'},
           ].map(s => (
-            <div key={s.label} className="py-2">
-              <div className="text-2xl mb-1">{s.icon}</div>
-              <div className="text-xl font-bold text-primary-600">{s.value}</div>
-              <div className="text-sm text-gray-500">{s.label}</div>
+            <div key={s.text} className="flex items-center justify-center gap-2 text-sm font-medium">
+              <span className="text-xl">{s.icon}</span>{s.text}
             </div>
           ))}
         </div>
       </section>
 
-      <div className="max-w-7xl mx-auto px-4 py-12">
+      <div className="max-w-7xl mx-auto px-4 py-10">
         {/* Categories */}
-        <section className="mb-12">
+        <div className="mb-10">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">تسوق حسب الفئة</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-            {categories.map(cat => {
-              const icons = { electronics: '💻', clothing: '👕', home: '🏠', sports: '⚽', books: '📚' };
-              return (
-                <Link
-                  key={cat.id}
-                  href={`/products?category=${cat.id}`}
-                  className="card p-5 text-center hover:border-primary-200 border border-transparent transition-all group"
-                >
-                  <div className="text-3xl mb-2">{icons[cat.id]}</div>
-                  <div className="font-semibold text-gray-700 group-hover:text-primary-600 transition-colors">
-                    {cat.label}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Featured Products */}
-        <section>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">منتجات مميزة</h2>
-            <Link href="/products" className="text-primary-600 hover:text-primary-700 font-medium text-sm">
-              عرض الكل ←
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {featured.map(p => (
-              <ProductCard key={p.id} product={p} />
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+            {CATEGORIES.map(c => (
+              <Link key={c.slug} href={`/products?category=${c.slug}`}
+                className={`${c.color} rounded-2xl p-4 text-center hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 group`}>
+                <div className="text-3xl mb-2 group-hover:scale-110 transition-transform">{c.icon}</div>
+                <p className="font-semibold text-sm">{c.name}</p>
+              </Link>
             ))}
           </div>
-        </section>
+        </div>
 
-        {/* Banner */}
-        <section className="mt-12 bg-gradient-to-r from-amber-400 to-orange-500 rounded-3xl p-8 md:p-12 text-white">
-          <div className="max-w-lg">
-            <h3 className="text-2xl md:text-3xl font-bold mb-3">خصم 25% على أول طلب</h3>
-            <p className="mb-6 text-amber-50">استخدم الكود <strong>FIRST25</strong> عند الدفع وتمتع بخصم رائع</p>
-            <Link href="/products"
-              className="inline-block bg-white text-orange-600 font-bold px-6 py-3 rounded-xl hover:bg-orange-50 transition-colors">
-              تسوق الآن
-            </Link>
+        {/* Featured Products */}
+        <div className="mb-10">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-800">منتجات مميزة ⭐</h2>
+            <Link href="/products" className="text-primary-600 font-semibold hover:text-primary-700 text-sm">عرض الكل ←</Link>
           </div>
-        </section>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {products.map(p => <ProductCard key={p.id} product={p} />)}
+          </div>
+        </div>
+
+        {/* Promo Banners */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+          <Link href="/products?category=electronics" className="bg-gradient-to-l from-blue-600 to-blue-800 rounded-2xl p-8 text-white hover:shadow-xl transition-shadow block">
+            <p className="text-sm font-medium opacity-80 mb-1">تخفيضات الموسم</p>
+            <h3 className="text-2xl font-bold mb-2">إلكترونيات بأسعار لا تُصدق 💻</h3>
+            <p className="text-sm opacity-80">خصم حتى 30% على المنتجات المختارة</p>
+            <div className="mt-4 inline-block bg-white text-blue-700 font-bold text-sm px-4 py-2 rounded-xl">تسوق الآن</div>
+          </Link>
+          <Link href="/products?category=clothing" className="bg-gradient-to-l from-pink-500 to-rose-600 rounded-2xl p-8 text-white hover:shadow-xl transition-shadow block">
+            <p className="text-sm font-medium opacity-80 mb-1">كولكشن جديد</p>
+            <h3 className="text-2xl font-bold mb-2">أحدث صيحات الموضة 👗</h3>
+            <p className="text-sm opacity-80">أناقة لكل المناسبات بأسعار رائعة</p>
+            <div className="mt-4 inline-block bg-white text-pink-600 font-bold text-sm px-4 py-2 rounded-xl">اكتشف الآن</div>
+          </Link>
+        </div>
       </div>
     </div>
   );
