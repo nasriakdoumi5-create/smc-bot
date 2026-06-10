@@ -1,0 +1,7 @@
+{
+  "env": {
+    "NEXTAUTH_SECRET": "mysecretstore2024xK9pL3mN7",
+    "NEXTAUTH_URL": "https://ecommerce-store-n3c81oixj-nasriakdoumi5-creates-projects.vercel.app"
+  },
+  "buildCommand": "prisma generate && prisma db push --accept-data-loss && node prisma/seed.js && next build"
+}
