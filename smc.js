@@ -98,7 +98,9 @@ function volumeSpike(bars, n, lookback = 20) {
   const recent = bars.slice(Math.max(0, n - lookback), n);
   const avgVol = recent.reduce((s, b) => s + (b.volume || 0), 0) / recent.length;
   const curVol = bars[n - 1].volume || 0;
-  return { spike: curVol > avgVol * 1.5, ratio: avgVol > 0 ? curVol / avgVol : 1 };
+  // إذا لا توجد بيانات حجم (Futures على Yahoo) — نعتبره محايداً true
+  if (avgVol === 0) return { spike: true, ratio: 1, noData: true };
+  return { spike: curVol > avgVol * 1.5, ratio: +(curVol / avgVol).toFixed(1), noData: false };
 }
 
 // ══ Momentum Rejection ═══════════════════════

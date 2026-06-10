@@ -40,14 +40,18 @@ const MAX_CONTRACTS = {
  * contracts = RISK / (SL_points × point_value)
  */
 function calcContracts(symbol, entryPrice, slPrice) {
-  const slPoints  = Math.abs(entryPrice - slPrice);
-  const pointVal  = POINT_VALUE[symbol] || 2;
+  const slPoints        = Math.abs(entryPrice - slPrice);
+  const pointVal        = POINT_VALUE[symbol] || 2;
   const riskPerContract = slPoints * pointVal;
-  if (riskPerContract <= 0) return 1;
+  if (riskPerContract <= 0) return { contracts: 1, actualRisk: RISK_PER_TRADE, warning: false };
 
-  const contracts = Math.floor(RISK_PER_TRADE / riskPerContract);
-  const maxC      = MAX_CONTRACTS[symbol] || 3;
-  return Math.max(1, Math.min(contracts, maxC));
+  const contracts  = Math.floor(RISK_PER_TRADE / riskPerContract);
+  const maxC       = MAX_CONTRACTS[symbol] || 3;
+  const final      = Math.max(1, Math.min(contracts, maxC));
+  const actualRisk = +(final * riskPerContract).toFixed(0);
+  // تحذير إذا الخطر الفعلي يتجاوز الميزانية بأكثر من 50%
+  const warning    = actualRisk > RISK_PER_TRADE * 1.5;
+  return { contracts: final, actualRisk, warning };
 }
 
 // ══════════════════════════════════════════════
@@ -156,10 +160,11 @@ async function checkSymbol(symbol, state) {
   state.tradesLeft = (state.tradesLeft ?? 12) - 1;
 
   // ── حساب العقود ──────────────────────────
-  const contracts  = calcContracts(symbol, signal.price, signal.sl);
+  const calc       = calcContracts(symbol, signal.price, signal.sl);
+  const contracts  = calc.contracts;
+  const riskDollar = calc.actualRisk;
+  const riskWarn   = calc.warning;
   const pointVal   = POINT_VALUE[symbol] || 2;
-  const slPoints   = Math.abs(signal.price - signal.sl);
-  const riskDollar = +(contracts * slPoints * pointVal).toFixed(0);
   const tp1Dollar  = +(contracts * Math.abs(signal.tp1 - signal.price) * pointVal).toFixed(0);
   const tp2Dollar  = +(contracts * Math.abs(signal.tp2 - signal.price) * pointVal).toFixed(0);
   const tp3Dollar  = +(contracts * Math.abs(signal.tp3 - signal.price) * pointVal).toFixed(0);
@@ -191,7 +196,7 @@ TP3: <b>${signal.tp3}</b>  ← +$${tp3Dollar}
 
 ━━━━━━━━━━━━━━━━━━━━
 💸 <b>إدارة المال</b>
-خطر:    <b>$${riskDollar}</b> من $${ACCOUNT_BALANCE.toLocaleString()}
+خطر:    <b>$${riskDollar}</b> من $${ACCOUNT_BALANCE.toLocaleString()}${riskWarn ? '  ⚠️ يتجاوز الميزانية' : ' ✅'}
 نقطة:   <b>$${pointVal} / عقد</b>
 ━━━━━━━━━━━━━━━━━━━━
 
