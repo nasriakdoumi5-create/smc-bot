@@ -1,0 +1,36 @@
+name: Deploy Store to Vercel
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ecommerce-store
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ecommerce-store branch
+        uses: actions/checkout@v4
+        with:
+          ref: ecommerce-store
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Deploy to Vercel
+        run: |
+          npx vercel --prod \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            --yes \
+            --name=ecommerce-store
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
