@@ -61,10 +61,11 @@ async function main() {
   }
 
   // ── حالة السوق ───────────────────────────
-  const [mnqBias, mgcBias, mclBias] = await Promise.all([
+  const [mnqBias, mgcBias, mclBias, mesBias] = await Promise.all([
     marketBias('MNQ'),
     marketBias('MGC'),
     marketBias('MCL'),
+    marketBias('MES'),
   ]);
 
   // ── تحذير أخبار حمراء ────────────────────
@@ -78,6 +79,7 @@ async function main() {
 
 📊 <b>حالة السوق (1H)</b>
 MNQ (Nasdaq):  ${mnqBias}
+MES (S&P 500): ${mesBias}
 MGC (Gold):    ${mgcBias}
 MCL (Oil):     ${mclBias}
 
@@ -86,6 +88,7 @@ MCL (Oil):     ${mclBias}
 ${newsSection}
 ━━━━━━━━━━━━━━━━━━━━
 🕐 <b>مواعيد الجلسات (إسبانيا)</b>
+🌏 آسيا:     02:00 – 06:00
 🇬🇧 لندن:    09:00 – 13:00
 🇺🇸 نيويورك: 14:30 – 18:00
 ${warning}

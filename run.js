@@ -11,7 +11,7 @@ import { readFileSync, writeFileSync, existsSync }  from 'fs';
 
 const TOKEN   = process.env.TELEGRAM_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-const SYMBOLS = ['MNQ', 'MGC', 'MCL'];
+const SYMBOLS = ['MNQ', 'MGC', 'MCL', 'MES'];
 
 // ══ إعدادات إدارة المال ══════════════════════
 const ACCOUNT_BALANCE  = 50_000;   // حجم الحساب الممول
@@ -24,8 +24,9 @@ const REMAINING_BUDGET = 900;      // المتبقي قبل الحرق ($1500 - 
 // قيمة النقطة لكل رمز (بالدولار)
 const POINT_VALUE = {
   MNQ: 2,    // Micro Nasdaq  — $2 / نقطة
-  MGC: 10,   // Micro Gold    — $10 / نقطة (1 نقطة = $1/oz × 10 oz)
-  MCL: 100,  // Micro Crude   — $100 / نقطة (1$ = 0.01 تغيير × 100 = $1... في الواقع $1/0.01=$100)
+  MGC: 10,   // Micro Gold    — $10 / نقطة
+  MCL: 100,  // Micro Crude   — $100 / نقطة
+  MES: 5,    // Micro S&P 500 — $5 / نقطة
 };
 
 // الحد الأقصى للعقود لكل رمز
@@ -33,6 +34,7 @@ const MAX_CONTRACTS = {
   MNQ: 5,
   MGC: 3,
   MCL: 2,
+  MES: 5,
 };
 
 /**
@@ -96,6 +98,7 @@ const symbolNames = {
   MNQ: 'Micro Nasdaq (MNQ)',
   MGC: 'Micro Gold (MGC)',
   MCL: 'Micro Crude Oil (MCL)',
+  MES: 'Micro S&P 500 (MES)',
 };
 
 const condLabels = {

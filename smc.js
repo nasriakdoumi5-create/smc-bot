@@ -88,9 +88,10 @@ function inSession(bar) {
   const h = d.getUTCHours();
   const m = d.getUTCMinutes();
   const mins = h * 60 + m;
-  const london = mins >= 8 * 60  && mins < 12 * 60;
-  const ny     = mins >= 13 * 60 + 30 && mins < 16 * 60;
-  return london || ny;
+  const asia   = mins >= 0       && mins < 4 * 60;        // UTC 00:00-04:00
+  const london = mins >= 8 * 60  && mins < 12 * 60;       // UTC 08:00-12:00
+  const ny     = mins >= 13 * 60 + 30 && mins < 16 * 60;  // UTC 13:30-16:00
+  return asia || london || ny;
 }
 
 // ══ Volume Spike ══════════════════════════════
