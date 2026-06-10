@@ -174,6 +174,7 @@ async function checkSymbol(symbol, state) {
   const tp3Dollar  = +(contracts * Math.abs(signal.tp3 - signal.price) * pointVal).toFixed(0);
 
   const isBull    = signal.type === 'LONG';
+  const isStrong  = signal.score >= 6;
   const scoreBar  = '●'.repeat(signal.score) + '○'.repeat(9 - signal.score);
   const risk      = Math.abs(signal.price - signal.sl);
   const rr        = risk > 0 ? (Math.abs(signal.tp1 - signal.price) / risk).toFixed(1) : '?';
@@ -181,10 +182,11 @@ async function checkSymbol(symbol, state) {
     .map(([k, v]) => `${v ? '✅' : '❌'} ${condLabels[k] || k}`)
     .join('\n');
 
-  const dir = isBull ? 'BUY' : 'SELL';
+  const dir        = isBull ? 'BUY' : 'SELL';
+  const qualLabel  = isStrong ? '🔥 إشارة قوية' : '⚡ إشارة متوسطة — تحقق من الشارت';
 
   await tg(
-`${isBull ? '📈' : '📉'} <b>إشارة ${signal.type} — ${symbolNames[symbol] || symbol}</b>
+`${isBull ? '📈' : '📉'} <b>${qualLabel} — ${symbolNames[symbol] || symbol}</b>
 
 ━━━━━━━━━━━━━━━━━━━━
 📌 <b>أمر التنفيذ</b>
