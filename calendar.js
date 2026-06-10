@@ -29,11 +29,12 @@ export async function isNewsTime() {
 
 export async function todaySummary() {
   const events = await fetchCalendar();
-  const today = new Date().toDateString();
-  const usd = events.filter(e => new Date(e.date).toDateString() === today && e.country === 'USD');
+  const TZ = 'Europe/Madrid';
+  const today = new Date().toLocaleDateString('es-ES', { timeZone: TZ });
+  const usd = events.filter(e => new Date(e.date).toLocaleDateString('es-ES', { timeZone: TZ }) === today && e.country === 'USD');
   if (!usd.length) return 'لا توجد أخبار USD اليوم ✅';
   return usd.sort((a, b) => new Date(a.date) - new Date(b.date)).map(e => {
-    const t = new Date(e.date).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' });
+    const t = new Date(e.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
     return (e.impact === 'High' ? '🔴' : e.impact === 'Medium' ? '🟡' : '⚪') + ` ${t} — ${e.title}`;
   }).join('\n');
 }

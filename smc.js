@@ -294,7 +294,7 @@ export function analyze(bars5m, bars1h) {
   return {
     symbol:    'NQ/MNQ',
     price:     +price.toFixed(2),
-    time:      new Date(last.time * 1000).toISOString(),
+    time:      new Date(last.time * 1000).toLocaleString('es-ES', { timeZone: 'Europe/Madrid' }),
     htfTrend:  htfBullStrong ? 'BULL↑' : htfBull ? 'BULL' : htfBearStrong ? 'BEAR↓' : htfBear ? 'BEAR' : 'NEUTRAL',
     session:   sessionOk,
     scoreLong, scoreShort,
