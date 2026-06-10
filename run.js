@@ -206,7 +206,7 @@ ${condList}
 متبقي كلياً: <b>${state.tradesLeft} صفقة</b> قبل الحد الأقصى
 
 ⚠️ <i>القرار النهائي لك — تحقق من الشارت قبل الدخول</i>
-🕐 ${new Date().toLocaleString('ar-DZ')}`
+🕐 ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })} (إسبانيا)`
   );
 
   console.log(`[${t}] ✅ إشعار ${symbol} — ${signal.type} @ ${signal.price} | ${signal.score}/9 | ${contracts} عقود`);
@@ -222,9 +222,10 @@ async function main() {
     if (key !== state.lastNewsKey) {
       state.lastNewsKey = key;
       const mins = Math.max(1, Math.round((new Date(e.date) - Date.now()) / 60000));
+      const newsTime = new Date(e.date).toLocaleString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' });
       await tg(
 `⚠️ <b>خبر مهم — ${e.title}</b>
-🕐 خلال <b>${mins} دقيقة</b>  |  🔴 High Impact
+🕐 خلال <b>${mins} دقيقة</b> (${newsTime} إسبانيا)  |  🔴 High Impact
 ⛔ <b>لا تدخل الصفقة — انتظر الخبر</b>`
       ).catch(() => {});
     }
