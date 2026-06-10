@@ -15,8 +15,11 @@ const SYMBOLS = ['MNQ', 'MGC', 'MCL'];
 
 // ══ إعدادات إدارة المال ══════════════════════
 const ACCOUNT_BALANCE  = 50_000;   // حجم الحساب الممول
-const RISK_PER_TRADE   = 300;      // مخاطرة ثابتة $300 = 0.6% من الحساب
+const CURRENT_BALANCE  = 49_400;   // الرصيد الحالي (بعد خسارة $600)
+const RISK_PER_TRADE   = 75;       // 🔴 مرحلة التعافي — $75/صفقة
 const MAX_DRAWDOWN     = 1_500;    // الحد الأقصى للخسارة الإجمالية
+const DAILY_STOP_LOSS  = 300;      // وقف يومي عند $300 (4 صفقات فاشلة)
+const REMAINING_BUDGET = 900;      // المتبقي قبل الحرق ($1500 - $600)
 
 // قيمة النقطة لكل رمز (بالدولار)
 const POINT_VALUE = {
@@ -60,7 +63,15 @@ function loadState() {
   try {
     if (existsSync(STATE_FILE)) return JSON.parse(readFileSync(STATE_FILE, 'utf8'));
   } catch {}
-  return { signals: {}, lastNewsKey: '', totalLoss: 0 };
+  return { signals: {}, lastNewsKey: '', dailyLoss: 0, dailyDate: '', tradesLeft: 12 };
+}
+
+function checkDailyReset(state) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (state.dailyDate !== today) {
+    state.dailyDate  = today;
+    state.dailyLoss  = 0;
+  }
 }
 
 function saveState(s) {
@@ -121,12 +132,28 @@ async function checkSymbol(symbol, state) {
     return;
   }
 
+  // وقف يومي
+  checkDailyReset(state);
+  if (state.dailyLoss >= DAILY_STOP_LOSS) {
+    console.log(`[${symbol}] ⛔ وقف يومي — خسارة اليوم $${state.dailyLoss}`);
+    return;
+  }
+
+  // عدد الصفقات المتبقية
+  if ((state.tradesLeft ?? 12) <= 0) {
+    console.log(`[${symbol}] ⛔ انتهت الصفقات المتاحة للحساب`);
+    await tg('🚨 <b>تحذير: انتهت الصفقات المتاحة</b>\nالحساب وصل لحد الخسارة الأقصى — لا تفتح صفقات جديدة').catch(() => {});
+    return;
+  }
+
   if (await isNewsTime()) {
     console.log(`[${symbol}] خبر جارٍ — تجاهل`);
     return;
   }
 
   state.signals[symbol] = { key: sigKey, time: now };
+  state.dailyLoss  = (state.dailyLoss  || 0) + RISK_PER_TRADE;
+  state.tradesLeft = (state.tradesLeft ?? 12) - 1;
 
   // ── حساب العقود ──────────────────────────
   const contracts  = calcContracts(symbol, signal.price, signal.sl);
@@ -172,6 +199,11 @@ TP3: <b>${signal.tp3}</b>  ← +$${tp3Dollar}
 📊 RSI: ${signal.rsi}  |  ATR: ${signal.atr}  |  Vol: ${signal.volRatio}x
 
 ${condList}
+
+━━━━━━━━━━━━━━━━━━━━
+📋 <b>حالة الحساب</b>
+صفقات اليوم: خسارة $${state.dailyLoss} / $${DAILY_STOP_LOSS}
+متبقي كلياً: <b>${state.tradesLeft} صفقة</b> قبل الحد الأقصى
 
 ⚠️ <i>القرار النهائي لك — تحقق من الشارت قبل الدخول</i>
 🕐 ${new Date().toLocaleString('ar-DZ')}`
