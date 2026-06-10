@@ -125,6 +125,33 @@ function nearLevel(price, level, atrVal) {
   return Math.abs(price - level) < atrVal * 0.5;
 }
 
+// ══ 1M Entry Confirmation ═════════════════════
+// تأكيد الدخول على الدقيقة: شمعة رفض + اتجاه متوافق
+export function confirm1m(bars1m, direction) {
+  if (!bars1m || bars1m.length < 5) return { confirmed: true, reason: 'no 1m data' };
+  const n    = bars1m.length;
+  const last = bars1m[n - 1];
+  const prev = bars1m[n - 2];
+  const body = Math.abs(last.close - last.open);
+  const range = last.high - last.low || 1;
+
+  if (direction === 'LONG') {
+    // شمعة صاعدة + جسم > 40% من النطاق + إغلاق فوق المنتصف
+    const bullCandle = last.close > last.open;
+    const strongBody = body / range > 0.4;
+    const aboveMid   = last.close > (last.high + last.low) / 2;
+    const confirmed  = bullCandle && strongBody && aboveMid;
+    return { confirmed, reason: confirmed ? '1M شمعة صاعدة قوية' : '1M لا تأكيد صاعد بعد' };
+  } else {
+    // شمعة هابطة + جسم > 40% + إغلاق تحت المنتصف
+    const bearCandle = last.close < last.open;
+    const strongBody = body / range > 0.4;
+    const belowMid   = last.close < (last.high + last.low) / 2;
+    const confirmed  = bearCandle && strongBody && belowMid;
+    return { confirmed, reason: confirmed ? '1M شمعة هابطة قوية' : '1M لا تأكيد هابط بعد' };
+  }
+}
+
 // ══ Main Analysis ════════════════════════════
 export function analyze(bars5m, bars1h) {
   if (bars5m.length < 50 || bars1h.length < 200) {

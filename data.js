@@ -45,6 +45,14 @@ async function fetchYahoo(symbol, interval, range) {
 }
 
 /**
+ * جلب 1m bars لآخر يومين (للدخول الدقيق)
+ */
+export async function get1mBars(symbol = 'MNQ') {
+  const ticker = SYMBOLS[symbol] || symbol;
+  return fetchYahoo(ticker, '1m', '2d');
+}
+
+/**
  * جلب 5m bars لآخر 5 أيام
  */
 export async function get5mBars(symbol = 'MNQ') {

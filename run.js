@@ -4,8 +4,8 @@
  * يحسب عدد العقود تلقائياً بناءً على الـ SL
  */
 
-import { get5mBars, get1hBars }                    from './data.js';
-import { analyze }                                  from './smc.js';
+import { get5mBars, get1hBars, get1mBars }          from './data.js';
+import { analyze, confirm1m }                       from './smc.js';
 import { getUpcomingHigh, isNewsTime }              from './calendar.js';
 import { readFileSync, writeFileSync, existsSync }  from 'fs';
 
@@ -111,9 +111,10 @@ const condLabels = {
 };
 
 async function checkSymbol(symbol, state) {
-  const [bars5m, bars1h] = await Promise.all([
+  const [bars5m, bars1h, bars1m] = await Promise.all([
     get5mBars(symbol),
-    get1hBars(symbol)
+    get1hBars(symbol),
+    get1mBars(symbol)
   ]);
 
   const result = analyze(bars5m, bars1h);
@@ -154,6 +155,9 @@ async function checkSymbol(symbol, state) {
     console.log(`[${symbol}] خبر جارٍ — تجاهل`);
     return;
   }
+
+  // تأكيد 1M قبل الإشارة
+  const entry1m = confirm1m(bars1m, signal.type);
 
   state.signals[symbol] = { key: sigKey, time: now };
   state.dailyLoss  = (state.dailyLoss  || 0) + RISK_PER_TRADE;
@@ -201,7 +205,8 @@ TP3: <b>${signal.tp3}</b>  ← +$${tp3Dollar}
 ━━━━━━━━━━━━━━━━━━━━
 
 ⭐ الجودة: <b>${signal.score}/9</b>  ${scoreBar}
-📊 RSI: ${signal.rsi}  |  ATR: ${signal.atr}  |  Vol: ${signal.volRatio}x
+📊 RSI: ${signal.rsi}  |  ATR: ${signal.atr}
+🕯 1M: ${entry1m.confirmed ? '✅' : '⚠️'} ${entry1m.reason}
 
 ${condList}
 
