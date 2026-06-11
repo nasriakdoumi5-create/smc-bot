@@ -1,7 +1,1 @@
-{
-  "env": {
-    "DATABASE_URL": "file:/tmp/store.db",
-    "NEXTAUTH_SECRET": "mysecretstore2024xK9pL3mN7",
-    "NEXTAUTH_URL": "https://ecommerce-store-smoky-ten.vercel.app"
-  }
-}
+{}

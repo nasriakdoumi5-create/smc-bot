@@ -1,8 +1,3 @@
 import { NextResponse } from 'next/server';
-import { db } from '../../../../lib/db';
-
-export async function PATCH(req, { params }) {
-  const { status } = await req.json();
-  const order = await db.order.update({ where: { id: params.id }, data: { status } });
-  return NextResponse.json(order);
-}
+export async function GET() { return NextResponse.json({ error: 'Not found' }, { status: 404 }); }
+export async function PATCH() { return NextResponse.json({ error: 'Not implemented' }, { status: 404 }); }
