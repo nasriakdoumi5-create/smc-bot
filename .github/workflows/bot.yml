@@ -30,9 +30,16 @@ jobs:
 
       - name: Run SMC checks
         env:
-          TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          SYMBOL: MNQ
+          TELEGRAM_TOKEN:       ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID:     ${{ secrets.TELEGRAM_CHAT_ID }}
+          SYMBOL:               MNQ
+          TRADOVATE_USERNAME:   ${{ secrets.TRADOVATE_USERNAME }}
+          TRADOVATE_PASSWORD:   ${{ secrets.TRADOVATE_PASSWORD }}
+          TRADOVATE_DEVICE_ID:  ${{ secrets.TRADOVATE_DEVICE_ID }}
+          TRADOVATE_CID:        ${{ secrets.TRADOVATE_CID }}
+          TRADOVATE_SECRET:     ${{ secrets.TRADOVATE_SECRET }}
+          TRADOVATE_DEMO:       ${{ secrets.TRADOVATE_DEMO }}
+          TRADOVATE_SYMBOL:     NQM6
         run: |
           for i in 1 2 3 4 5; do
             echo "فحص رقم $i من 5"

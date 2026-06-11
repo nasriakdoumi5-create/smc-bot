@@ -96,7 +96,7 @@ function inSession(bar) {
 }
 
 // ══ Main Analysis ════════════════════════════
-export function analyze(bars5m, bars1h) {
+export function analyze(bars5m, bars1h, dom = null) {
   if (bars5m.length < 50 || bars1h.length < 200) {
     return { error: 'not enough data' };
   }
@@ -190,25 +190,31 @@ export function analyze(bars5m, bars1h) {
   }
 
   // ── ⑦ RSI ─────────────────────────────────
-  const rsiOversold   = curRSI < 50;   // تحت المنتصف = ضغط هبوطي
-  const rsiOverbought = curRSI > 50;   // فوق المنتصف = ضغط صاعد
+  const rsiOversold   = curRSI < 50;
+  const rsiOverbought = curRSI > 50;
 
-  // ── Score ─────────────────────────────────
-  const scoreLong  = (htfBull         ? 1 : 0)
-                   + (sessionOk        ? 1 : 0)
-                   + (recentSweepDown  ? 1 : 0)
-                   + (inBullOB         ? 1 : 0)
-                   + (recentBullFVG    ? 1 : 0)
-                   + (fibOTE_bull      ? 1 : 0)
-                   + (rsiOversold      ? 1 : 0);
+  // ── ⑧ Stacked Imbalance (Order Book) ──────
+  const stackedBuyImbalance  = dom?.stackedBuy  ?? false;
+  const stackedSellImbalance = dom?.stackedSell ?? false;
 
-  const scoreShort = (htfBear          ? 1 : 0)
-                   + (sessionOk         ? 1 : 0)
-                   + (recentSweepUp     ? 1 : 0)
-                   + (inBearOB          ? 1 : 0)
-                   + (recentBearFVG     ? 1 : 0)
-                   + (fibOTE_bear       ? 1 : 0)
-                   + (rsiOverbought     ? 1 : 0);
+  // ── Score (8 شروط) ───────────────────────
+  const scoreLong  = (htfBull               ? 1 : 0)
+                   + (sessionOk              ? 1 : 0)
+                   + (recentSweepDown        ? 1 : 0)
+                   + (inBullOB               ? 1 : 0)
+                   + (recentBullFVG          ? 1 : 0)
+                   + (fibOTE_bull            ? 1 : 0)
+                   + (rsiOversold            ? 1 : 0)
+                   + (stackedBuyImbalance    ? 1 : 0);
+
+  const scoreShort = (htfBear               ? 1 : 0)
+                   + (sessionOk              ? 1 : 0)
+                   + (recentSweepUp          ? 1 : 0)
+                   + (inBearOB               ? 1 : 0)
+                   + (recentBearFVG          ? 1 : 0)
+                   + (fibOTE_bear            ? 1 : 0)
+                   + (rsiOverbought          ? 1 : 0)
+                   + (stackedSellImbalance   ? 1 : 0);
 
   // ── SL / TP ───────────────────────────────
   const price = last.close;
@@ -227,7 +233,7 @@ export function analyze(bars5m, bars1h) {
       rr:     '2:1',
       atr:    +curATR.toFixed(2),
       rsi:    +curRSI.toFixed(1),
-      conditions: { htfBull, sessionOk, recentSweepDown, inBullOB, recentBullFVG, fibOTE_bull, rsiOversold }
+      conditions: { htfBull, sessionOk, recentSweepDown, inBullOB, recentBullFVG, fibOTE_bull, rsiOversold, stackedBuyImbalance }
     };
   } else if (scoreShort >= 4 && scoreShort > scoreLong) {
     const sl  = bearOB_top ? bearOB_top + curATR : price + curATR * 2;
@@ -242,7 +248,7 @@ export function analyze(bars5m, bars1h) {
       rr:     '2:1',
       atr:    +curATR.toFixed(2),
       rsi:    +curRSI.toFixed(1),
-      conditions: { htfBear, sessionOk, recentSweepUp, inBearOB, recentBearFVG, fibOTE_bear, rsiOverbought }
+      conditions: { htfBear, sessionOk, recentSweepUp, inBearOB, recentBearFVG, fibOTE_bear, rsiOverbought, stackedSellImbalance }
     };
   }
 
