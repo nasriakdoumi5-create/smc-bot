@@ -1,124 +1,113 @@
 import Link from 'next/link';
-import Image from 'next/image';
-import { db } from '../lib/db';
-import ProductCard from '../components/ProductCard';
+import { getFeaturedProducts } from '@/data/products';
+import ProductCard from '@/components/ProductCard';
+import NewsletterSection from '@/components/NewsletterSection';
 
-const CATEGORIES = [
-  {slug:'electronics',name:'إلكترونيات',icon:'💻',color:'bg-blue-50 text-blue-600'},
-  {slug:'clothing',name:'ملابس',icon:'👕',color:'bg-pink-50 text-pink-600'},
-  {slug:'home',name:'المنزل',icon:'🏠',color:'bg-amber-50 text-amber-600'},
-  {slug:'sports',name:'رياضة',icon:'⚽',color:'bg-green-50 text-green-600'},
-  {slug:'books',name:'كتب',icon:'📚',color:'bg-purple-50 text-purple-600'},
-];
+export const metadata = {
+  title: 'PawCase — Custom Pet Phone Cases for Dog & Cat Lovers',
+  description: 'Premium phone cases with adorable dog and cat designs. Custom pet photo cases. Ships from EU in 3-5 days.',
+};
 
-export default async function HomePage() {
-  const featuredProducts = await db.product.findMany({
-    where: { featured: true },
-    include: {
-      category: true,
-      reviews: { select: { rating: true } },
-      _count: { select: { reviews: true } },
-    },
-    take: 8,
-  });
-
-  const products = featuredProducts.map(p => ({
-    ...p,
-    images: JSON.parse(p.images),
-    avgRating: p.reviews.length ? (p.reviews.reduce((s, r) => s + r.rating, 0) / p.reviews.length).toFixed(1) : 0,
-    reviewCount: p._count.reviews,
-  }));
-
+export default function HomePage() {
+  const featured = getFeaturedProducts().slice(0, 4);
   return (
-    <div>
-      {/* Hero Banner */}
-      <section className="bg-gradient-to-l from-slate-800 to-slate-900 text-white py-16 px-4">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-8">
-          <div className="flex-1 text-center md:text-right">
-            <span className="badge bg-primary-600 text-white mb-4 text-sm px-3 py-1">🎉 عروض حصرية</span>
-            <h1 className="text-4xl md:text-5xl font-extrabold mb-4 leading-tight">
-              تسوق بذكاء<br />
-              <span className="text-primary-400">وفّر أكثر</span>
-            </h1>
-            <p className="text-gray-300 text-lg mb-8">آلاف المنتجات بأفضل الأسعار مع توصيل سريع لباب منزلك</p>
-            <div className="flex gap-3 justify-center md:justify-start flex-wrap">
-              <Link href="/products" className="btn-primary text-base px-8 py-3">تسوق الآن</Link>
-              <Link href="/products?featured=true" className="btn-outline border-white text-white hover:bg-white/10 text-base px-8 py-3">العروض المميزة</Link>
-            </div>
-          </div>
-          <div className="flex-1 flex justify-center">
-            <div className="relative w-72 h-72 md:w-96 md:h-96">
-              <div className="absolute inset-0 bg-primary-600/20 rounded-full blur-3xl" />
-              <div className="relative grid grid-cols-2 gap-4 p-4">
-                {products.slice(0,4).map((p, i) => (
-                  <div key={p.id} className={`relative rounded-2xl overflow-hidden bg-white/10 backdrop-blur aspect-square ${i === 0 ? 'col-span-2 row-span-1' : ''}`}>
-                    <Image src={p.images[0]} alt={p.name} fill className="object-cover opacity-80" sizes="200px" />
-                  </div>
-                ))}
-              </div>
-            </div>
+    <>
+      {/* Hero */}
+      <section className="bg-primary text-white py-20 px-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="text-6xl mb-6">🐾</div>
+          <h1 className="text-4xl md:text-6xl font-extrabold mb-6 leading-tight">
+            Cases That Show Your<br />
+            <span className="text-accent">Love for Your Pet</span>
+          </h1>
+          <p className="text-xl text-green-100 mb-10 max-w-2xl mx-auto">
+            Premium custom phone cases for dog and cat lovers. Made with love, shipped from Europe in 3–5 days.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/products" className="bg-accent text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-orange-600 transition-colors shadow-lg">
+              Shop Now
+            </Link>
+            <Link href="/product/custom-pet-phone-case" className="border-2 border-white text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-white hover:text-primary transition-colors">
+              Custom Case →
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* Stats bar */}
-      <section className="bg-primary-600 text-white py-4">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+      {/* Trust badges */}
+      <section className="bg-white py-8 shadow-sm">
+        <div className="max-w-5xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
           {[
-            {icon:'🚚', text:'شحن مجاني فوق 500 ر.س'},
-            {icon:'🔒', text:'دفع آمن 100%'},
-            {icon:'↩️', text:'إرجاع خلال 14 يوم'},
-            {icon:'🎧', text:'دعم 24/7'},
-          ].map(s => (
-            <div key={s.text} className="flex items-center justify-center gap-2 text-sm font-medium">
-              <span className="text-xl">{s.icon}</span>{s.text}
+            { icon: '🚚', title: 'Free Shipping', sub: 'On orders over €40' },
+            { icon: '🔄', title: '30-Day Returns', sub: 'Hassle-free returns' },
+            { icon: '🔒', title: 'Secure Payment', sub: 'SSL encrypted checkout' },
+            { icon: '🇪🇺', title: 'Ships from EU', sub: '3-5 business days' },
+          ].map(b => (
+            <div key={b.title} className="flex flex-col items-center gap-1">
+              <span className="text-2xl">{b.icon}</span>
+              <p className="font-semibold text-dark text-sm">{b.title}</p>
+              <p className="text-xs text-gray-500">{b.sub}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <div className="max-w-7xl mx-auto px-4 py-10">
-        {/* Categories */}
-        <div className="mb-10">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">تسوق حسب الفئة</h2>
-          <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-            {CATEGORIES.map(c => (
-              <Link key={c.slug} href={`/products?category=${c.slug}`}
-                className={`${c.color} rounded-2xl p-4 text-center hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 group`}>
-                <div className="text-3xl mb-2 group-hover:scale-110 transition-transform">{c.icon}</div>
-                <p className="font-semibold text-sm">{c.name}</p>
-              </Link>
-            ))}
-          </div>
+      {/* Browse by category */}
+      <section className="max-w-5xl mx-auto px-4 py-16">
+        <h2 className="text-3xl font-bold text-center mb-2">Shop by Category</h2>
+        <p className="text-center text-gray-500 mb-10">Find the perfect case for your pet lover</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { slug: 'dogs', name: 'Dog Lovers', emoji: '🐕', desc: 'Golden Retrievers, Bulldogs & more', color: 'bg-amber-50 border-amber-200' },
+            { slug: 'cats', name: 'Cat Lovers', emoji: '🐈', desc: 'Black cats, tabby cats & more', color: 'bg-purple-50 border-purple-200' },
+            { slug: 'custom', name: 'Custom Cases', emoji: '✨', desc: 'Upload your own pet photo', color: 'bg-green-50 border-green-200' },
+          ].map(c => (
+            <Link key={c.slug} href={`/products?cat=${c.slug}`} className={`${c.color} border-2 rounded-2xl p-8 text-center hover:shadow-md transition-all hover:-translate-y-1`}>
+              <div className="text-5xl mb-3">{c.emoji}</div>
+              <h3 className="text-xl font-bold mb-1">{c.name}</h3>
+              <p className="text-gray-500 text-sm">{c.desc}</p>
+            </Link>
+          ))}
         </div>
+      </section>
 
-        {/* Featured Products */}
-        <div className="mb-10">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">منتجات مميزة ⭐</h2>
-            <Link href="/products" className="text-primary-600 font-semibold hover:text-primary-700 text-sm">عرض الكل ←</Link>
+      {/* Featured products */}
+      <section className="bg-white py-16">
+        <div className="max-w-6xl mx-auto px-4">
+          <h2 className="text-3xl font-bold text-center mb-2">Best Sellers</h2>
+          <p className="text-center text-gray-500 mb-10">Our most loved designs by pet lovers across Europe</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {featured.map(p => <ProductCard key={p.id} product={p} />)}
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {products.map(p => <ProductCard key={p.id} product={p} />)}
+          <div className="text-center mt-10">
+            <Link href="/products" className="btn-outline">View All Products</Link>
           </div>
         </div>
+      </section>
 
-        {/* Promo Banners */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
-          <Link href="/products?category=electronics" className="bg-gradient-to-l from-blue-600 to-blue-800 rounded-2xl p-8 text-white hover:shadow-xl transition-shadow block">
-            <p className="text-sm font-medium opacity-80 mb-1">تخفيضات الموسم</p>
-            <h3 className="text-2xl font-bold mb-2">إلكترونيات بأسعار لا تُصدق 💻</h3>
-            <p className="text-sm opacity-80">خصم حتى 30% على المنتجات المختارة</p>
-            <div className="mt-4 inline-block bg-white text-blue-700 font-bold text-sm px-4 py-2 rounded-xl">تسوق الآن</div>
-          </Link>
-          <Link href="/products?category=clothing" className="bg-gradient-to-l from-pink-500 to-rose-600 rounded-2xl p-8 text-white hover:shadow-xl transition-shadow block">
-            <p className="text-sm font-medium opacity-80 mb-1">كولكشن جديد</p>
-            <h3 className="text-2xl font-bold mb-2">أحدث صيحات الموضة 👗</h3>
-            <p className="text-sm opacity-80">أناقة لكل المناسبات بأسعار رائعة</p>
-            <div className="mt-4 inline-block bg-white text-pink-600 font-bold text-sm px-4 py-2 rounded-xl">اكتشف الآن</div>
-          </Link>
+      {/* Testimonials */}
+      <section className="max-w-5xl mx-auto px-4 py-16">
+        <h2 className="text-3xl font-bold text-center mb-2">What Pet Lovers Say</h2>
+        <p className="text-center text-gray-500 mb-10">Over 5,000 happy customers across Europe</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { name: 'Sofia M.', location: 'Madrid, Spain', text: 'My golden retriever case gets compliments everywhere I go! The print quality is amazing and it arrived in just 4 days.', stars: 5 },
+            { name: 'Lucas K.', location: 'Berlin, Germany', text: "Ordered a custom case with my cat's photo. The result was incredible — super sharp and detailed. Will order again!", stars: 5 },
+            { name: 'Emma V.', location: 'Amsterdam, Netherlands', text: 'Adorable design, perfect protection. Already ordered a second one as a gift for my sister. She loved it!', stars: 5 },
+          ].map(t => (
+            <div key={t.name} className="card p-6">
+              <div className="flex text-yellow-400 mb-3">{Array(t.stars).fill('⭐').join('')}</div>
+              <p className="text-gray-700 text-sm mb-4 italic">"{t.text}"</p>
+              <div>
+                <p className="font-semibold text-dark text-sm">{t.name}</p>
+                <p className="text-xs text-gray-400">{t.location}</p>
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
-    </div>
+      </section>
+
+      <NewsletterSection />
+    </>
   );
 }
