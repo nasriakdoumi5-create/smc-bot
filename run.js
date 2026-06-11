@@ -2,6 +2,7 @@ import { get5mBars, get1hBars } from './data.js';
 import { analyze } from './smc.js';
 import { getUpcomingHigh, isNewsTime } from './calendar.js';
 import { getDOMSnapshot, domSummaryText } from './tradovate.js';
+import { getOrderFlow, orderFlowText } from './orderflow.js';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 
 const TOKEN   = process.env.TELEGRAM_TOKEN;
@@ -35,7 +36,14 @@ const condLabels = {
   recentBullFVG:'Fair Value Gap صاعد', recentBearFVG:'Fair Value Gap هابط',
   fibOTE_bull:'Fibonacci OTE (61-78%)', fibOTE_bear:'Fibonacci OTE (61-78%)',
   rsiOversold:'RSI تحت 50', rsiOverbought:'RSI فوق 50',
-  stackedBuyImbalance:'Stacked Buy Imbalance ✦', stackedSellImbalance:'Stacked Sell Imbalance ✦',
+  domBuyImbalance:'DOM — Stacked Buy (Order Book)',
+  domSellImbalance:'DOM — Stacked Sell (Order Book)',
+  positiveDelta:'Order Flow — Delta إيجابي ↑',
+  negativeDelta:'Order Flow — Delta سلبي ↓',
+  ofBuyImbalance:'Order Flow — Stacked Buy Imbalance ✦',
+  ofSellImbalance:'Order Flow — Stacked Sell Imbalance ✦',
+  bullDivergence:'Delta Divergence صاعد ⚠️',
+  bearDivergence:'Delta Divergence هابط ⚠️',
 };
 
 async function check() {
@@ -53,13 +61,14 @@ async function check() {
   }
 
   // ── جلب البيانات (Yahoo + Tradovate موازي) ──
-  const [bars5m, bars1h, dom] = await Promise.all([
+  const [bars5m, bars1h, dom, of] = await Promise.all([
     get5mBars(SYMBOL),
     get1hBars(SYMBOL),
     getDOMSnapshot(TV_SYMBOL).catch(() => null),
+    getOrderFlow(TV_SYMBOL).catch(() => null),
   ]);
 
-  const result = analyze(bars5m, bars1h, dom);
+  const result = analyze(bars5m, bars1h, dom, of);
   if (result.error) { console.log('[SMC]', result.error); saveState(state); return; }
 
   const { price, signal, htfTrend, session, scoreLong, scoreShort, rsi } = result;
@@ -68,7 +77,13 @@ async function check() {
     ? `📖 DOM: Bid ${dom.totalBid} / Ask ${dom.totalAsk} (${dom.depthRatio}x)${dom.stackedSell ? ' 🔴 Stacked SELL' : ''}${dom.stackedBuy ? ' 🟢 Stacked BUY' : ''}`
     : '📖 DOM: غير متصل';
 
-  console.log(`${SYMBOL} @ ${price} | ${htfTrend} L:${scoreLong}/8 S:${scoreShort}/8 RSI:${rsi} | ${domInfo}`);
+  const ofInfo = of
+    ? `⚡ OF: Delta ${of.lastDelta >= 0 ? '+' : ''}${of.lastDelta} | Cum.Δ ${of.cumDelta >= 0 ? '+' : ''}${of.cumDelta}${of.stackedSell ? ' 🔴 SI' : ''}${of.stackedBuy ? ' 🟢 SI' : ''}${of.bearDivergence ? ' ⚠️DIV' : ''}`
+    : '⚡ OF: غير متصل';
+
+  console.log(`${SYMBOL} @ ${price} | ${htfTrend} L:${scoreLong}/11 S:${scoreShort}/11 RSI:${rsi}`);
+  console.log(domInfo);
+  console.log(ofInfo);
 
   // ── Heartbeat كل ساعة ─────────────────────
   const nowMs = Date.now();
@@ -80,8 +95,8 @@ async function check() {
 📊 ${SYMBOL} @ <b>${price}</b>
 📈 HTF Trend: <b>${htfTrend}</b>
 🕐 الجلسة: ${session ? '🟢 نشطة' : '🔴 مغلقة'}
-⬆️ نقاط LONG:  ${scoreLong}/8
-⬇️ نقاط SHORT: ${scoreShort}/8
+⬆️ نقاط LONG:  ${scoreLong}/11
+⬇️ نقاط SHORT: ${scoreShort}/11
 📉 RSI: ${rsi}
 ${domInfo}
 
@@ -111,6 +126,7 @@ ${signal ? `⚡ <b>إشارة ${signal.type} جاهزة</b>` : '⏳ لا توج�
     .join('\n');
 
   const domBlock = domSummaryText(dom);
+  const ofBlock  = orderFlowText(of);
 
   await tg(
 `${isBull ? '📈' : '📉'} <b>إشارة ${signal.type} — NQ Futures</b>
@@ -125,6 +141,7 @@ ${signal ? `⚡ <b>إشارة ${signal.type} جاهزة</b>` : '⏳ لا توج�
 📊 RSI: ${signal.rsi}  |  ATR: ${signal.atr}
 
 ${condList}
+${ofBlock  ? '\n' + ofBlock  : ''}
 ${domBlock ? '\n' + domBlock : ''}
 
 <i>⚠️ القرار النهائي لك</i>
