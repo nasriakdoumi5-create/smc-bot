@@ -52,6 +52,26 @@ async function check() {
   const { price, signal, htfTrend, session, scoreLong, scoreShort, rsi } = result;
   console.log(`${SYMBOL} @ ${price} | ${htfTrend} L:${scoreLong}/7 S:${scoreShort}/7 RSI:${rsi}`);
 
+  // إرسال حالة كل ساعة حتى يعرف المستخدم البوت شغال
+  const nowH = Date.now();
+  const lastHeartbeat = state.lastHeartbeat || 0;
+  if (nowH - lastHeartbeat > 60 * 60 * 1000) {
+    state.lastHeartbeat = nowH;
+    const sessionIcon = session ? '🟢 نشطة' : '🔴 مغلقة';
+    await tg(
+`🤖 <b>SMC Bot — تقرير الساعة</b>
+
+📊 ${SYMBOL} @ <b>${price}</b>
+📈 HTF Trend: <b>${htfTrend}</b>
+🕐 الجلسة: ${sessionIcon}
+⬆️ نقاط LONG:  ${scoreLong}/7
+⬇️ نقاط SHORT: ${scoreShort}/7
+📉 RSI: ${rsi}
+
+${signal ? `⚡ <b>إشارة ${signal.type} جاهزة — تحقق من الرسالة التالية</b>` : '⏳ لا توجد إشارة بعد — البوت يراقب...'}`
+    ).catch(() => {});
+  }
+
   if (!signal) { saveState(state); return; }
 
   const sigKey = `${signal.type}_${Math.round(signal.price / 10)}`;

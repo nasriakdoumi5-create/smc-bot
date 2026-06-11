@@ -90,8 +90,8 @@ function inSession(bar) {
   const h = d.getUTCHours();
   const m = d.getUTCMinutes();
   const mins = h * 60 + m;
-  const london = mins >= 8 * 60  && mins < 12 * 60;           // 08:00–12:00 GMT
-  const ny     = mins >= 13 * 60 + 30 && mins < 16 * 60;      // 13:30–16:00 GMT
+  const london = mins >= 8 * 60  && mins < 13 * 60;            // 08:00–13:00 GMT
+  const ny     = mins >= 13 * 60 && mins < 17 * 60;            // 13:00–17:00 GMT
   return london || ny;
 }
 
@@ -190,8 +190,8 @@ export function analyze(bars5m, bars1h) {
   }
 
   // ── ⑦ RSI ─────────────────────────────────
-  const rsiOversold   = curRSI < 40;
-  const rsiOverbought = curRSI > 60;
+  const rsiOversold   = curRSI < 50;   // تحت المنتصف = ضغط هبوطي
+  const rsiOverbought = curRSI > 50;   // فوق المنتصف = ضغط صاعد
 
   // ── Score ─────────────────────────────────
   const scoreLong  = (htfBull         ? 1 : 0)
@@ -214,7 +214,7 @@ export function analyze(bars5m, bars1h) {
   const price = last.close;
   let signal = null;
 
-  if (scoreLong >= 5 && scoreLong > scoreShort) {
+  if (scoreLong >= 4 && scoreLong > scoreShort) {
     const sl  = bullOB_bot ? bullOB_bot - curATR : price - curATR * 2;
     const risk = Math.abs(price - sl);
     signal = {
@@ -229,7 +229,7 @@ export function analyze(bars5m, bars1h) {
       rsi:    +curRSI.toFixed(1),
       conditions: { htfBull, sessionOk, recentSweepDown, inBullOB, recentBullFVG, fibOTE_bull, rsiOversold }
     };
-  } else if (scoreShort >= 5 && scoreShort > scoreLong) {
+  } else if (scoreShort >= 4 && scoreShort > scoreLong) {
     const sl  = bearOB_top ? bearOB_top + curATR : price + curATR * 2;
     const risk = Math.abs(sl - price);
     signal = {
