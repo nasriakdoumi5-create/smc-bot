@@ -193,11 +193,7 @@ export function analyze(bars5m, bars1h, dom = null, of = null) {
   const rsiOversold   = curRSI < 50;
   const rsiOverbought = curRSI > 50;
 
-  // ── ⑧ Order Book DOM Imbalance ────────────
-  const domBuyImbalance  = dom?.stackedBuy  ?? false;
-  const domSellImbalance = dom?.stackedSell ?? false;
-
-  // ── ⑨ Order Flow — Delta ──────────────────
+  // ── ⑧ Order Flow — Delta ──────────────────
   const positiveDelta = of?.positiveDelta ?? false;
   const negativeDelta = of?.negativeDelta ?? false;
 
@@ -209,30 +205,28 @@ export function analyze(bars5m, bars1h, dom = null, of = null) {
   const bullDivergence = of?.bullDivergence ?? false;
   const bearDivergence = of?.bearDivergence ?? false;
 
-  // ── Score (11 شروط) ──────────────────────
-  const scoreLong  = (htfBull            ? 1 : 0)
-                   + (sessionOk           ? 1 : 0)
-                   + (recentSweepDown     ? 1 : 0)
-                   + (inBullOB            ? 1 : 0)
-                   + (recentBullFVG       ? 1 : 0)
-                   + (fibOTE_bull         ? 1 : 0)
-                   + (rsiOversold         ? 1 : 0)
-                   + (domBuyImbalance     ? 1 : 0)
-                   + (positiveDelta       ? 1 : 0)
-                   + (ofBuyImbalance      ? 1 : 0)
-                   + (bullDivergence      ? 1 : 0);
+  // ── Score (10 شروط) ──────────────────────
+  const scoreLong  = (htfBull        ? 1 : 0)
+                   + (sessionOk       ? 1 : 0)
+                   + (recentSweepDown ? 1 : 0)
+                   + (inBullOB        ? 1 : 0)
+                   + (recentBullFVG   ? 1 : 0)
+                   + (fibOTE_bull     ? 1 : 0)
+                   + (rsiOversold     ? 1 : 0)
+                   + (positiveDelta   ? 1 : 0)
+                   + (ofBuyImbalance  ? 1 : 0)
+                   + (bullDivergence  ? 1 : 0);
 
-  const scoreShort = (htfBear            ? 1 : 0)
-                   + (sessionOk           ? 1 : 0)
-                   + (recentSweepUp       ? 1 : 0)
-                   + (inBearOB            ? 1 : 0)
-                   + (recentBearFVG       ? 1 : 0)
-                   + (fibOTE_bear         ? 1 : 0)
-                   + (rsiOverbought       ? 1 : 0)
-                   + (domSellImbalance    ? 1 : 0)
-                   + (negativeDelta       ? 1 : 0)
-                   + (ofSellImbalance     ? 1 : 0)
-                   + (bearDivergence      ? 1 : 0);
+  const scoreShort = (htfBear        ? 1 : 0)
+                   + (sessionOk       ? 1 : 0)
+                   + (recentSweepUp   ? 1 : 0)
+                   + (inBearOB        ? 1 : 0)
+                   + (recentBearFVG   ? 1 : 0)
+                   + (fibOTE_bear     ? 1 : 0)
+                   + (rsiOverbought   ? 1 : 0)
+                   + (negativeDelta   ? 1 : 0)
+                   + (ofSellImbalance ? 1 : 0)
+                   + (bearDivergence  ? 1 : 0);
 
   // ── SL / TP ───────────────────────────────
   const price = last.close;
@@ -251,7 +245,7 @@ export function analyze(bars5m, bars1h, dom = null, of = null) {
       rr:     '2:1',
       atr:    +curATR.toFixed(2),
       rsi:    +curRSI.toFixed(1),
-      conditions: { htfBull, sessionOk, recentSweepDown, inBullOB, recentBullFVG, fibOTE_bull, rsiOversold, domBuyImbalance, positiveDelta, ofBuyImbalance, bullDivergence }
+      conditions: { htfBull, sessionOk, recentSweepDown, inBullOB, recentBullFVG, fibOTE_bull, rsiOversold, positiveDelta, ofBuyImbalance, bullDivergence }
     };
   } else if (scoreShort >= 5 && scoreShort > scoreLong) {
     const sl  = bearOB_top ? bearOB_top + curATR : price + curATR * 2;
@@ -266,7 +260,7 @@ export function analyze(bars5m, bars1h, dom = null, of = null) {
       rr:     '2:1',
       atr:    +curATR.toFixed(2),
       rsi:    +curRSI.toFixed(1),
-      conditions: { htfBear, sessionOk, recentSweepUp, inBearOB, recentBearFVG, fibOTE_bear, rsiOverbought, domSellImbalance, negativeDelta, ofSellImbalance, bearDivergence }
+      conditions: { htfBear, sessionOk, recentSweepUp, inBearOB, recentBearFVG, fibOTE_bear, rsiOverbought, negativeDelta, ofSellImbalance, bearDivergence }
     };
   }
 
