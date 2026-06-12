@@ -75,7 +75,7 @@ export async function POST(req) {
     const { Resend } = await import('resend');
     const resend = new Resend(resendKey);
     await resend.emails.send({
-      from: 'PawCase <orders@pawcase.eu>',
+      from: 'PawCase <onboarding@resend.dev>',
       to: email,
       subject: `${firstName}, your cart is saved — 10% off inside 🐾`,
       html,
