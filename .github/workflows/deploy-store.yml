@@ -18,8 +18,41 @@ jobs:
 
       - run: npm install
 
-      - name: Deploy to Vercel
+      - name: Get Team ID and Deploy
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          npx vercel@27 --prod --token="$VERCEL_TOKEN" --yes 2>&1
+          PROJECT_ID="prj_5EI3wO1O7pEskH3qnYRSrKLNJVBB"
+
+          # Try to get team ID by slug
+          echo "=== Fetching team info ==="
+          TEAM=$(curl -s "https://api.vercel.com/v2/teams/nasriakdoumi5-creates-projects" \
+            -H "Authorization: Bearer $VERCEL_TOKEN")
+          echo "$TEAM" | head -c 300
+          TEAM_ID=$(echo "$TEAM" | jq -r '.id // empty')
+          echo "Team ID: $TEAM_ID"
+
+          # Also try project endpoint with teamId slug
+          echo "=== Project via team slug ==="
+          PROJ=$(curl -s "https://api.vercel.com/v9/projects/$PROJECT_ID?teamId=nasriakdoumi5-creates-projects" \
+            -H "Authorization: Bearer $VERCEL_TOKEN")
+          echo "$PROJ" | head -c 200
+
+          # Write .vercel/project.json so CLI skips scope discovery
+          mkdir -p .vercel
+          if [ -n "$TEAM_ID" ]; then
+            echo "{\"orgId\":\"$TEAM_ID\",\"projectId\":\"$PROJECT_ID\"}" > .vercel/project.json
+          else
+            echo "{\"orgId\":\"nasriakdoumi5-creates-projects\",\"projectId\":\"$PROJECT_ID\"}" > .vercel/project.json
+          fi
+          echo "project.json: $(cat .vercel/project.json)"
+
+          # Deploy — with project.json present, CLI should skip scope loading
+          if [ -n "$TEAM_ID" ]; then
+            VERCEL_ORG_ID="$TEAM_ID" VERCEL_PROJECT_ID="$PROJECT_ID" \
+              npx vercel@27 --prod --token="$VERCEL_TOKEN" --yes 2>&1
+          else
+            VERCEL_PROJECT_ID="$PROJECT_ID" \
+              npx vercel@27 --prod --token="$VERCEL_TOKEN" \
+              --scope=nasriakdoumi5-creates-projects --yes 2>&1
+          fi
