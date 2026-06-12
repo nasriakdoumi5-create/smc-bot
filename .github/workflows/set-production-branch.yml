@@ -1,0 +1,25 @@
+name: Set Production Branch
+
+on:
+  workflow_dispatch:
+
+jobs:
+  set-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set ecommerce-store as production branch
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          RESPONSE=$(curl -s -X PATCH \
+            "https://api.vercel.com/v9/projects/prj_5EI3wO1O7pEskH3qnYRSrKLNJVBB?teamId=nasriakdoumi5-creates-projects" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"productionBranch": "ecommerce-store"}')
+          echo "$RESPONSE"
+
+          # Also try to promote latest deployment
+          DEPLOY=$(curl -s \
+            "https://api.vercel.com/v6/deployments?projectId=prj_5EI3wO1O7pEskH3qnYRSrKLNJVBB&teamId=nasriakdoumi5-creates-projects&limit=1" \
+            -H "Authorization: Bearer $VERCEL_TOKEN")
+          echo "Latest deploy: $DEPLOY"
