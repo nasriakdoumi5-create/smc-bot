@@ -28,6 +28,6 @@ jobs:
           npx vercel@32 --prod \
             --token=${{ secrets.VERCEL_TOKEN }} \
             --yes \
-            --name=ecommerce-store
+            --scope=nasriakdoumi5-create
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
