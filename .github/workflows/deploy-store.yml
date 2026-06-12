@@ -23,6 +23,22 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Link Vercel project
+        run: |
+          ORG_ID=$(curl -s https://api.vercel.com/v2/user \
+            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['user']['id'])")
+
+          PROJECT_ID=$(curl -s "https://api.vercel.com/v9/projects/ecommerce-store" \
+            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))")
+
+          mkdir -p .vercel
+          echo "{\"orgId\":\"$ORG_ID\",\"projectId\":\"$PROJECT_ID\"}" > .vercel/project.json
+          cat .vercel/project.json
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
       - name: Deploy to Vercel
         run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
         env:
