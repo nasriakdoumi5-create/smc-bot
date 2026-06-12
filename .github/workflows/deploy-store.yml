@@ -25,22 +25,22 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          ORG_ID=$(curl -sf https://api.vercel.com/v2/user \
+          ORG_ID=$(curl -s https://api.vercel.com/v2/user \
             -H "Authorization: Bearer $VERCEL_TOKEN" | jq -r '.user.id')
-
           echo "Org ID: $ORG_ID"
 
-          PROJECTS=$(curl -sf https://api.vercel.com/v9/projects \
-            -H "Authorization: Bearer $VERCEL_TOKEN")
+          # Try to get project ID from recent deployments
+          PROJECT_ID=$(curl -s "https://api.vercel.com/v6/deployments?limit=20" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            | jq -r '.deployments[] | select(.name=="ecommerce-store") | .projectId' \
+            | head -1)
 
-          echo "All projects:"
-          echo "$PROJECTS" | jq -r '.projects[].name'
-
-          PROJECT_ID=$(echo "$PROJECTS" | jq -r '.projects[] | select(.name | ascii_downcase | test("ecommerce|pawcase")) | .id' | head -1)
-
-          if [ -z "$PROJECT_ID" ]; then
-            PROJECT_ID=$(echo "$PROJECTS" | jq -r '.projects[0].id')
-            echo "Fallback to first project: $PROJECT_ID"
+          # Fallback: try by URL pattern
+          if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "null" ]; then
+            PROJECT_ID=$(curl -s "https://api.vercel.com/v6/deployments?limit=20" \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              | jq -r '.deployments[] | select(.url | test("ecommerce")) | .projectId' \
+              | head -1)
           fi
 
           echo "Project ID: $PROJECT_ID"
