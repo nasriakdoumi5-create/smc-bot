@@ -12,47 +12,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - run: npm install
-
-      - name: Get Team ID and Deploy
+      - name: Deploy via Vercel REST API
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          PROJECT_ID="prj_5EI3wO1O7pEskH3qnYRSrKLNJVBB"
+          SHA=$(git rev-parse HEAD)
+          echo "Deploying commit: $SHA"
 
-          # Try to get team ID by slug
-          echo "=== Fetching team info ==="
-          TEAM=$(curl -s "https://api.vercel.com/v2/teams/nasriakdoumi5-creates-projects" \
-            -H "Authorization: Bearer $VERCEL_TOKEN")
-          echo "$TEAM" | head -c 300
-          TEAM_ID=$(echo "$TEAM" | jq -r '.id // empty')
-          echo "Team ID: $TEAM_ID"
+          RESPONSE=$(curl -s -X POST "https://api.vercel.com/v13/deployments" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"name\": \"ecommerce-store\",
+              \"project\": \"prj_5EI3wO1O7pEskH3qnYRSrKLNJVBB\",
+              \"target\": \"production\",
+              \"gitSource\": {
+                \"type\": \"github\",
+                \"repoId\": \"1264489348\",
+                \"ref\": \"ecommerce-store\",
+                \"sha\": \"$SHA\"
+              }
+            }")
 
-          # Also try project endpoint with teamId slug
-          echo "=== Project via team slug ==="
-          PROJ=$(curl -s "https://api.vercel.com/v9/projects/$PROJECT_ID?teamId=nasriakdoumi5-creates-projects" \
-            -H "Authorization: Bearer $VERCEL_TOKEN")
-          echo "$PROJ" | head -c 200
+          echo "Response:"
+          echo "$RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps(d, indent=2))" 2>/dev/null || echo "$RESPONSE"
 
-          # Write .vercel/project.json so CLI skips scope discovery
-          mkdir -p .vercel
-          if [ -n "$TEAM_ID" ]; then
-            echo "{\"orgId\":\"$TEAM_ID\",\"projectId\":\"$PROJECT_ID\"}" > .vercel/project.json
+          # Check for error
+          ERROR=$(echo "$RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('error',{}).get('message',''))" 2>/dev/null)
+          URL=$(echo "$RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('url',''))" 2>/dev/null)
+
+          if [ -n "$URL" ]; then
+            echo "SUCCESS! Deployment URL: https://$URL"
+          elif [ -n "$ERROR" ]; then
+            echo "API Error: $ERROR"
+            exit 1
           else
-            echo "{\"orgId\":\"nasriakdoumi5-creates-projects\",\"projectId\":\"$PROJECT_ID\"}" > .vercel/project.json
-          fi
-          echo "project.json: $(cat .vercel/project.json)"
-
-          # Deploy — with project.json present, CLI should skip scope loading
-          if [ -n "$TEAM_ID" ]; then
-            VERCEL_ORG_ID="$TEAM_ID" VERCEL_PROJECT_ID="$PROJECT_ID" \
-              npx vercel@27 --prod --token="$VERCEL_TOKEN" --yes 2>&1
-          else
-            VERCEL_PROJECT_ID="$PROJECT_ID" \
-              npx vercel@27 --prod --token="$VERCEL_TOKEN" \
-              --scope=nasriakdoumi5-creates-projects --yes 2>&1
+            echo "Unknown response"
+            exit 1
           fi
