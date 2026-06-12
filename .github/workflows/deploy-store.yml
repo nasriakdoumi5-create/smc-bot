@@ -7,46 +7,8 @@ on:
       - ecommerce-store
 
 jobs:
-  deploy:
+  notify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy via Vercel REST API
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          SHA=$(git rev-parse HEAD)
-          echo "Deploying commit: $SHA"
-
-          RESPONSE=$(curl -s -X POST "https://api.vercel.com/v13/deployments" \
-            -H "Authorization: Bearer $VERCEL_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"name\": \"ecommerce-store\",
-              \"project\": \"prj_5EI3wO1O7pEskH3qnYRSrKLNJVBB\",
-              \"target\": \"production\",
-              \"gitSource\": {
-                \"type\": \"github\",
-                \"repoId\": \"1264489348\",
-                \"ref\": \"ecommerce-store\",
-                \"sha\": \"$SHA\"
-              }
-            }")
-
-          echo "Response:"
-          echo "$RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps(d, indent=2))" 2>/dev/null || echo "$RESPONSE"
-
-          # Check for error
-          ERROR=$(echo "$RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('error',{}).get('message',''))" 2>/dev/null)
-          URL=$(echo "$RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('url',''))" 2>/dev/null)
-
-          if [ -n "$URL" ]; then
-            echo "SUCCESS! Deployment URL: https://$URL"
-          elif [ -n "$ERROR" ]; then
-            echo "API Error: $ERROR"
-            exit 1
-          else
-            echo "Unknown response"
-            exit 1
-          fi
+      - name: Deployment triggered
+        run: echo "Push to ecommerce-store branch - Vercel GitHub integration handles deployment"
