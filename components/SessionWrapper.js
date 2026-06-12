@@ -1,3 +1,1 @@
-export default function SessionWrapper({ children }) {
-  return children;
-}
+export default function SessionWrapper({ children }) { return children; }
