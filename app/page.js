@@ -1,10 +1,50 @@
 'use client';
 import Link from 'next/link';
-import { getFeaturedProducts } from '@/data/products';
+import { getFeaturedProducts, products } from '@/data/products';
 import ProductCard from '@/components/ProductCard';
 import NewsletterSection from '@/components/NewsletterSection';
+import { useState, useEffect } from 'react';
 
 const featured = getFeaturedProducts().slice(0, 4);
+
+function UrgencyCounter() {
+  const [count, setCount] = useState(47);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCount(c => {
+        const delta = Math.random() > 0.5 ? 1 : -1;
+        return Math.max(30, Math.min(80, c + delta));
+      });
+    }, 8000);
+    return () => clearInterval(interval);
+  }, []);
+  return (
+    <div className="inline-flex items-center gap-2 bg-white/15 rounded-full px-4 py-1.5 text-sm">
+      <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+      <span><strong>{count}</strong> people shopping right now</span>
+    </div>
+  );
+}
+
+function RecentlyViewed() {
+  const [viewed, setViewed] = useState([]);
+  useEffect(() => {
+    try {
+      const ids = JSON.parse(localStorage.getItem('pawcase-recent') || '[]');
+      const viewedProducts = ids.map(id => products.find(p => p.id === id)).filter(Boolean).slice(0, 4);
+      setViewed(viewedProducts);
+    } catch {}
+  }, []);
+  if (viewed.length < 2) return null;
+  return (
+    <section className="max-w-6xl mx-auto px-4 py-12">
+      <h2 className="text-2xl font-bold mb-6">Recently Viewed</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {viewed.map(p => <ProductCard key={p.id} product={p} />)}
+      </div>
+    </section>
+  );
+}
 
 export default function HomePage() {
   return (
@@ -13,9 +53,12 @@ export default function HomePage() {
       <section className="bg-primary text-white py-20 px-4">
         <div className="max-w-4xl mx-auto text-center">
           <div className="text-6xl mb-4">🐾</div>
-          <div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-2 text-sm font-medium mb-6">
-            <span className="text-yellow-300">⭐⭐⭐⭐⭐</span>
-            <span>4.9/5 from 5,000+ happy pet lovers across Europe</span>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6">
+            <div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-2 text-sm font-medium">
+              <span className="text-yellow-300">⭐⭐⭐⭐⭐</span>
+              <span>4.9/5 from 5,000+ pet lovers</span>
+            </div>
+            <UrgencyCounter />
           </div>
           <h1 className="text-4xl md:text-6xl font-extrabold mb-6 leading-tight">
             Carry Your Best Friend<br />
@@ -32,6 +75,7 @@ export default function HomePage() {
               Custom Case ✨
             </Link>
           </div>
+          <p className="text-green-200 text-sm mt-5">🚚 Free shipping on orders over €40 · 30-day returns</p>
         </div>
       </section>
 
@@ -58,7 +102,7 @@ export default function HomePage() {
           {[
             { icon: '🚚', title: 'Free Shipping', sub: 'On orders over €40' },
             { icon: '🔄', title: '30-Day Returns', sub: 'Hassle-free returns' },
-            { icon: '🔒', title: 'Secure Payment', sub: 'SSL encrypted checkout' },
+            { icon: '🔒', title: 'Secure Payment', sub: 'Visa, MC, PayPal, Apple Pay' },
             { icon: '🇪🇺', title: 'Ships from EU', sub: '3-5 business days' },
           ].map(b => (
             <div key={b.title} className="flex flex-col items-center gap-1">
@@ -70,20 +114,33 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* As Seen In */}
+      <section className="bg-secondary py-8">
+        <div className="max-w-5xl mx-auto px-4 text-center">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-5">As featured in</p>
+          <div className="flex flex-wrap items-center justify-center gap-8 opacity-60">
+            {['PetWorld Magazine', 'DogLovers EU', 'The Pet Blog', 'CatFancy', 'PetStyle Weekly'].map(m => (
+              <span key={m} className="text-sm font-bold text-gray-500 italic">{m}</span>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Browse by category */}
       <section className="max-w-5xl mx-auto px-4 py-16">
         <h2 className="text-3xl font-bold text-center mb-2">Shop by Category</h2>
         <p className="text-center text-gray-500 mb-10">Find the perfect case for your pet lover</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
-            { slug: 'dogs', name: 'Dog Lovers', emoji: '🐕', desc: 'Golden Retrievers, Bulldogs & more', color: 'bg-amber-50 border-amber-200' },
-            { slug: 'cats', name: 'Cat Lovers', emoji: '🐈', desc: 'Black cats, tabby cats & more', color: 'bg-purple-50 border-purple-200' },
-            { slug: 'custom', name: 'Custom Cases', emoji: '✨', desc: 'Upload your own pet photo', color: 'bg-green-50 border-green-200' },
+            { slug: 'dogs', name: 'Dog Lovers', emoji: '🐕', desc: 'Golden Retrievers, Bulldogs & more', color: 'bg-amber-50 border-amber-200', count: products.filter(p=>p.category==='dogs').length },
+            { slug: 'cats', name: 'Cat Lovers', emoji: '🐈', desc: 'Black cats, tabby cats & more', color: 'bg-purple-50 border-purple-200', count: products.filter(p=>p.category==='cats').length },
+            { slug: 'custom', name: 'Custom Cases', emoji: '✨', desc: 'Upload your own pet photo', color: 'bg-green-50 border-green-200', count: 'Unlimited' },
           ].map(c => (
             <Link key={c.slug} href={`/products?cat=${c.slug}`} className={`${c.color} border-2 rounded-2xl p-8 text-center hover:shadow-md transition-all hover:-translate-y-1`}>
               <div className="text-5xl mb-3">{c.emoji}</div>
               <h3 className="text-xl font-bold mb-1">{c.name}</h3>
-              <p className="text-gray-500 text-sm">{c.desc}</p>
+              <p className="text-gray-500 text-sm mb-2">{c.desc}</p>
+              <span className="text-xs font-semibold text-primary">{c.count} designs →</span>
             </Link>
           ))}
         </div>
@@ -92,8 +149,13 @@ export default function HomePage() {
       {/* Featured products */}
       <section className="bg-white py-16">
         <div className="max-w-6xl mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-2">Best Sellers</h2>
-          <p className="text-center text-gray-500 mb-10">Our most loved designs by pet lovers across Europe</p>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-3xl font-bold">Best Sellers</h2>
+            <div className="hidden sm:flex items-center gap-2 text-sm text-orange-500 font-medium bg-orange-50 px-3 py-1.5 rounded-full">
+              🔥 Selling fast today
+            </div>
+          </div>
+          <p className="text-gray-500 mb-10">Our most loved designs by pet lovers across Europe</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {featured.map(p => <ProductCard key={p.id} product={p} />)}
           </div>
@@ -121,14 +183,9 @@ export default function HomePage() {
             </Link>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            {[
-              'https://picsum.photos/seed/pet1/300/300',
-              'https://picsum.photos/seed/pet2/300/300',
-              'https://picsum.photos/seed/pet3/300/300',
-              'https://picsum.photos/seed/pet4/300/300',
-            ].map((src, i) => (
+            {['pet1','pet2','pet3','pet4'].map((seed, i) => (
               <div key={i} className="rounded-2xl overflow-hidden aspect-square">
-                <img src={src} alt={`Custom pet case example ${i + 1}`} className="w-full h-full object-cover" />
+                <img src={`https://picsum.photos/seed/${seed}/300/300`} alt={`Custom pet case example ${i + 1}`} className="w-full h-full object-cover" />
               </div>
             ))}
           </div>
@@ -191,6 +248,9 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* Recently Viewed */}
+      <RecentlyViewed />
 
       <NewsletterSection />
     </>
