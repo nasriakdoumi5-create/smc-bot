@@ -18,50 +18,13 @@ jobs:
 
       - run: npm install
 
-      - name: Resolve Vercel Team and Project IDs
-        id: ids
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          # Step 1: get the team ID for nasriakdoumi5-creates-projects
-          TEAMS=$(curl -sf "https://api.vercel.com/v2/teams" \
-            -H "Authorization: Bearer $VERCEL_TOKEN") || TEAMS='{}'
-          echo "Raw teams response:"
-          echo "$TEAMS" | head -c 500
-
-          TEAM_ID=$(echo "$TEAMS" | jq -r '.teams[]? | select(.slug == "nasriakdoumi5-creates-projects") | .id // empty')
-          echo "Team ID from list: $TEAM_ID"
-
-          # Fallback: try fetching team directly by slug
-          if [ -z "$TEAM_ID" ]; then
-            TEAM_RESP=$(curl -sf "https://api.vercel.com/v2/teams?slug=nasriakdoumi5-creates-projects" \
-              -H "Authorization: Bearer $VERCEL_TOKEN") || TEAM_RESP='{}'
-            TEAM_ID=$(echo "$TEAM_RESP" | jq -r '.id // .teams[0]?.id // empty')
-            echo "Team ID from slug lookup: $TEAM_ID"
-          fi
-
-          # Step 2: get the project ID using the team ID
-          if [ -n "$TEAM_ID" ]; then
-            PROJ=$(curl -sf "https://api.vercel.com/v9/projects/ecommerce-store?teamId=$TEAM_ID" \
-              -H "Authorization: Bearer $VERCEL_TOKEN") || PROJ='{}'
-          else
-            PROJ=$(curl -sf "https://api.vercel.com/v9/projects/ecommerce-store" \
-              -H "Authorization: Bearer $VERCEL_TOKEN") || PROJ='{}'
-          fi
-
-          PROJECT_ID=$(echo "$PROJ" | jq -r '.id // empty')
-          echo "Project ID: $PROJECT_ID"
-          echo "Project name: $(echo $PROJ | jq -r '.name // empty')"
-
-          # Export for next step
-          echo "team_id=$TEAM_ID" >> $GITHUB_OUTPUT
-          echo "project_id=$PROJECT_ID" >> $GITHUB_OUTPUT
-
       - name: Deploy to Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ steps.ids.outputs.team_id }}
-          VERCEL_PROJECT_ID: ${{ steps.ids.outputs.project_id }}
+          VERCEL_ORG_ID: "1yKAojrTgNo2ii5DPJoay8E7"
         run: |
-          echo "Deploying with ORG_ID=$VERCEL_ORG_ID PROJECT_ID=$VERCEL_PROJECT_ID"
-          npx vercel@32 --prod --token="$VERCEL_TOKEN" --yes
+          # v27 predates the "Loading scopes" bug; deploy to personal account
+          npx vercel@27 --prod \
+            --token="$VERCEL_TOKEN" \
+            --name=pawcase-store \
+            --yes 2>&1
