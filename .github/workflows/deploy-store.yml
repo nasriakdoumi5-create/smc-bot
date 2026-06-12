@@ -21,41 +21,40 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Get Vercel project IDs
+      - name: Get Vercel IDs and link project
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          ORG_ID=$(curl -s https://api.vercel.com/v2/user \
-            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['user']['id'])")
+          ORG_ID=$(curl -sf https://api.vercel.com/v2/user \
+            -H "Authorization: Bearer $VERCEL_TOKEN" | jq -r '.user.id')
 
-          PROJECT_ID=$(curl -s "https://api.vercel.com/v9/projects" \
-            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
-            | python3 -c "
-import sys,json
-data=json.load(sys.stdin)
-for p in data.get('projects',[]):
-    name=p.get('name','')
-    print('FOUND:',name, p.get('id'), file=sys.stderr)
-    if 'ecommerce' in name.lower() or 'pawcase' in name.lower():
-        print(p['id'])
-        break
-else:
-    projects=data.get('projects',[])
-    if projects:
-        print(projects[0]['id'])
-")
+          echo "Org ID: $ORG_ID"
+
+          PROJECTS=$(curl -sf https://api.vercel.com/v9/projects \
+            -H "Authorization: Bearer $VERCEL_TOKEN")
+
+          echo "All projects:"
+          echo "$PROJECTS" | jq -r '.projects[].name'
+
+          PROJECT_ID=$(echo "$PROJECTS" | jq -r '.projects[] | select(.name | ascii_downcase | test("ecommerce|pawcase")) | .id' | head -1)
+
+          if [ -z "$PROJECT_ID" ]; then
+            PROJECT_ID=$(echo "$PROJECTS" | jq -r '.projects[0].id')
+            echo "Fallback to first project: $PROJECT_ID"
+          fi
+
+          echo "Project ID: $PROJECT_ID"
 
           mkdir -p .vercel
-          echo "{\"orgId\":\"$ORG_ID\",\"projectId\":\"$PROJECT_ID\"}" > .vercel/project.json
+          printf '{"orgId":"%s","projectId":"%s"}' "$ORG_ID" "$PROJECT_ID" > .vercel/project.json
           cat .vercel/project.json
 
           echo "VERCEL_ORG_ID=$ORG_ID" >> $GITHUB_ENV
           echo "VERCEL_PROJECT_ID=$PROJECT_ID" >> $GITHUB_ENV
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy to Vercel
-        run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ env.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID }}
+        run: npx vercel --prod --token=$VERCEL_TOKEN --yes
