@@ -96,6 +96,29 @@ function OrderSuccessContent() {
         <Link href="/" className="btn-outline">Back to Home</Link>
       </div>
 
+      {/* Post-purchase upsell */}
+      <div className="mt-10 pt-8 border-t border-gray-100">
+        <p className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4">Pet owners also bought</p>
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { name: 'Custom Pet Case', price: 35, image: 'https://picsum.photos/seed/custompet1/600/600', slug: 'custom-pet-phone-case', badge: 'Your Photo' },
+            { name: 'French Bulldog Case', price: 24, image: 'https://picsum.photos/seed/frenchbull1/600/600', slug: 'french-bulldog-phone-case', badge: 'Popular' },
+          ].map(p => (
+            <Link key={p.slug} href={`/product/${p.slug}`}
+              className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden text-left">
+              <div className="relative aspect-square overflow-hidden">
+                {p.badge && <span className="absolute top-2 left-2 z-10 bg-accent text-white text-xs font-bold px-2 py-0.5 rounded-full">{p.badge}</span>}
+                <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              </div>
+              <div className="p-3">
+                <p className="font-bold text-dark text-xs mb-1">{p.name}</p>
+                <p className="text-accent font-extrabold text-sm">€{p.price}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
       <p className="text-xs text-gray-400 mt-6">
         Questions? Email us at <a href="mailto:hello@pawcase.eu" className="underline hover:text-primary">hello@pawcase.eu</a>
       </p>

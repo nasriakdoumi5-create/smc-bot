@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { trackViewContent } from '@/components/MetaPixel';
+import { ttqViewContent } from '@/components/TikTokPixel';
 
 const PRODUCTS = [
   {
@@ -77,6 +79,11 @@ function Stars({ count = 5 }) {
 
 export default function GeneralLandingPage() {
   const [shoppers, setShoppers] = useState(41);
+
+  useEffect(() => {
+    trackViewContent({ name: 'Pet Cases Collection', id: 'lp-general', price: 22 });
+    ttqViewContent({ name: 'Pet Cases Collection', id: 'lp-general', price: 22 });
+  }, []);
 
   useEffect(() => {
     const base = Math.floor(Math.random() * 25) + 30;

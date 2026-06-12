@@ -8,6 +8,7 @@ import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import { MetaPixelInit } from '@/components/MetaPixel';
 import { TikTokPixelInit } from '@/components/TikTokPixel';
+import UTMCapture from '@/components/UTMCapture';
 
 export const metadata = {
   title: { default: 'PawCase — Custom Pet Phone Cases', template: '%s | PawCase' },
@@ -35,6 +36,7 @@ export default function RootLayout({ children }) {
       <body>
         <MetaPixelInit />
         <TikTokPixelInit />
+        <UTMCapture />
         <SessionWrapper>
           <CartProvider>
             <Navbar />

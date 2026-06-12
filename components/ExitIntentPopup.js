@@ -39,6 +39,12 @@ export default function ExitIntentPopup() {
   const handleClaim = () => {
     if (!email) return;
     setSubmitted(true);
+    // Save lead and send coupon email
+    fetch('/api/save-lead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }).catch(() => {});
   };
 
   const handleShopNow = () => {

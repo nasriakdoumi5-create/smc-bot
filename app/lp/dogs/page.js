@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { trackViewContent } from '@/components/MetaPixel';
+import { ttqViewContent } from '@/components/TikTokPixel';
 
 const PRODUCTS = [
   {
@@ -61,6 +63,11 @@ function Stars({ count = 5 }) {
 
 export default function DogsLandingPage() {
   const [shoppers, setShoppers] = useState(34);
+
+  useEffect(() => {
+    trackViewContent({ name: 'Dog Cases Collection', id: 'lp-dogs', price: 22 });
+    ttqViewContent({ name: 'Dog Cases Collection', id: 'lp-dogs', price: 22 });
+  }, []);
 
   useEffect(() => {
     const base = Math.floor(Math.random() * 20) + 25;

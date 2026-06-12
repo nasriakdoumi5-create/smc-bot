@@ -87,6 +87,8 @@ function CheckoutContent() {
     if (!validate1()) return;
     // Save cart + email for abandoned cart recovery
     try {
+      let utm = {};
+      try { utm = JSON.parse(localStorage.getItem('pawcase-utm') || '{}'); } catch {}
       fetch('/api/save-cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -95,6 +97,7 @@ function CheckoutContent() {
           name: `${form.firstName} ${form.lastName}`,
           items,
           total: finalTotal,
+          utm,
         }),
       });
     } catch {}
