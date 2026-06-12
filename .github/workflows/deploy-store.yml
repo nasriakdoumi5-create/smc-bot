@@ -21,40 +21,22 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Get Vercel IDs and link project
+      - name: Debug - find project ID
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          ORG_ID=$(curl -s https://api.vercel.com/v2/user \
-            -H "Authorization: Bearer $VERCEL_TOKEN" | jq -r '.user.id')
-          echo "Org ID: $ORG_ID"
+          echo "=== User ==="
+          curl -s https://api.vercel.com/v2/user \
+            -H "Authorization: Bearer $VERCEL_TOKEN" | jq '{id: .user.id, name: .user.name}'
 
-          # Try to get project ID from recent deployments
-          PROJECT_ID=$(curl -s "https://api.vercel.com/v6/deployments?limit=20" \
-            -H "Authorization: Bearer $VERCEL_TOKEN" \
-            | jq -r '.deployments[] | select(.name=="ecommerce-store") | .projectId' \
-            | head -1)
+          echo "=== Project by name ==="
+          curl -s https://api.vercel.com/v9/projects/ecommerce-store \
+            -H "Authorization: Bearer $VERCEL_TOKEN" | jq '{id, name}'
 
-          # Fallback: try by URL pattern
-          if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "null" ]; then
-            PROJECT_ID=$(curl -s "https://api.vercel.com/v6/deployments?limit=20" \
-              -H "Authorization: Bearer $VERCEL_TOKEN" \
-              | jq -r '.deployments[] | select(.url | test("ecommerce")) | .projectId' \
-              | head -1)
-          fi
+          echo "=== Deployments ==="
+          curl -s "https://api.vercel.com/v6/deployments?limit=5" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" | jq '.deployments[]? | {name, projectId, url}'
 
-          echo "Project ID: $PROJECT_ID"
-
-          mkdir -p .vercel
-          printf '{"orgId":"%s","projectId":"%s"}' "$ORG_ID" "$PROJECT_ID" > .vercel/project.json
-          cat .vercel/project.json
-
-          echo "VERCEL_ORG_ID=$ORG_ID" >> $GITHUB_ENV
-          echo "VERCEL_PROJECT_ID=$PROJECT_ID" >> $GITHUB_ENV
-
-      - name: Deploy to Vercel
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ env.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID }}
-        run: npx vercel --prod --token=$VERCEL_TOKEN --yes
+          echo "=== Projects list ==="
+          curl -s "https://api.vercel.com/v9/projects" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" | jq '{error, projects: [.projects[]?.name]}'
