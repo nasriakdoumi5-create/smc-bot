@@ -12,6 +12,8 @@ import RecentPurchaseNotification from '@/components/RecentPurchaseNotification'
 import WishlistButton from '@/components/WishlistButton';
 import { ShoppingCart, Zap, CheckCircle, Upload, Users, Shield, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
+import { trackViewContent } from '@/components/MetaPixel';
+import { ttqViewContent } from '@/components/TikTokPixel';
 
 const faqs = [
   { q: 'How long does delivery take?', a: '3–5 business days EU-wide via Printful. Express options available at checkout.' },
@@ -37,6 +39,8 @@ export default function ProductPage() {
   useEffect(() => {
     if (product) {
       addToRecentlyViewed(product.id);
+      trackViewContent(product);
+      ttqViewContent(product);
     }
   }, [product ? product.id : null]);
 

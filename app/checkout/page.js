@@ -2,9 +2,16 @@
 import { useCart } from '@/context/CartContext';
 import Link from 'next/link';
 import { Shield, Lock, RotateCcw, Truck, CheckCircle, ChevronRight } from 'lucide-react';
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import FreeShippingBar from '@/components/FreeShippingBar';
+import { STRIPE_ENABLED } from '@/lib/stripe';
+import { trackInitiateCheckout } from '@/components/MetaPixel';
+import { ttqInitiateCheckout } from '@/components/TikTokPixel';
+
+const StripePaymentStep = STRIPE_ENABLED
+  ? lazy(() => import('@/components/StripePaymentStep'))
+  : null;
 
 const getDeliveryDate = () => {
   const d = new Date();
@@ -30,6 +37,7 @@ function CheckoutContent() {
       setCouponApplied(true);
     }
   }, [searchParams]);
+
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [payMethod, setPayMethod] = useState('card');
@@ -75,13 +83,34 @@ function CheckoutContent() {
     return Object.keys(e).length === 0;
   };
 
+  const handleContinueToPayment = () => {
+    if (!validate1()) return;
+    // Save cart + email for abandoned cart recovery
+    try {
+      fetch('/api/save-cart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email,
+          name: `${form.firstName} ${form.lastName}`,
+          items,
+          total: finalTotal,
+        }),
+      });
+    } catch {}
+    // Fire checkout pixels
+    trackInitiateCheckout(finalTotal, items.reduce((s, i) => s + i.qty, 0));
+    ttqInitiateCheckout(finalTotal);
+    setStep(2);
+  };
+
   const handlePlaceOrder = () => {
     if (!validate2()) return;
     setLoading(true);
     setTimeout(() => {
       clearCart();
       const orderNum = 'PW' + Date.now().toString().slice(-6);
-      router.push(`/order-success?order=${orderNum}&email=${encodeURIComponent(form.email)}`);
+      router.push(`/order-success?order=${orderNum}&email=${encodeURIComponent(form.email)}&amount=${finalTotal.toFixed(2)}`);
     }, 1800);
   };
 
@@ -121,6 +150,17 @@ function CheckoutContent() {
       </div>
     );
   }
+
+  const orderMeta = {
+    email: form.email,
+    name: `${form.firstName} ${form.lastName}`,
+    firstName: form.firstName,
+    lastName: form.lastName,
+    address: form.address,
+    city: form.city,
+    country: form.country,
+    zip: form.zip,
+  };
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-12">
@@ -177,7 +217,7 @@ function CheckoutContent() {
                 <Truck className="w-4 h-4 flex-shrink-0" />
                 <span>Estimated delivery: <strong>{getDeliveryDate()}</strong></span>
               </div>
-              <button onClick={() => { if (validate1()) setStep(2); }} className="btn-primary w-full mt-4">
+              <button onClick={handleContinueToPayment} className="btn-primary w-full mt-4">
                 Continue to Payment →
               </button>
             </div>
@@ -186,70 +226,84 @@ function CheckoutContent() {
           {/* STEP 2 — Payment */}
           {step === 2 && (
             <div className="card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold text-lg">Payment</h2>
-                <button onClick={() => setStep(1)} className="text-xs text-primary hover:underline">← Edit shipping</button>
-              </div>
-
-              <div className="bg-secondary rounded-xl p-3 text-xs mb-4 text-gray-600">
-                <strong>{form.firstName} {form.lastName}</strong> · {form.address}, {form.city} {form.zip}, {form.country}
-                <span className="block mt-0.5">{form.email}</span>
-              </div>
-
-              {/* Method tabs */}
-              <div className="flex gap-2 mb-5">
-                {[{id:'card',label:'💳 Card'},{id:'paypal',label:'🅿️ PayPal'},{id:'applepay',label:' Apple Pay'}].map(m => (
-                  <button key={m.id} onClick={() => setPayMethod(m.id)}
-                    className={`flex-1 py-2 rounded-xl text-sm font-semibold border-2 transition-all ${payMethod === m.id ? 'border-primary bg-primary/5 text-primary' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-
-              {payMethod === 'card' && (
-                <div className="space-y-3">
-                  <Field label="Name on Card" name="cardName" placeholder="Maria García" />
-                  <Field label="Card Number" name="card" placeholder="4242 4242 4242 4242" />
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Expiry (MM/YY)" name="expiry" placeholder="12/26" />
-                    <Field label="CVV" name="cvv" placeholder="123" />
+              {STRIPE_ENABLED && StripePaymentStep ? (
+                <Suspense fallback={<div className="flex justify-center py-8"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>}>
+                  <StripePaymentStep
+                    totalAmount={total}
+                    orderMeta={orderMeta}
+                    onBack={() => setStep(1)}
+                    discount={discount}
+                    shipping={shipping}
+                    finalTotal={finalTotal}
+                  />
+                </Suspense>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-bold text-lg">Payment</h2>
+                    <button onClick={() => setStep(1)} className="text-xs text-primary hover:underline">← Edit shipping</button>
                   </div>
-                  <div className="flex items-center gap-3 pt-1">
-                    <span className="text-xs text-gray-400">Accepted:</span>
-                    {['VISA','MC','AMEX'].map(c => (
-                      <span key={c} className="text-xs font-bold border border-gray-200 rounded px-2 py-0.5 text-gray-500 bg-gray-50">{c}</span>
+
+                  <div className="bg-secondary rounded-xl p-3 text-xs mb-4 text-gray-600">
+                    <strong>{form.firstName} {form.lastName}</strong> · {form.address}, {form.city} {form.zip}, {form.country}
+                    <span className="block mt-0.5">{form.email}</span>
+                  </div>
+
+                  <div className="flex gap-2 mb-5">
+                    {[{id:'card',label:'💳 Card'},{id:'paypal',label:'🅿️ PayPal'},{id:'applepay',label:' Apple Pay'}].map(m => (
+                      <button key={m.id} onClick={() => setPayMethod(m.id)}
+                        className={`flex-1 py-2 rounded-xl text-sm font-semibold border-2 transition-all ${payMethod === m.id ? 'border-primary bg-primary/5 text-primary' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                        {m.label}
+                      </button>
                     ))}
-                    <span className="ml-auto flex items-center gap-1 text-xs text-green-600"><Lock className="w-3 h-3" />256-bit SSL</span>
                   </div>
-                </div>
-              )}
 
-              {payMethod === 'paypal' && (
-                <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5 text-center">
-                  <div className="text-3xl mb-2">🅿️</div>
-                  <p className="font-semibold text-blue-800 mb-1">Pay with PayPal</p>
-                  <p className="text-sm text-blue-600">You'll be redirected to PayPal to complete your purchase securely.</p>
-                </div>
-              )}
+                  {payMethod === 'card' && (
+                    <div className="space-y-3">
+                      <Field label="Name on Card" name="cardName" placeholder="Maria García" />
+                      <Field label="Card Number" name="card" placeholder="4242 4242 4242 4242" />
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="Expiry (MM/YY)" name="expiry" placeholder="12/26" />
+                        <Field label="CVV" name="cvv" placeholder="123" />
+                      </div>
+                      <div className="flex items-center gap-3 pt-1">
+                        <span className="text-xs text-gray-400">Accepted:</span>
+                        {['VISA','MC','AMEX'].map(c => (
+                          <span key={c} className="text-xs font-bold border border-gray-200 rounded px-2 py-0.5 text-gray-500 bg-gray-50">{c}</span>
+                        ))}
+                        <span className="ml-auto flex items-center gap-1 text-xs text-green-600"><Lock className="w-3 h-3" />256-bit SSL</span>
+                      </div>
+                    </div>
+                  )}
 
-              {payMethod === 'applepay' && (
-                <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-5 text-center">
-                  <p className="font-semibold mb-1">Pay with Apple Pay</p>
-                  <p className="text-sm text-gray-500">Complete your purchase using Face ID or Touch ID.</p>
-                </div>
-              )}
+                  {payMethod === 'paypal' && (
+                    <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5 text-center">
+                      <div className="text-3xl mb-2">🅿️</div>
+                      <p className="font-semibold text-blue-800 mb-1">Pay with PayPal</p>
+                      <p className="text-sm text-blue-600">You'll be redirected to PayPal to complete your purchase securely.</p>
+                    </div>
+                  )}
 
-              <button onClick={handlePlaceOrder} disabled={loading}
-                className="btn-primary w-full mt-5 flex items-center justify-center gap-2 disabled:opacity-70">
-                {loading ? (
-                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Processing…</>
-                ) : (
-                  <><Lock className="w-4 h-4" />Place Order — €{finalTotal.toFixed(2)}</>
-                )}
-              </button>
-              <p className="text-xs text-gray-400 text-center mt-2">
-                By placing your order you agree to our <a href="/faq" className="underline hover:text-primary">Returns Policy</a>
-              </p>
+                  {payMethod === 'applepay' && (
+                    <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-5 text-center">
+                      <p className="font-semibold mb-1">Pay with Apple Pay</p>
+                      <p className="text-sm text-gray-500">Complete your purchase using Face ID or Touch ID.</p>
+                    </div>
+                  )}
+
+                  <button onClick={handlePlaceOrder} disabled={loading}
+                    className="btn-primary w-full mt-5 flex items-center justify-center gap-2 disabled:opacity-70">
+                    {loading ? (
+                      <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Processing…</>
+                    ) : (
+                      <><Lock className="w-4 h-4" />Place Order — €{finalTotal.toFixed(2)}</>
+                    )}
+                  </button>
+                  <p className="text-xs text-gray-400 text-center mt-2">
+                    By placing your order you agree to our <a href="/faq" className="underline hover:text-primary">Returns Policy</a>
+                  </p>
+                </>
+              )}
             </div>
           )}
 

@@ -1,5 +1,7 @@
 'use client';
 import { createContext, useContext, useState, useEffect } from 'react';
+import { trackAddToCart } from '@/components/MetaPixel';
+import { ttqAddToCart } from '@/components/TikTokPixel';
 
 const CartContext = createContext();
 
@@ -37,6 +39,8 @@ export function CartProvider({ children }) {
   }, [recentlyViewed]);
 
   const addToCart = (product, model, qty = 1) => {
+    trackAddToCart(product);
+    ttqAddToCart(product);
     setItems(prev => {
       const key = `${product.id}-${model}`;
       const existing = prev.find(i => `${i.id}-${i.model}` === key);

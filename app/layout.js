@@ -6,6 +6,8 @@ import ExitIntentPopup from '@/components/ExitIntentPopup';
 import SessionWrapper from '@/components/SessionWrapper';
 import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
+import { MetaPixelInit } from '@/components/MetaPixel';
+import { TikTokPixelInit } from '@/components/TikTokPixel';
 
 export const metadata = {
   title: { default: 'PawCase — Custom Pet Phone Cases', template: '%s | PawCase' },
@@ -31,6 +33,8 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
+        <MetaPixelInit />
+        <TikTokPixelInit />
         <SessionWrapper>
           <CartProvider>
             <Navbar />
