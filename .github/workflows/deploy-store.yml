@@ -21,10 +21,5 @@ jobs:
       - name: Deploy to Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: "1yKAojrTgNo2ii5DPJoay8E7"
         run: |
-          # v27 predates the "Loading scopes" bug; deploy to personal account
-          npx vercel@27 --prod \
-            --token="$VERCEL_TOKEN" \
-            --name=pawcase-store \
-            --yes 2>&1
+          npx vercel@27 --prod --token="$VERCEL_TOKEN" --yes 2>&1
