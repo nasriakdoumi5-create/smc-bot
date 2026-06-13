@@ -12,7 +12,7 @@ export async function GET() {
       subject: '✅ PawCase Test Email',
       html: '<h1>✅ يعمل! Check Gmail now</h1>',
     });
-    return NextResponse.json({ status: 'SENT', id: r?.data?.id, error: r?.error });
+    return NextResponse.json({ status: 'SENT', id: r?.data?.id, resendError: r?.error });
   } catch (e) {
     return NextResponse.json({ status: 'ERROR', problem: e.message }, { status: 500 });
   }
