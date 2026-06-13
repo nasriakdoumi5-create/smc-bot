@@ -4,9 +4,13 @@
  */
 
 const SYMBOLS = {
-  MNQ: 'NQ=F',   // Micro Nasdaq → نستخدم NQ=F (نفس الحركة)
-  MGC: 'GC=F',   // Gold Futures
-  MES: 'ES=F',   // S&P 500
+  MNQ: 'NQ=F',   // Micro Nasdaq
+  MGC: 'GC=F',   // Micro Gold
+  MCL: 'CL=F',   // Micro Crude Oil
+  MES: 'ES=F',   // Micro S&P 500
+  CNQ: 'CNQ',    // Canadian Natural Resources
+  CML: 'CML',    // CML
+  CGC: 'CGC',    // Canopy Growth
 };
 
 const INTERVALS = {
