@@ -1,0 +1,354 @@
+//@version=5
+strategy("SMC + AMD ULTRA PRO AUTO TRADING SYSTEM",
+     shorttitle        = "SMC+AMD ULTRA",
+     overlay           = true,
+     default_qty_type  = strategy.percent_of_equity,
+     default_qty_value = 2,
+     initial_capital   = 100000,
+     commission_type   = strategy.commission.percent,
+     commission_value  = 0.02,
+     pyramiding        = 0)
+
+// ══════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════
+g_smc = "⚡ SMC"
+swLen  = input.int(10,    "Swing Lookback",      minval=3,    maxval=50,  group=g_smc)
+liqBuf = input.float(0.05,"Liquidity Buffer %",  minval=0.01, step=0.05, group=g_smc) / 100
+
+g_amd = "🌍 AMD"
+asiaS = input.int(2,  "Asia Start (Madrid)", minval=0, maxval=23, group=g_amd)
+asiaE = input.int(10, "Asia End (Madrid)",   minval=0, maxval=23, group=g_amd)
+mPct  = input.float(0.1,"Manipulation %",   minval=0.01, step=0.05, group=g_amd) / 100
+
+g_sess = "🕐 Sessions (Madrid Time)"
+lonS = input.int(8,  "London Start", minval=0, maxval=23, group=g_sess)
+lonE = input.int(17, "London End",   minval=0, maxval=23, group=g_sess)
+nyS  = input.int(14, "NY Start",     minval=0, maxval=23, group=g_sess)
+nyE  = input.int(23, "NY End",       minval=0, maxval=23, group=g_sess)
+
+g_risk = "💰 Risk"
+atrP = input.int(14,    "ATR Period",      minval=1,   group=g_risk)
+atrM = input.float(1.5, "ATR SL Mult",     minval=0.5, step=0.25, group=g_risk)
+rrR  = input.float(2.5, "R:R (TP)",        minval=1.0, step=0.25, group=g_risk)
+
+g_vis = "🎨 Visuals"
+showL  = input.bool(true, "Labels",       group=g_vis)
+showZ  = input.bool(true, "FVG/OB Zones", group=g_vis)
+showSW = input.bool(true, "Swings",       group=g_vis)
+
+// ══════════════════════════════════════════════
+// SESSIONS  (Europe/Madrid — auto DST)
+// ══════════════════════════════════════════════
+mHr = hour(time, "Europe/Madrid")
+
+inAsia()    => mHr >= asiaS and mHr < asiaE
+inLondon()  => mHr >= lonS  and mHr < lonE
+inNY()      => mHr >= nyS   and mHr < nyE
+inTrading() => inLondon() or inNY()
+
+// ══════════════════════════════════════════════
+// ATR
+// ══════════════════════════════════════════════
+atrV = ta.atr(atrP)
+
+// ══════════════════════════════════════════════
+// AMD — ASIA RANGE (Accumulation)
+// ══════════════════════════════════════════════
+var float aHigh  = na
+var float aLow   = na
+var float asiaHF = na
+var float asiaLF = na
+var bool  asiaOk = false
+
+asOn  = inAsia()
+wasAs = inAsia()[1]
+
+if asOn and not wasAs
+    aHigh  := high
+    aLow   := low
+    asiaOk := false
+
+if asOn
+    aHigh := math.max(aHigh, high)
+    aLow  := math.min(aLow,  low)
+
+if not asOn and wasAs
+    asiaHF := aHigh
+    asiaLF := aLow
+    asiaOk := true
+
+asiaRng = asiaOk ? asiaHF - asiaLF : float(na)
+mBuf    = asiaOk ? asiaRng * mPct  : float(na)
+
+// AMD — MANIPULATION (London sweeps Asia range)
+var bool  mUp = false
+var bool  mDn = false
+var float mHP = na
+var float mLP = na
+
+if asiaOk and not na(mBuf) and not asOn
+    if high > asiaHF + mBuf and not mUp
+        mUp := true
+        mHP := high
+    if low < asiaLF - mBuf and not mDn
+        mDn := true
+        mLP := low
+
+if dayofmonth != dayofmonth[1]
+    mUp    := false
+    mDn    := false
+    mHP    := na
+    mLP    := na
+    asiaOk := false
+
+// ══════════════════════════════════════════════
+// SMC — SWING HIGHS / LOWS
+// ══════════════════════════════════════════════
+swH = ta.pivothigh(high, swLen, swLen)
+swL = ta.pivotlow(low,  swLen, swLen)
+
+var float lastSH = na
+var float lastSL = na
+
+if not na(swH)
+    lastSH := swH
+if not na(swL)
+    lastSL := swL
+
+// ══════════════════════════════════════════════
+// SMC — LIQUIDITY SWEEPS
+// ══════════════════════════════════════════════
+bssSweep = not na(lastSH) and high > lastSH * (1 + liqBuf) and close < lastSH
+sssSweep = not na(lastSL) and low  < lastSL * (1 - liqBuf) and close > lastSL
+
+var bool hadBSS = false
+var bool hadSSS = false
+var int  bssB   = 0
+var int  sssB   = 0
+
+if bssSweep
+    hadBSS := true
+    bssB   := bar_index
+if sssSweep
+    hadSSS := true
+    sssB   := bar_index
+
+if bar_index - bssB > 30
+    hadBSS := false
+if bar_index - sssB > 30
+    hadSSS := false
+
+// ══════════════════════════════════════════════
+// SMC — MARKET STRUCTURE (BOS / CHoCH)
+// ══════════════════════════════════════════════
+var int mStr = 0  // 1=bullish, -1=bearish
+
+bullBrk = not na(lastSH) and close > lastSH and not (close[1] > lastSH)
+bearBrk = not na(lastSL) and close < lastSL and not (close[1] < lastSL)
+
+bullBOS   = mStr[1] == 1  and bullBrk
+bearBOS   = mStr[1] == -1 and bearBrk
+bullCHoCH = mStr[1] == -1 and bullBrk
+bearCHoCH = mStr[1] == 1  and bearBrk
+
+if bullBrk
+    mStr := 1
+else if bearBrk
+    mStr := -1
+
+// ══════════════════════════════════════════════
+// SMC — FAIR VALUE GAP (FVG)
+// ══════════════════════════════════════════════
+bullFVG = low > high[2]
+bearFVG = high < low[2]
+
+var float bFT = na
+var float bFB = na
+var float sFT = na
+var float sFB = na
+
+if bullFVG
+    bFT := low
+    bFB := high[2]
+if bearFVG
+    sFT := low[2]
+    sFB := high
+
+inBFVG = not na(bFT) and close <= bFT and close >= bFB
+inSFVG = not na(sFT) and close <= sFT and close >= sFB
+
+// ══════════════════════════════════════════════
+// SMC — ORDER BLOCK (OB)
+// ══════════════════════════════════════════════
+bullDisp = (close - open) > atrV * 1.2 and close > high[1]
+bearDisp = (open - close) > atrV * 1.2 and close < low[1]
+
+var float bOT = na
+var float bOB2 = na
+var float sOT = na
+var float sOB2 = na
+
+if bullDisp and open[1] > close[1]
+    bOT  := open[1]
+    bOB2 := close[1]
+if bearDisp and close[1] > open[1]
+    sOT  := close[1]
+    sOB2 := open[1]
+
+inBOB = not na(bOT) and close <= bOT and close >= bOB2
+inSOB = not na(sOT) and close <= sOT and close >= sOB2
+
+// ══════════════════════════════════════════════
+// ENTRY CONDITIONS
+// ══════════════════════════════════════════════
+smcLong  = hadSSS and (bullBOS or bullCHoCH) and (inBFVG or inBOB) and inTrading()
+smcShort = hadBSS and (bearBOS or bearCHoCH) and (inSFVG or inSOB) and inTrading()
+amdLong  = inNY() and asiaOk and mDn and not mUp and close > asiaLF
+amdShort = inNY() and asiaOk and mUp and not mDn and close < asiaHF
+
+longSig  = smcLong  or amdLong
+shortSig = smcShort or amdShort
+
+// ══════════════════════════════════════════════
+// STRATEGY EXECUTION + ALERTS
+// ══════════════════════════════════════════════
+sessTxt = inNY() ? "New York" : inLondon() ? "London" : "Other"
+
+if longSig and strategy.position_size == 0
+    _sl  = close - atrV * atrM
+    _rsk = close - _sl
+    _tp  = close + _rsk * rrR
+    _lbl = smcLong ? "SMC" : "AMD"
+    strategy.entry("LONG", strategy.long, comment=_lbl + " LONG")
+    strategy.exit("LX", "LONG", stop=_sl, limit=_tp)
+    if showL
+        label.new(bar_index, low,
+                  "📈 " + _lbl + " LONG\nSL: " + str.tostring(_sl, "#.##") +
+                  "\nTP: " + str.tostring(_tp, "#.##"),
+                  color=color.green, textcolor=color.white,
+                  style=label.style_label_up, size=size.normal)
+    alert('{"signal":"BUY","symbol":"'   + syminfo.ticker             +
+          '","price":"'                  + str.tostring(close,"#.##") +
+          '","time":"'                   + str.tostring(time)         +
+          '","session":"'                + sessTxt                    +
+          '","strategy":"SMC+AMD ULTRA PRO"}',
+          alert.freq_once_per_bar_close)
+
+if shortSig and strategy.position_size == 0
+    _sl  = close + atrV * atrM
+    _rsk = _sl - close
+    _tp  = close - _rsk * rrR
+    _lbl = smcShort ? "SMC" : "AMD"
+    strategy.entry("SHORT", strategy.short, comment=_lbl + " SHORT")
+    strategy.exit("SX", "SHORT", stop=_sl, limit=_tp)
+    if showL
+        label.new(bar_index, high,
+                  "📉 " + _lbl + " SHORT\nSL: " + str.tostring(_sl, "#.##") +
+                  "\nTP: " + str.tostring(_tp, "#.##"),
+                  color=color.red, textcolor=color.white,
+                  style=label.style_label_down, size=size.normal)
+    alert('{"signal":"SELL","symbol":"'  + syminfo.ticker             +
+          '","price":"'                  + str.tostring(close,"#.##") +
+          '","time":"'                   + str.tostring(time)         +
+          '","session":"'                + sessTxt                    +
+          '","strategy":"SMC+AMD ULTRA PRO"}',
+          alert.freq_once_per_bar_close)
+
+alertcondition(longSig,  title="SMC+AMD LONG",
+     message='{"signal":"BUY","symbol":"{{ticker}}","price":"{{close}}","time":"{{time}}","session":"London/NY","strategy":"SMC+AMD ULTRA PRO"}')
+alertcondition(shortSig, title="SMC+AMD SHORT",
+     message='{"signal":"SELL","symbol":"{{ticker}}","price":"{{close}}","time":"{{time}}","session":"London/NY","strategy":"SMC+AMD ULTRA PRO"}')
+
+// ══════════════════════════════════════════════
+// VISUALS
+// ══════════════════════════════════════════════
+bgcolor(inAsia()   ? color.new(color.blue,   96) : na, title="Asia")
+bgcolor(inLondon() ? color.new(color.orange, 96) : na, title="London")
+bgcolor(inNY()     ? color.new(color.green,  96) : na, title="NY")
+
+plot(asiaOk ? asiaHF : na, "Asia H", color=color.blue, linewidth=1, style=plot.style_linebr)
+plot(asiaOk ? asiaLF : na, "Asia L", color=color.blue, linewidth=1, style=plot.style_linebr)
+
+var box asiaBox = na
+if asiaOk and not wasAs
+    asiaBox := box.new(bar_index - 1, asiaHF, bar_index, asiaLF,
+                       border_color=color.blue, border_width=1,
+                       bgcolor=color.new(color.blue, 90))
+if not na(asiaBox) and asiaOk
+    box.set_right(asiaBox, bar_index)
+
+bgcolor(mUp and not mDn ? color.new(color.red,  93) : na, title="Manip↑")
+bgcolor(mDn and not mUp ? color.new(color.lime, 93) : na, title="Manip↓")
+
+plotshape(showSW and not na(swH), "Swing H", shape.diamond, location.abovebar, color.red,  size=size.tiny)
+plotshape(showSW and not na(swL), "Swing L", shape.diamond, location.belowbar, color.lime, size=size.tiny)
+
+plotshape(bssSweep, "Buy-Side Sweep",  shape.xcross, location.abovebar, color.red,  size=size.small)
+plotshape(sssSweep, "Sell-Side Sweep", shape.xcross, location.belowbar, color.lime, size=size.small)
+
+if showL
+    if bullBOS
+        label.new(bar_index, lastSH, "BOS↑",   color=color.green,  textcolor=color.white, style=label.style_label_left, size=size.tiny)
+    if bearBOS
+        label.new(bar_index, lastSL, "BOS↓",   color=color.red,    textcolor=color.white, style=label.style_label_left, size=size.tiny)
+    if bullCHoCH
+        label.new(bar_index, lastSH, "CHoCH↑", color=color.teal,   textcolor=color.white, style=label.style_label_left, size=size.tiny)
+    if bearCHoCH
+        label.new(bar_index, lastSL, "CHoCH↓", color=color.orange, textcolor=color.white, style=label.style_label_left, size=size.tiny)
+    if mUp and not mUp[1]
+        label.new(bar_index, high, "🔴 Stop Hunt↑\n" + str.tostring(high, "#.##"),
+                  color=color.red,  textcolor=color.white, style=label.style_label_down, size=size.small)
+    if mDn and not mDn[1]
+        label.new(bar_index, low,  "🟢 Stop Hunt↓\n" + str.tostring(low,  "#.##"),
+                  color=color.lime, textcolor=color.white, style=label.style_label_up,   size=size.small)
+
+if showZ
+    if bullFVG
+        box.new(bar_index - 2, bFT, bar_index + 15, bFB,
+                border_color=color.teal,   border_width=1, bgcolor=color.new(color.teal,   80))
+    if bearFVG
+        box.new(bar_index - 2, sFT, bar_index + 15, sFB,
+                border_color=color.orange, border_width=1, bgcolor=color.new(color.orange, 80))
+    if bullDisp and open[1] > close[1]
+        box.new(bar_index - 1, bOT,  bar_index + 20, bOB2,
+                border_color=color.green, border_width=2, bgcolor=color.new(color.green, 75))
+    if bearDisp and close[1] > open[1]
+        box.new(bar_index - 1, sOT,  bar_index + 20, sOB2,
+                border_color=color.red,   border_width=2, bgcolor=color.new(color.red,   75))
+
+// ══════════════════════════════════════════════
+// INFO TABLE
+// ══════════════════════════════════════════════
+var table tbl = table.new(position.top_right, 2, 9,
+                           border_color=color.gray, border_width=1,
+                           bgcolor=color.new(color.black, 72))
+
+if barstate.islast
+    _sess  = inAsia()   ? "🌏 Asia"     :
+             inLondon() ? "🇬🇧 London"  :
+             inNY()     ? "🇺🇸 NY"      : "⏸ Closed"
+    _str   = mStr ==  1 ? "🟢 Bull"     : mStr == -1 ? "🔴 Bear" : "⚪ Neutral"
+    _manip = mUp        ? "🔴 Hunt↑"    : mDn        ? "🟢 Hunt↓" : "⏳ —"
+    _sweep = hadBSS     ? "🔴 Buy-Side" : hadSSS     ? "🟢 Sell-Side" : "—"
+    _zone  = (inBFVG or inBOB) ? "🟢 Bull Zone" : (inSFVG or inSOB) ? "🔴 Bear Zone" : "—"
+    _sig   = longSig    ? "📈 LONG"     : shortSig   ? "📉 SHORT" : "—"
+
+    table.cell(tbl, 0, 0, "SMC+AMD ULTRA PRO", bgcolor=color.new(color.navy,20), text_color=color.white, text_halign=text.align_center)
+    table.cell(tbl, 1, 0, _sess,               bgcolor=color.new(color.navy,20), text_color=color.white)
+    table.cell(tbl, 0, 1, "Structure",  text_color=color.gray, text_halign=text.align_left)
+    table.cell(tbl, 1, 1, _str,         text_color=mStr==1 ? color.green : mStr==-1 ? color.red : color.gray)
+    table.cell(tbl, 0, 2, "Sweep",      text_color=color.gray, text_halign=text.align_left)
+    table.cell(tbl, 1, 2, _sweep,       text_color=hadBSS ? color.red : hadSSS ? color.lime : color.gray)
+    table.cell(tbl, 0, 3, "Manip",      text_color=color.gray, text_halign=text.align_left)
+    table.cell(tbl, 1, 3, _manip,       text_color=mUp ? color.red : mDn ? color.lime : color.gray)
+    table.cell(tbl, 0, 4, "Asia H",     text_color=color.gray, text_halign=text.align_left)
+    table.cell(tbl, 1, 4, asiaOk ? str.tostring(asiaHF, "#.##") : "—", text_color=color.blue)
+    table.cell(tbl, 0, 5, "Asia L",     text_color=color.gray, text_halign=text.align_left)
+    table.cell(tbl, 1, 5, asiaOk ? str.tostring(asiaLF, "#.##") : "—", text_color=color.blue)
+    table.cell(tbl, 0, 6, "FVG / OB",   text_color=color.gray, text_halign=text.align_left)
+    table.cell(tbl, 1, 6, _zone,        text_color=(inBFVG or inBOB) ? color.lime : (inSFVG or inSOB) ? color.red : color.gray)
+    table.cell(tbl, 0, 7, "ATR",        text_color=color.gray, text_halign=text.align_left)
+    table.cell(tbl, 1, 7, str.tostring(atrV, "#.##"), text_color=color.white)
+    table.cell(tbl, 0, 8, "Signal",     text_color=color.gray, text_halign=text.align_left)
+    table.cell(tbl, 1, 8, _sig,         text_color=longSig ? color.green : shortSig ? color.red : color.gray)

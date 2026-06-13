@@ -1,0 +1,243 @@
+//@version=5
+strategy("AMD — Accumulation / Manipulation / Distribution",
+     shorttitle="AMD Elite",
+     overlay=true,
+     default_qty_type=strategy.fixed,
+     default_qty_value=1,
+     initial_capital=50000,
+     commission_type=strategy.commission.cash_per_contract,
+     commission_value=0.5)
+
+// ══════════════════════════════════════════════
+//  INPUTS
+// ══════════════════════════════════════════════
+grpAsia   = "Asia Session (Accumulation)"
+asiaStart = input.int(23, "بداية Asia (UTC Hour)", minval=0, maxval=23, group=grpAsia)
+asiaEnd   = input.int(4,  "نهاية Asia (UTC Hour)",  minval=0, maxval=23, group=grpAsia)
+
+grpManip  = "Manipulation"
+manipPct  = input.float(0.1, "نسبة اختراق الـ Range %", minval=0.01, step=0.05, group=grpManip) / 100
+
+grpNY     = "NY Session (Distribution)"
+nyStart   = input.int(13, "بداية NY (UTC Hour)", minval=0, maxval=23, group=grpNY)
+nyStartM  = input.int(30, "دقائق بداية NY",      minval=0, maxval=59, group=grpNY)
+nyEnd     = input.int(16, "نهاية NY (UTC Hour)",  minval=0, maxval=23, group=grpNY)
+
+grpRisk   = "إدارة المخاطر"
+rrTP1     = input.float(2.0, "R:R للـ TP1", minval=1.0, step=0.5, group=grpRisk)
+rrTP2     = input.float(4.0, "R:R للـ TP2", minval=1.0, step=0.5, group=grpRisk)
+slBuffer  = input.float(0.1, "SL Buffer (% من Asia Range)", minval=0.01, step=0.05, group=grpRisk) / 100
+
+grpVis    = "المظهر"
+colAsia   = input.color(color.new(color.blue,   80), "لون Asia Range", group=grpVis)
+colManipH = input.color(color.new(color.red,    70), "لون Manipulation صاعد", group=grpVis)
+colManipL = input.color(color.new(color.green,  70), "لون Manipulation هابط", group=grpVis)
+showLabels = input.bool(true, "إظهار Labels", group=grpVis)
+
+// ══════════════════════════════════════════════
+//  SESSION FUNCTIONS
+// ══════════════════════════════════════════════
+utcHour = hour(time, "UTC")
+utcMin  = minute(time, "UTC")
+utcMins = utcHour * 60 + utcMin
+
+inAsia() =>
+    if asiaStart > asiaEnd  // يتجاوز منتصف الليل
+        utcHour >= asiaStart or utcHour < asiaEnd
+    else
+        utcHour >= asiaStart and utcHour < asiaEnd
+
+inLondon() =>
+    utcHour >= 7 and utcHour < 9
+
+inNY() =>
+    utcMins >= nyStart * 60 + nyStartM and utcHour < nyEnd
+
+// ══════════════════════════════════════════════
+//  ASIA RANGE (يُحسب كل يوم)
+// ══════════════════════════════════════════════
+var float asiaHigh = na
+var float asiaLow  = na
+var float asiaHighFixed = na
+var float asiaLowFixed  = na
+var bool  asiaComplete  = false
+
+// عند دخول Asia — نبدأ من جديد
+asiaSession = inAsia()
+prevAsia    = inAsia()[1]
+
+if asiaSession and not prevAsia
+    asiaHigh     := high
+    asiaLow      := low
+    asiaComplete := false
+
+if asiaSession
+    asiaHigh := math.max(asiaHigh, high)
+    asiaLow  := math.min(asiaLow,  low)
+
+// عند خروج Asia — نثبّت الـ Range
+if not asiaSession and prevAsia
+    asiaHighFixed := asiaHigh
+    asiaLowFixed  := asiaLow
+    asiaComplete  := true
+
+// ══════════════════════════════════════════════
+//  MANIPULATION DETECTION
+// ══════════════════════════════════════════════
+var bool manipUp   = false  // كسر فوق Asia High = Stop Hunt صاعد
+var bool manipDown = false  // كسر تحت Asia Low  = Stop Hunt هابط
+var float manipHighPrice = na
+var float manipLowPrice  = na
+
+asiaSize = not na(asiaHighFixed) ? asiaHighFixed - asiaLowFixed : na
+buffer   = not na(asiaSize) ? asiaSize * manipPct : na
+
+// كشف Manipulation (London أو قبل NY)
+postAsia = asiaComplete and not inAsia() and not inNY()
+
+if postAsia and not na(asiaHighFixed)
+    if high > asiaHighFixed + buffer and not manipUp
+        manipUp        := true
+        manipHighPrice := high
+    if low < asiaLowFixed - buffer and not manipDown
+        manipDown      := true
+        manipLowPrice  := low
+
+// إعادة تعيين في بداية يوم جديد
+newDay = dayofmonth != dayofmonth[1]
+if newDay
+    manipUp        := false
+    manipDown      := false
+    manipHighPrice := na
+    manipLowPrice  := na
+    asiaComplete   := false
+
+// ══════════════════════════════════════════════
+//  ENTRY CONDITIONS (Distribution — NY Session)
+// ══════════════════════════════════════════════
+nySession = inNY()
+
+// SHORT: Manipulation فوق Asia High → Distribution هابط
+shortCond = nySession and
+            asiaComplete and
+            manipUp and
+            not manipDown and
+            close < asiaHighFixed  // السعر عاد تحت Asia High
+
+// LONG: Manipulation تحت Asia Low → Distribution صاعد
+longCond  = nySession and
+            asiaComplete and
+            manipDown and
+            not manipUp and
+            close > asiaLowFixed   // السعر عاد فوق Asia Low
+
+// ══════════════════════════════════════════════
+//  STRATEGY EXECUTION
+// ══════════════════════════════════════════════
+if shortCond and strategy.position_size == 0
+    slPrice  = (not na(manipHighPrice) ? manipHighPrice : asiaHighFixed) * (1 + slBuffer)
+    risk     = math.abs(close - slPrice)
+    tp1Price = close - risk * rrTP1
+    tp2Price = asiaLowFixed
+
+    strategy.entry("SHORT", strategy.short, comment="AMD SHORT")
+    strategy.exit("SHORT TP1", "SHORT", qty_percent=50, limit=tp1Price, stop=slPrice, comment="TP1")
+    strategy.exit("SHORT TP2", "SHORT", qty_percent=50, limit=tp2Price, stop=slPrice, comment="TP2 Asia Low")
+
+if longCond and strategy.position_size == 0
+    slPrice  = (not na(manipLowPrice) ? manipLowPrice : asiaLowFixed) * (1 - slBuffer)
+    risk     = math.abs(close - slPrice)
+    tp1Price = close + risk * rrTP1
+    tp2Price = asiaHighFixed
+
+    strategy.entry("LONG", strategy.long, comment="AMD LONG")
+    strategy.exit("LONG TP1",  "LONG", qty_percent=50, limit=tp1Price, stop=slPrice, comment="TP1")
+    strategy.exit("LONG TP2",  "LONG", qty_percent=50, limit=tp2Price, stop=slPrice, comment="TP2 Asia High")
+
+// ══════════════════════════════════════════════
+//  VISUALS
+// ══════════════════════════════════════════════
+
+// Asia Range Box
+var box asiaBox = na
+if asiaComplete and not prevAsia[0]
+    asiaBox := box.new(bar_index - 1, asiaHighFixed, bar_index, asiaLowFixed,
+                       border_color=color.blue, border_width=1,
+                       bgcolor=colAsia)
+
+// مدّ الـ Box حتى نهاية جلسة NY
+if not na(asiaBox) and asiaComplete
+    box.set_right(asiaBox, bar_index)
+
+// Asia High / Low Lines
+plot(asiaComplete ? asiaHighFixed : na, "Asia High", color=color.blue, linewidth=1, style=plot.style_linebr)
+plot(asiaComplete ? asiaLowFixed  : na, "Asia Low",  color=color.blue, linewidth=1, style=plot.style_linebr)
+
+// Manipulation Zones
+bgcolor(manipUp   and not manipDown ? color.new(color.red,   93) : na, title="Manip Zone ↑")
+bgcolor(manipDown and not manipUp   ? color.new(color.green, 93) : na, title="Manip Zone ↓")
+
+// Labels
+if showLabels
+    if asiaComplete and not prevAsia[0]
+        label.new(bar_index, asiaHighFixed,
+                  "Asia H: " + str.tostring(asiaHighFixed, "#.##"),
+                  color=color.blue, textcolor=color.white, style=label.style_label_right, size=size.small)
+        label.new(bar_index, asiaLowFixed,
+                  "Asia L: " + str.tostring(asiaLowFixed, "#.##"),
+                  color=color.blue, textcolor=color.white, style=label.style_label_right, size=size.small)
+
+    if manipUp and not manipUp[1]
+        label.new(bar_index, high,
+                  "🔴 Stop Hunt ↑\n" + str.tostring(high, "#.##"),
+                  color=color.red, textcolor=color.white, style=label.style_label_down, size=size.normal)
+
+    if manipDown and not manipDown[1]
+        label.new(bar_index, low,
+                  "🟢 Stop Hunt ↓\n" + str.tostring(low, "#.##"),
+                  color=color.green, textcolor=color.white, style=label.style_label_up, size=size.normal)
+
+    if shortCond and strategy.position_size == 0
+        label.new(bar_index, high,
+                  "📉 SHORT\nDistribution",
+                  color=color.red, textcolor=color.white, style=label.style_label_down, size=size.large)
+
+    if longCond and strategy.position_size == 0
+        label.new(bar_index, low,
+                  "📈 LONG\nDistribution",
+                  color=color.green, textcolor=color.white, style=label.style_label_up, size=size.large)
+
+// Session Background
+bgcolor(inAsia()   ? color.new(color.blue,   97) : na, title="Asia Session")
+bgcolor(inLondon() ? color.new(color.orange, 97) : na, title="London Session")
+bgcolor(inNY()     ? color.new(color.green,  97) : na, title="NY Session")
+
+// ══════════════════════════════════════════════
+//  INFO TABLE
+// ══════════════════════════════════════════════
+var table infoTable = table.new(position.top_right, 2, 6,
+                                border_color=color.gray, border_width=1,
+                                bgcolor=color.new(color.black, 80))
+
+if barstate.islast
+    currentSession = inAsia() ? "🌏 Asia" : inLondon() ? "🇬🇧 London" : inNY() ? "🇺🇸 NY" : "⏸ مغلق"
+
+    table.cell(infoTable, 0, 0, "AMD Strategy",     text_color=color.white, bgcolor=color.new(color.blue, 50), text_halign=text.align_center)
+    table.cell(infoTable, 1, 0, currentSession,      text_color=color.white, bgcolor=color.new(color.blue, 50))
+
+    table.cell(infoTable, 0, 1, "Asia High",         text_color=color.gray,  text_halign=text.align_left)
+    table.cell(infoTable, 1, 1, asiaComplete ? str.tostring(asiaHighFixed, "#.##") : "—", text_color=color.blue)
+
+    table.cell(infoTable, 0, 2, "Asia Low",          text_color=color.gray,  text_halign=text.align_left)
+    table.cell(infoTable, 1, 2, asiaComplete ? str.tostring(asiaLowFixed, "#.##") : "—",  text_color=color.blue)
+
+    table.cell(infoTable, 0, 3, "Manipulation",      text_color=color.gray,  text_halign=text.align_left)
+    table.cell(infoTable, 1, 3, manipUp ? "🔴 Stop Hunt ↑" : manipDown ? "🟢 Stop Hunt ↓" : "⏳ لم يحدث",
+               text_color=manipUp ? color.red : manipDown ? color.green : color.gray)
+
+    table.cell(infoTable, 0, 4, "الإشارة",           text_color=color.gray,  text_halign=text.align_left)
+    table.cell(infoTable, 1, 4, shortCond ? "📉 SHORT" : longCond ? "📈 LONG" : "—",
+               text_color=shortCond ? color.red : longCond ? color.green : color.gray)
+
+    table.cell(infoTable, 0, 5, "Asia Size",         text_color=color.gray,  text_halign=text.align_left)
+    table.cell(infoTable, 1, 5, asiaComplete ? str.tostring(asiaSize, "#.##") + " pts" : "—", text_color=color.white)

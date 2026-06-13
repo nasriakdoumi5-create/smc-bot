@@ -1,17 +1,16 @@
 /**
  * AMD Strategy Engine — Accumulation / Manipulation / Distribution
- * ICT Methodology — NQ Futures
+ * ICT Methodology
  *
- * Asia Session   → يحدد الـ Range (Accumulation)
- * London Open    → يكسر الـ Range (Manipulation / Stop Hunt)
- * NY Session     → الاتجاه الحقيقي (Distribution)
+ * Asia Session  → يحدد الـ Range
+ * London Open   → كسر الـ Range (Stop Hunt)
+ * NY Session    → الاتجاه الحقيقي (Distribution)
  */
 
-// ══ Session Times (UTC) ══════════════════════
 const SESSIONS = {
-  asia:   { start: 23 * 60,      end:  4 * 60 },   // 23:00 – 04:00 UTC
-  london: { start:  7 * 60,      end:  9 * 60 },   // 07:00 – 09:00 UTC
-  ny:     { start: 13 * 60 + 30, end: 16 * 60 },   // 13:30 – 16:00 UTC
+  asia:   { start: 23 * 60,      end:  4 * 60 },   // 23:00–04:00 UTC
+  london: { start:  7 * 60,      end:  9 * 60 },   // 07:00–09:00 UTC
+  ny:     { start: 13 * 60 + 30, end: 16 * 60 },   // 13:30–16:00 UTC
 };
 
 function minsUTC(bar) {
@@ -21,7 +20,6 @@ function minsUTC(bar) {
 
 function dateKeyUTC(bar) {
   const d = new Date(bar.time * 1000);
-  // Asia session crosses midnight — نُسند لليوم التالي
   const m = minsUTC(bar);
   if (m >= SESSIONS.asia.start) {
     const next = new Date(d.getTime() + 86400000);
@@ -35,17 +33,11 @@ function inAsia(bar) {
   return m >= SESSIONS.asia.start || m < SESSIONS.asia.end;
 }
 
-function inLondon(bar) {
-  const m = minsUTC(bar);
-  return m >= SESSIONS.london.start && m < SESSIONS.london.end;
-}
-
 function inNY(bar) {
   const m = minsUTC(bar);
   return m >= SESSIONS.ny.start && m < SESSIONS.ny.end;
 }
 
-// ══ بناء Asia Range لكل يوم ═══════════════════
 function buildAsiaRanges(bars) {
   const days = {};
   for (const b of bars) {
@@ -59,15 +51,20 @@ function buildAsiaRanges(bars) {
   return days;
 }
 
-// ══ التحليل الرئيسي ════════════════════════════
+function getSession(m) {
+  if (m >= SESSIONS.asia.start || m < SESSIONS.asia.end) return 'Asia 🌏';
+  if (m >= SESSIONS.london.start && m < SESSIONS.london.end) return 'London 🇬🇧';
+  if (m >= SESSIONS.ny.start && m < SESSIONS.ny.end) return 'NY 🇺🇸';
+  return 'مغلق ⏸';
+}
+
 export function analyzeAMD(bars5m) {
   if (!bars5m || bars5m.length < 100) return { error: 'not enough data' };
 
-  const last = bars5m[bars5m.length - 1];
-  const now  = minsUTC(last);
+  const last  = bars5m[bars5m.length - 1];
+  const now   = minsUTC(last);
   const price = last.close;
 
-  // ── بناء Asia Ranges ──────────────────────
   const asiaRanges = buildAsiaRanges(bars5m);
   const todayKey   = dateKeyUTC(last);
   const asia       = asiaRanges[todayKey];
@@ -80,13 +77,10 @@ export function analyzeAMD(bars5m) {
   const asiaLow  = +asia.low.toFixed(2);
   const asiaSize = +(asiaHigh - asiaLow).toFixed(2);
 
-  // ── كشف Manipulation ──────────────────────
-  // هل كسرت London أو NY طرف الـ Range؟
-  let manipHigh = false;  // كسر فوق Asia High (Stop Hunt للمشترين)
-  let manipLow  = false;  // كسر تحت Asia Low  (Stop Hunt للبائعين)
+  let manipHigh = false;
+  let manipLow  = false;
   let manipBar  = null;
 
-  // نفحص الشموع بعد نهاية Asia
   const postAsia = bars5m.filter(b => {
     const m = minsUTC(b);
     const k = dateKeyUTC(b);
@@ -104,55 +98,54 @@ export function analyzeAMD(bars5m) {
     }
   }
 
-  // ── الجلسة الحالية ────────────────────────
-  const session = getSession(now);
+  const session        = getSession(now);
   const inDistribution = inNY(last);
-
-  // ── إشارة الصفقة ──────────────────────────
   let signal = null;
 
   if (inDistribution) {
-    // Manipulation فوق Asia High → Distribution = SHORT
     if (manipHigh && !manipLow) {
-      const sl  = manipBar ? +(manipBar.high + asiaSize * 0.1).toFixed(2) : +(asiaHigh + asiaSize * 0.5).toFixed(2);
+      const sl   = manipBar
+        ? +(manipBar.high + asiaSize * 0.1).toFixed(2)
+        : +(asiaHigh + asiaSize * 0.5).toFixed(2);
       const risk = Math.abs(price - sl);
       signal = {
         type:  'SHORT',
         price: +price.toFixed(2),
         sl,
         tp1:   +(price - risk * 2).toFixed(2),
-        tp2:   +(asiaLow).toFixed(2),
+        tp2:   +asiaLow.toFixed(2),
         phase: 'Distribution',
-        manipulation: `Stop Hunt فوق Asia High عند ${manipBar?.high?.toFixed(2) || asiaHigh}`,
+        manipulation: `Stop Hunt فوق Asia High عند ${(manipBar?.high || asiaHigh).toFixed(2)}`,
         conditions: {
-          asiaRangeDefined: true,
-          manipulationUp:   manipHigh,
-          nySession:        true,
+          asiaRangeDefined:   true,
+          manipulationUp:     manipHigh,
+          nySession:          true,
           priceBelowAsiaHigh: price < asiaHigh,
-          sweepReverted:    price < (manipBar?.high || asiaHigh),
-        }
+          sweepReverted:      price < (manipBar?.high || asiaHigh),
+        },
       };
     }
 
-    // Manipulation تحت Asia Low → Distribution = LONG
     if (manipLow && !manipHigh) {
-      const sl  = manipBar ? +(manipBar.low - asiaSize * 0.1).toFixed(2) : +(asiaLow - asiaSize * 0.5).toFixed(2);
+      const sl   = manipBar
+        ? +(manipBar.low - asiaSize * 0.1).toFixed(2)
+        : +(asiaLow - asiaSize * 0.5).toFixed(2);
       const risk = Math.abs(price - sl);
       signal = {
         type:  'LONG',
         price: +price.toFixed(2),
         sl,
         tp1:   +(price + risk * 2).toFixed(2),
-        tp2:   +(asiaHigh).toFixed(2),
+        tp2:   +asiaHigh.toFixed(2),
         phase: 'Distribution',
-        manipulation: `Stop Hunt تحت Asia Low عند ${manipBar?.low?.toFixed(2) || asiaLow}`,
+        manipulation: `Stop Hunt تحت Asia Low عند ${(manipBar?.low || asiaLow).toFixed(2)}`,
         conditions: {
           asiaRangeDefined:  true,
           manipulationDown:  manipLow,
           nySession:         true,
           priceAboveAsiaLow: price > asiaLow,
           sweepReverted:     price > (manipBar?.low || asiaLow),
-        }
+        },
       };
     }
   }
@@ -165,15 +158,10 @@ export function analyzeAMD(bars5m) {
     asiaSize,
     manipHigh,
     manipLow,
-    manipPrice: manipBar ? +(manipHigh ? manipBar.high : manipBar.low).toFixed(2) : null,
+    manipPrice: manipBar
+      ? +(manipHigh ? manipBar.high : manipBar.low).toFixed(2)
+      : null,
     inDistribution,
     signal,
   };
-}
-
-function getSession(minsUTC) {
-  if (minsUTC >= SESSIONS.asia.start || minsUTC < SESSIONS.asia.end) return 'Asia 🌏';
-  if (minsUTC >= SESSIONS.london.start && minsUTC < SESSIONS.london.end) return 'London 🇬🇧';
-  if (minsUTC >= SESSIONS.ny.start && minsUTC < SESSIONS.ny.end) return 'NY 🇺🇸';
-  return 'مغلق ⏸';
 }

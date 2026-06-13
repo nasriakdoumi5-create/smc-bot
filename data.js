@@ -7,7 +7,10 @@ const SYMBOLS = {
   MNQ: 'NQ=F',   // Micro Nasdaq
   MGC: 'GC=F',   // Micro Gold
   MCL: 'CL=F',   // Micro Crude Oil
-  MES: 'ES=F',   // S&P 500
+  MES: 'ES=F',   // Micro S&P 500
+  CNQ: 'CNQ',    // Canadian Natural Resources
+  CML: 'CML',    // CML
+  CGC: 'CGC',    // Canopy Growth
 };
 
 const INTERVALS = {
@@ -42,14 +45,6 @@ async function fetchYahoo(symbol, interval, range) {
   })).filter(b => b.close != null);
 
   return bars;
-}
-
-/**
- * جلب 1m bars لآخر يومين (للدخول الدقيق)
- */
-export async function get1mBars(symbol = 'MNQ') {
-  const ticker = SYMBOLS[symbol] || symbol;
-  return fetchYahoo(ticker, '1m', '2d');
 }
 
 /**
