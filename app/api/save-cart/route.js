@@ -1,5 +1,23 @@
 import { NextResponse } from 'next/server';
 
+export async function GET() {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return NextResponse.json({ status: 'ERROR', problem: 'RESEND_API_KEY not set in Vercel' }, { status: 500 });
+  try {
+    const { Resend } = await import('resend');
+    const resend = new Resend(key);
+    const r = await resend.emails.send({
+      from: 'PawCase <onboarding@resend.dev>',
+      to: 'nasriakdoumi5@gmail.com',
+      subject: '✅ PawCase Test Email',
+      html: '<h1>✅ يعمل! Check Gmail now</h1>',
+    });
+    return NextResponse.json({ status: 'SENT', id: r?.data?.id, error: r?.error });
+  } catch (e) {
+    return NextResponse.json({ status: 'ERROR', problem: e.message }, { status: 500 });
+  }
+}
+
 export async function POST(req) {
   try {
     const { email, name, items, total } = await req.json();
