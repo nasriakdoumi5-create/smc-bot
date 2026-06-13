@@ -1,15 +1,12 @@
-import { get5mBars, get1hBars } from './data.js';
-import { analyze } from './smc.js';
-import { getUpcomingHigh, isNewsTime } from './calendar.js';
+import { get5mBars } from './data.js';
+import { analyzeAMD } from './amd.js';
 import { analyzeOrderFlow, orderFlowText } from './orderflow.js';
+import { getUpcomingHigh, isNewsTime } from './calendar.js';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 
 const TOKEN   = process.env.TELEGRAM_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const SYMBOL  = process.env.SYMBOL || 'MNQ';
-
-// رمز Tradovate للـ NQ — يتغير حسب الشهر
-const TV_SYMBOL = process.env.TRADOVATE_SYMBOL || 'NQM6';
 
 if (!TOKEN || !CHAT_ID) { console.error('❌ TOKEN مفقود'); process.exit(1); }
 
@@ -28,21 +25,6 @@ async function tg(text) {
   return r.ok;
 }
 
-const condLabels = {
-  htfBull:'HTF Trend صاعد', htfBear:'HTF Trend هابط', sessionOk:'جلسة نشطة',
-  recentSweepDown:'Liquidity Sweep هبوطي', recentSweepUp:'Liquidity Sweep صاعد',
-  inBullOB:'Order Block صاعد', inBearOB:'Order Block هابط',
-  recentBullFVG:'Fair Value Gap صاعد', recentBearFVG:'Fair Value Gap هابط',
-  fibOTE_bull:'Fibonacci OTE (61-78%)', fibOTE_bear:'Fibonacci OTE (61-78%)',
-  rsiOversold:'RSI تحت 50', rsiOverbought:'RSI فوق 50',
-  positiveDelta:'Order Flow — Delta إيجابي ↑',
-  negativeDelta:'Order Flow — Delta سلبي ↓',
-  ofBuyImbalance:'Order Flow — Stacked Buy Imbalance ✦',
-  ofSellImbalance:'Order Flow — Stacked Sell Imbalance ✦',
-  bullDivergence:'Delta Divergence صاعد ⚠️',
-  bearDivergence:'Delta Divergence هابط ⚠️',
-};
-
 async function check() {
   const state = loadState();
 
@@ -57,79 +39,82 @@ async function check() {
     }
   }
 
-  // ── جلب البيانات (Yahoo Finance فقط — مجاني 100%) ──
-  const [bars5m, bars1h] = await Promise.all([
-    get5mBars(SYMBOL),
-    get1hBars(SYMBOL),
-  ]);
+  // ── جلب البيانات ──────────────────────────
+  const bars5m = await get5mBars(SYMBOL);
+  const result = analyzeAMD(bars5m);
+  const of     = analyzeOrderFlow(bars5m);
 
-  // Order Flow يُحسب من نفس بيانات Yahoo — لا يحتاج API إضافي
-  const of = analyzeOrderFlow(bars5m);
+  if (result.error) {
+    console.log('[AMD]', result.error);
+    saveState(state); return;
+  }
 
-  const result = analyze(bars5m, bars1h, null, of);
-  if (result.error) { console.log('[SMC]', result.error); saveState(state); return; }
+  const { price, session, asiaHigh, asiaLow, asiaSize, manipHigh, manipLow, manipPrice, inDistribution, signal } = result;
 
-  const { price, signal, htfTrend, session, scoreLong, scoreShort, rsi } = result;
-
-  const ofInfo = of
-    ? `⚡ OF: Delta ${of.lastDelta >= 0 ? '+' : ''}${of.lastDelta} | Cum.Δ ${of.cumDelta >= 0 ? '+' : ''}${of.cumDelta}${of.stackedSell ? ' 🔴 SI' : ''}${of.stackedBuy ? ' 🟢 SI' : ''}${of.bearDivergence ? ' ⚠️DIV' : ''}`
-    : '⚡ OF: -';
-
-  console.log(`${SYMBOL} @ ${price} | ${htfTrend} L:${scoreLong}/11 S:${scoreShort}/11 RSI:${rsi} | ${ofInfo}`);
+  // ── log ───────────────────────────────────
+  const manipTxt = manipHigh ? `🔴 Manip↑${manipPrice}` : manipLow ? `🟢 Manip↓${manipPrice}` : '⏳ لا يوجد';
+  console.log(`${SYMBOL} @ ${price} | ${session} | Asia[${asiaLow}-${asiaHigh}] | ${manipTxt}`);
 
   // ── Heartbeat كل ساعة ─────────────────────
   const nowMs = Date.now();
   if (nowMs - (state.lastHeartbeat || 0) > 60 * 60 * 1000) {
     state.lastHeartbeat = nowMs;
     await tg(
-`🤖 <b>SMC Bot — تقرير الساعة</b>
+`🤖 <b>AMD Bot — تقرير الساعة</b>
 
-📊 ${SYMBOL} @ <b>${price}</b>
-📈 HTF Trend: <b>${htfTrend}</b>
-🕐 الجلسة: ${session ? '🟢 نشطة' : '🔴 مغلقة'}
-⬆️ نقاط LONG:  ${scoreLong}/11
-⬇️ نقاط SHORT: ${scoreShort}/11
-📉 RSI: ${rsi}
-${domInfo}
+💰 ${SYMBOL} @ <b>${price}</b>
+🕐 الجلسة: <b>${session}</b>
 
-${signal ? `⚡ <b>إشارة ${signal.type} جاهزة</b>` : '⏳ لا توجد إشارة — البوت يراقب...'}`
+📦 Asia Range:
+   High: <b>${asiaHigh}</b>
+   Low:  <b>${asiaLow}</b>
+   Size: ${asiaSize} نقطة
+
+🎭 Manipulation:
+${manipHigh ? `   🔴 Stop Hunt فوق Asia High @ ${manipPrice}` : ''}${manipLow ? `   🟢 Stop Hunt تحت Asia Low  @ ${manipPrice}` : ''}${!manipHigh && !manipLow ? '   ⏳ لم يحدث بعد — انتظار London' : ''}
+
+${inDistribution && signal ? '⚡ <b>إشارة جاهزة — تحقق من الرسالة التالية</b>' : inDistribution ? '🔍 NY نشطة — لا توجد إشارة بعد' : '⏳ انتظار جلسة NY للدخول'}`
     ).catch(() => {});
   }
 
   if (!signal) { saveState(state); return; }
 
-  // ── تجنب التكرار ──────────────────────────
+  // ── تجنب التكرار (30 دقيقة) ───────────────
   const sigKey = `${signal.type}_${Math.round(signal.price / 10)}`;
   if (sigKey === state.lastSignalKey && (nowMs - state.lastSignalTime) < 30 * 60 * 1000) {
-    console.log(`تكرار — تجاهل`); saveState(state); return;
+    console.log('تكرار — تجاهل'); saveState(state); return;
   }
-  if (await isNewsTime()) { console.log(`خبر جارٍ — تجاهل`); saveState(state); return; }
+  if (await isNewsTime()) { console.log('خبر جارٍ — تجاهل'); saveState(state); return; }
 
   state.lastSignalKey  = sigKey;
   state.lastSignalTime = nowMs;
 
-  const isBull   = signal.type === 'LONG';
-  const total    = Object.keys(signal.conditions).length;
-  const scoreBar = '●'.repeat(signal.score) + '○'.repeat(total - signal.score);
-  const risk     = Math.abs(signal.price - signal.sl);
-  const rr       = risk > 0 ? (Math.abs(signal.tp1 - signal.price) / risk).toFixed(1) : '?';
+  // ── إرسال الإشارة ─────────────────────────
+  const isBull = signal.type === 'LONG';
+  const risk   = Math.abs(signal.price - signal.sl);
+  const rr     = risk > 0 ? (Math.abs(signal.tp1 - signal.price) / risk).toFixed(1) : '?';
+  const ofBlock = orderFlowText(of);
+
   const condList = Object.entries(signal.conditions)
     .map(([k, v]) => `${v ? '✅' : '❌'} ${condLabels[k] || k}`)
     .join('\n');
 
-  const ofBlock = orderFlowText(of);
-
   await tg(
-`${isBull ? '📈' : '📉'} <b>إشارة ${signal.type} — NQ Futures</b>
+`${isBull ? '📈' : '📉'} <b>AMD — إشارة ${signal.type} | NQ Futures</b>
 
-💰 السعر:  <b>${signal.price}</b>
-🛑 SL:     <b>${signal.sl}</b>  (${risk.toFixed(0)} نقطة)
-🎯 TP1:    <b>${signal.tp1}</b>
-🎯 TP2:    <b>${signal.tp2}</b>
-⚖️  R:R:   <b>${rr}:1</b>
+━━━━━━━━━━━━━━━━
+🎭 <b>المرحلة: ${signal.phase}</b>
+📦 ${signal.manipulation}
 
-⭐ الجودة: <b>${signal.score}/${total}</b>  ${scoreBar}
-📊 RSI: ${signal.rsi}  |  ATR: ${signal.atr}
+━━━━━━━━━━━━━━━━
+💰 الدخول:  <b>${signal.price}</b>
+🛑 SL:      <b>${signal.sl}</b>  (${risk.toFixed(0)} نقطة)
+🎯 TP1:     <b>${signal.tp1}</b>
+🎯 TP2:     <b>${signal.tp2}</b>  ← ${isBull ? 'Asia High' : 'Asia Low'}
+⚖️  R:R:    <b>${rr}:1</b>
+
+━━━━━━━━━━━━━━━━
+📊 Asia Range: ${asiaLow} – ${asiaHigh} (${asiaSize} نقطة)
 
 ${condList}
 ${ofBlock ? '\n' + ofBlock : ''}
@@ -138,8 +123,18 @@ ${ofBlock ? '\n' + ofBlock : ''}
 🕐 ${new Date().toLocaleString('ar-DZ')}`
   );
 
-  console.log(`✅ إشعار — ${signal.type} @ ${signal.price} | ${signal.score}/${total}`);
+  console.log(`✅ إشارة AMD ${signal.type} @ ${signal.price}`);
   saveState(state);
 }
+
+const condLabels = {
+  asiaRangeDefined:    'Asia Range محدد',
+  manipulationUp:      'Manipulation فوق Asia High (Stop Hunt صاعد)',
+  manipulationDown:    'Manipulation تحت Asia Low (Stop Hunt هابط)',
+  nySession:           'جلسة NY نشطة (Distribution)',
+  priceBelowAsiaHigh:  'السعر عاد تحت Asia High',
+  priceAboveAsiaLow:   'السعر عاد فوق Asia Low',
+  sweepReverted:       'السعر انعكس بعد الـ Sweep',
+};
 
 check().catch(e => { console.error('[Fatal]', e.message); process.exit(1); });
