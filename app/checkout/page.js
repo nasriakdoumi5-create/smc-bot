@@ -107,14 +107,25 @@ function CheckoutContent() {
     setStep(2);
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (!validate2()) return;
     setLoading(true);
-    setTimeout(() => {
-      clearCart();
-      const orderNum = 'PW' + Date.now().toString().slice(-6);
-      router.push(`/order-success?order=${orderNum}&email=${encodeURIComponent(form.email)}&amount=${finalTotal.toFixed(2)}`);
-    }, 1800);
+    const orderNum = 'PW' + Date.now().toString().slice(-6);
+    try {
+      await fetch('/api/send-order-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email,
+          name: `${form.firstName} ${form.lastName}`,
+          orderNum,
+          amount: finalTotal.toFixed(2),
+          items: items.map(i => ({ name: i.name, price: i.price, quantity: i.qty })),
+        }),
+      });
+    } catch {}
+    clearCart();
+    router.push(`/order-success?order=${orderNum}&email=${encodeURIComponent(form.email)}&amount=${finalTotal.toFixed(2)}`);
   };
 
   const formatCard = v => v.replace(/\D/g,'').slice(0,16).replace(/(\d{4})(?=\d)/g,'$1 ').trim();
