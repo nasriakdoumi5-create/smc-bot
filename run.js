@@ -1,255 +1,145 @@
-/**
- * SMC Elite — GitHub Actions Runner
- * يفحص MNQ + MGC + MCL في كل دورة
- * يحسب عدد العقود تلقائياً بناءً على الـ SL
- */
-
-import { get5mBars, get1hBars, get1mBars }          from './data.js';
-import { analyze, confirm1m }                       from './smc.js';
-import { getUpcomingHigh, isNewsTime }              from './calendar.js';
-import { readFileSync, writeFileSync, existsSync }  from 'fs';
+import { get5mBars, get1hBars } from './data.js';
+import { analyze } from './smc.js';
+import { getUpcomingHigh, isNewsTime } from './calendar.js';
+import { analyzeOrderFlow, orderFlowText } from './orderflow.js';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 
 const TOKEN   = process.env.TELEGRAM_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-const SYMBOLS = ['MNQ', 'MGC', 'MCL', 'MES'];
+const SYMBOL  = process.env.SYMBOL || 'MNQ';
 
-// ══ إعدادات إدارة المال ══════════════════════
-const ACCOUNT_BALANCE  = 50_000;   // حجم الحساب الممول
-const CURRENT_BALANCE  = 49_400;   // الرصيد الحالي (بعد خسارة $600)
-const RISK_PER_TRADE   = 75;       // 🔴 مرحلة التعافي — $75/صفقة
-const MAX_DRAWDOWN     = 1_500;    // الحد الأقصى للخسارة الإجمالية
-const DAILY_STOP_LOSS  = 300;      // وقف يومي عند $300 (4 صفقات فاشلة)
-const REMAINING_BUDGET = 900;      // المتبقي قبل الحرق ($1500 - $600)
+// رمز Tradovate للـ NQ — يتغير حسب الشهر
+const TV_SYMBOL = process.env.TRADOVATE_SYMBOL || 'NQM6';
 
-// قيمة النقطة لكل رمز (بالدولار)
-const POINT_VALUE = {
-  MNQ: 2,    // Micro Nasdaq  — $2 / نقطة
-  MGC: 10,   // Micro Gold    — $10 / نقطة
-  MCL: 100,  // Micro Crude   — $100 / نقطة
-  MES: 5,    // Micro S&P 500 — $5 / نقطة
-};
-
-// الحد الأقصى للعقود لكل رمز
-const MAX_CONTRACTS = {
-  MNQ: 5,
-  MGC: 3,
-  MCL: 2,
-  MES: 5,
-};
-
-/**
- * حساب عدد العقود بناءً على المخاطرة والـ SL
- * contracts = RISK / (SL_points × point_value)
- */
-function calcContracts(symbol, entryPrice, slPrice) {
-  const slPoints        = Math.abs(entryPrice - slPrice);
-  const pointVal        = POINT_VALUE[symbol] || 2;
-  const riskPerContract = slPoints * pointVal;
-  if (riskPerContract <= 0) return { contracts: 1, actualRisk: RISK_PER_TRADE, warning: false };
-
-  const contracts  = Math.floor(RISK_PER_TRADE / riskPerContract);
-  const maxC       = MAX_CONTRACTS[symbol] || 3;
-  const final      = Math.max(1, Math.min(contracts, maxC));
-  const actualRisk = +(final * riskPerContract).toFixed(0);
-  // تحذير إذا الخطر الفعلي يتجاوز الميزانية بأكثر من 50%
-  const warning    = actualRisk > RISK_PER_TRADE * 1.5;
-  return { contracts: final, actualRisk, warning };
-}
-
-// ══════════════════════════════════════════════
-
-if (!TOKEN || !CHAT_ID) {
-  console.error('❌ TELEGRAM_TOKEN أو TELEGRAM_CHAT_ID غير موجود');
-  process.exit(1);
-}
+if (!TOKEN || !CHAT_ID) { console.error('❌ TOKEN مفقود'); process.exit(1); }
 
 const STATE_FILE = '/tmp/smc_state.json';
-
 function loadState() {
-  try {
-    if (existsSync(STATE_FILE)) return JSON.parse(readFileSync(STATE_FILE, 'utf8'));
-  } catch {}
-  return { signals: {}, lastNewsKey: '', dailyLoss: 0, dailyDate: '', tradesLeft: 12 };
+  try { if (existsSync(STATE_FILE)) return JSON.parse(readFileSync(STATE_FILE, 'utf8')); } catch {}
+  return { lastSignalKey: '', lastSignalTime: 0, lastNewsKey: '', lastHeartbeat: 0 };
 }
-
-function checkDailyReset(state) {
-  const today = new Date().toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' });
-  if (state.dailyDate !== today) {
-    state.dailyDate  = today;
-    state.dailyLoss  = 0;
-  }
-}
-
-function saveState(s) {
-  try { writeFileSync(STATE_FILE, JSON.stringify(s)); } catch {}
-}
+function saveState(s) { try { writeFileSync(STATE_FILE, JSON.stringify(s)); } catch {} }
 
 async function tg(text) {
   const r = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ chat_id: CHAT_ID, text, parse_mode: 'HTML' })
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: CHAT_ID, text, parse_mode: 'HTML' })
   });
-  if (!r.ok) console.error('[TG Error]', await r.text());
   return r.ok;
 }
 
-const symbolNames = {
-  MNQ: 'Micro Nasdaq (MNQ)',
-  MGC: 'Micro Gold (MGC)',
-  MCL: 'Micro Crude Oil (MCL)',
-  MES: 'Micro S&P 500 (MES)',
-};
-
 const condLabels = {
-  htfBull:'HTF Trend صاعد',       htfBear:'HTF Trend هابط',
-  sessionOk:'جلسة نشطة',
-  recentSweepDown:'Liquidity Sweep ↓', recentSweepUp:'Liquidity Sweep ↑',
-  inBullOB:'Order Block صاعد',    inBearOB:'Order Block هابط',
-  recentBullFVG:'FVG صاعد',       recentBearFVG:'FVG هابط',
-  fibOTE_bull:'Fibonacci OTE',    fibOTE_bear:'Fibonacci OTE',
-  rsiOversold:'RSI ذروة بيع',     rsiOverbought:'RSI ذروة شراء',
-  volSpike:'حجم تداول مرتفع',
-  bullMomentum:'رفض صاعد قوي',    bearMomentum:'رفض هابط قوي',
+  htfBull:'HTF Trend صاعد', htfBear:'HTF Trend هابط', sessionOk:'جلسة نشطة',
+  recentSweepDown:'Liquidity Sweep هبوطي', recentSweepUp:'Liquidity Sweep صاعد',
+  inBullOB:'Order Block صاعد', inBearOB:'Order Block هابط',
+  recentBullFVG:'Fair Value Gap صاعد', recentBearFVG:'Fair Value Gap هابط',
+  fibOTE_bull:'Fibonacci OTE (61-78%)', fibOTE_bear:'Fibonacci OTE (61-78%)',
+  rsiOversold:'RSI تحت 50', rsiOverbought:'RSI فوق 50',
+  positiveDelta:'Order Flow — Delta إيجابي ↑',
+  negativeDelta:'Order Flow — Delta سلبي ↓',
+  ofBuyImbalance:'Order Flow — Stacked Buy Imbalance ✦',
+  ofSellImbalance:'Order Flow — Stacked Sell Imbalance ✦',
+  bullDivergence:'Delta Divergence صاعد ⚠️',
+  bearDivergence:'Delta Divergence هابط ⚠️',
 };
 
-async function checkSymbol(symbol, state) {
-  const [bars5m, bars1h, bars1m] = await Promise.all([
-    get5mBars(symbol),
-    get1hBars(symbol),
-    get1mBars(symbol)
-  ]);
-
-  const result = analyze(bars5m, bars1h);
-  if (result.error) { console.log(`[${symbol}]`, result.error); return; }
-
-  const { price, signal, htfTrend, session, scoreLong, scoreShort, rsi } = result;
-  const t = new Date().toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' });
-  console.log(`[${t}] ${symbol} @ ${price} | ${htfTrend} L:${scoreLong}/9 S:${scoreShort}/9 RSI:${rsi}`);
-
-  if (!signal) return;
-
-  // تجنب التكرار لكل رمز بشكل مستقل
-  if (!state.signals) state.signals = {};
-  const sigKey = `${signal.type}_${Math.round(signal.price / 10)}`;
-  const now    = Date.now();
-  const last   = state.signals[symbol] || {};
-
-  if (last.key === sigKey && (now - last.time) < 30 * 60 * 1000) {
-    console.log(`[${symbol}] تكرار — تجاهل`);
-    return;
-  }
-
-  // وقف يومي
-  checkDailyReset(state);
-  if (state.dailyLoss >= DAILY_STOP_LOSS) {
-    console.log(`[${symbol}] ⛔ وقف يومي — خسارة اليوم $${state.dailyLoss}`);
-    return;
-  }
-
-  // عدد الصفقات المتبقية
-  if ((state.tradesLeft ?? 12) <= 0) {
-    console.log(`[${symbol}] ⛔ انتهت الصفقات المتاحة للحساب`);
-    await tg('🚨 <b>تحذير: انتهت الصفقات المتاحة</b>\nالحساب وصل لحد الخسارة الأقصى — لا تفتح صفقات جديدة').catch(() => {});
-    return;
-  }
-
-  if (await isNewsTime()) {
-    console.log(`[${symbol}] خبر جارٍ — تجاهل`);
-    return;
-  }
-
-  // تأكيد 1M قبل الإشارة
-  const entry1m = confirm1m(bars1m, signal.type);
-
-  state.signals[symbol] = { key: sigKey, time: now };
-  state.dailyLoss  = (state.dailyLoss  || 0) + RISK_PER_TRADE;
-  state.tradesLeft = (state.tradesLeft ?? 12) - 1;
-
-  // ── حساب العقود ──────────────────────────
-  const calc       = calcContracts(symbol, signal.price, signal.sl);
-  const contracts  = calc.contracts;
-  const riskDollar = calc.actualRisk;
-  const riskWarn   = calc.warning;
-  const pointVal   = POINT_VALUE[symbol] || 2;
-  const tp1Dollar  = +(contracts * Math.abs(signal.tp1 - signal.price) * pointVal).toFixed(0);
-  const tp2Dollar  = +(contracts * Math.abs(signal.tp2 - signal.price) * pointVal).toFixed(0);
-  const tp3Dollar  = +(contracts * Math.abs(signal.tp3 - signal.price) * pointVal).toFixed(0);
-
-  const isBull    = signal.type === 'LONG';
-  const isStrong  = signal.score >= 6;
-  const scoreBar  = '●'.repeat(signal.score) + '○'.repeat(9 - signal.score);
-  const risk      = Math.abs(signal.price - signal.sl);
-  const rr        = risk > 0 ? (Math.abs(signal.tp1 - signal.price) / risk).toFixed(1) : '?';
-  const condList  = Object.entries(signal.conditions)
-    .map(([k, v]) => `${v ? '✅' : '❌'} ${condLabels[k] || k}`)
-    .join('\n');
-
-  const dir        = isBull ? 'BUY' : 'SELL';
-  const qualLabel  = isStrong ? '🔥 إشارة قوية' : '⚡ إشارة متوسطة — تحقق من الشارت';
-
-  await tg(
-`${isBull ? '📈' : '📉'} <b>${qualLabel} — ${symbolNames[symbol] || symbol}</b>
-
-━━━━━━━━━━━━━━━━━━━━
-📌 <b>أمر التنفيذ</b>
-${isBull ? '🟢' : '🔴'} الاتجاه: <b>${dir}</b>
-📦 العقود: <b>${contracts}</b> عقد
-💵 السعر:  <b>${signal.price}</b>
-🛑 SL:     <b>${signal.sl}</b>  (${slPoints.toFixed(0)} نقطة)
-
-🎯 <b>الأهداف</b>
-TP1: <b>${signal.tp1}</b>  ← +$${tp1Dollar} (R:R ${rr})
-TP2: <b>${signal.tp2}</b>  ← +$${tp2Dollar}
-TP3: <b>${signal.tp3}</b>  ← +$${tp3Dollar}
-
-━━━━━━━━━━━━━━━━━━━━
-💸 <b>إدارة المال</b>
-خطر:    <b>$${riskDollar}</b> من $${ACCOUNT_BALANCE.toLocaleString()}${riskWarn ? '  ⚠️ يتجاوز الميزانية' : ' ✅'}
-نقطة:   <b>$${pointVal} / عقد</b>
-━━━━━━━━━━━━━━━━━━━━
-
-⭐ الجودة: <b>${signal.score}/9</b>  ${scoreBar}
-📊 RSI: ${signal.rsi}  |  ATR: ${signal.atr}
-🕯 1M: ${entry1m.confirmed ? '✅' : '⚠️'} ${entry1m.reason}
-
-${condList}
-
-━━━━━━━━━━━━━━━━━━━━
-📋 <b>حالة الحساب</b>
-صفقات اليوم: خسارة $${state.dailyLoss} / $${DAILY_STOP_LOSS}
-متبقي كلياً: <b>${state.tradesLeft} صفقة</b> قبل الحد الأقصى
-
-⚠️ <i>القرار النهائي لك — تحقق من الشارت قبل الدخول</i>
-🕐 ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })} (إسبانيا)`
-  );
-
-  console.log(`[${t}] ✅ إشعار ${symbol} — ${signal.type} @ ${signal.price} | ${signal.score}/9 | ${contracts} عقود`);
-}
-
-async function main() {
+async function check() {
   const state = loadState();
 
-  // أخبار قادمة
+  // ── أخبار ────────────────────────────────
   const upcoming = await getUpcomingHigh(15).catch(() => []);
   for (const e of upcoming) {
     const key = e.date + e.title;
     if (key !== state.lastNewsKey) {
       state.lastNewsKey = key;
       const mins = Math.max(1, Math.round((new Date(e.date) - Date.now()) / 60000));
-      const newsTime = new Date(e.date).toLocaleString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' });
-      await tg(
-`⚠️ <b>خبر مهم — ${e.title}</b>
-🕐 خلال <b>${mins} دقيقة</b> (${newsTime} إسبانيا)  |  🔴 High Impact
-⛔ <b>لا تدخل الصفقة — انتظر الخبر</b>`
-      ).catch(() => {});
+      await tg(`⚠️ <b>خبر مهم — ${e.title}</b>\n🕐 خلال <b>${mins} دقيقة</b> | 🔴 High Impact\n⛔ <b>لا تدخل الصفقة</b>`).catch(() => {});
     }
   }
 
-  // فحص الثلاثة بالتوازي
-  await Promise.all(SYMBOLS.map(s => checkSymbol(s, state).catch(e => console.error(`[${s}]`, e.message))));
+  // ── جلب البيانات (Yahoo Finance فقط — مجاني 100%) ──
+  const [bars5m, bars1h] = await Promise.all([
+    get5mBars(SYMBOL),
+    get1hBars(SYMBOL),
+  ]);
 
+  // Order Flow يُحسب من نفس بيانات Yahoo — لا يحتاج API إضافي
+  const of = analyzeOrderFlow(bars5m);
+
+  const result = analyze(bars5m, bars1h, null, of);
+  if (result.error) { console.log('[SMC]', result.error); saveState(state); return; }
+
+  const { price, signal, htfTrend, session, scoreLong, scoreShort, rsi } = result;
+
+  const ofInfo = of
+    ? `⚡ OF: Delta ${of.lastDelta >= 0 ? '+' : ''}${of.lastDelta} | Cum.Δ ${of.cumDelta >= 0 ? '+' : ''}${of.cumDelta}${of.stackedSell ? ' 🔴 SI' : ''}${of.stackedBuy ? ' 🟢 SI' : ''}${of.bearDivergence ? ' ⚠️DIV' : ''}`
+    : '⚡ OF: -';
+
+  console.log(`${SYMBOL} @ ${price} | ${htfTrend} L:${scoreLong}/11 S:${scoreShort}/11 RSI:${rsi} | ${ofInfo}`);
+
+  // ── Heartbeat كل ساعة ─────────────────────
+  const nowMs = Date.now();
+  if (nowMs - (state.lastHeartbeat || 0) > 60 * 60 * 1000) {
+    state.lastHeartbeat = nowMs;
+    await tg(
+`🤖 <b>SMC Bot — تقرير الساعة</b>
+
+📊 ${SYMBOL} @ <b>${price}</b>
+📈 HTF Trend: <b>${htfTrend}</b>
+🕐 الجلسة: ${session ? '🟢 نشطة' : '🔴 مغلقة'}
+⬆️ نقاط LONG:  ${scoreLong}/11
+⬇️ نقاط SHORT: ${scoreShort}/11
+📉 RSI: ${rsi}
+${domInfo}
+
+${signal ? `⚡ <b>إشارة ${signal.type} جاهزة</b>` : '⏳ لا توجد إشارة — البوت يراقب...'}`
+    ).catch(() => {});
+  }
+
+  if (!signal) { saveState(state); return; }
+
+  // ── تجنب التكرار ──────────────────────────
+  const sigKey = `${signal.type}_${Math.round(signal.price / 10)}`;
+  if (sigKey === state.lastSignalKey && (nowMs - state.lastSignalTime) < 30 * 60 * 1000) {
+    console.log(`تكرار — تجاهل`); saveState(state); return;
+  }
+  if (await isNewsTime()) { console.log(`خبر جارٍ — تجاهل`); saveState(state); return; }
+
+  state.lastSignalKey  = sigKey;
+  state.lastSignalTime = nowMs;
+
+  const isBull   = signal.type === 'LONG';
+  const total    = Object.keys(signal.conditions).length;
+  const scoreBar = '●'.repeat(signal.score) + '○'.repeat(total - signal.score);
+  const risk     = Math.abs(signal.price - signal.sl);
+  const rr       = risk > 0 ? (Math.abs(signal.tp1 - signal.price) / risk).toFixed(1) : '?';
+  const condList = Object.entries(signal.conditions)
+    .map(([k, v]) => `${v ? '✅' : '❌'} ${condLabels[k] || k}`)
+    .join('\n');
+
+  const ofBlock = orderFlowText(of);
+
+  await tg(
+`${isBull ? '📈' : '📉'} <b>إشارة ${signal.type} — NQ Futures</b>
+
+💰 السعر:  <b>${signal.price}</b>
+🛑 SL:     <b>${signal.sl}</b>  (${risk.toFixed(0)} نقطة)
+🎯 TP1:    <b>${signal.tp1}</b>
+🎯 TP2:    <b>${signal.tp2}</b>
+⚖️  R:R:   <b>${rr}:1</b>
+
+⭐ الجودة: <b>${signal.score}/${total}</b>  ${scoreBar}
+📊 RSI: ${signal.rsi}  |  ATR: ${signal.atr}
+
+${condList}
+${ofBlock ? '\n' + ofBlock : ''}
+
+<i>⚠️ القرار النهائي لك</i>
+🕐 ${new Date().toLocaleString('ar-DZ')}`
+  );
+
+  console.log(`✅ إشعار — ${signal.type} @ ${signal.price} | ${signal.score}/${total}`);
   saveState(state);
 }
 
-main().catch(e => { console.error('[Fatal]', e.message); process.exit(1); });
+check().catch(e => { console.error('[Fatal]', e.message); process.exit(1); });
