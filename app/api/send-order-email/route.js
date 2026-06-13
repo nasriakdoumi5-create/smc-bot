@@ -132,7 +132,7 @@ export async function POST(req) {
   const resend = new Resend(process.env.RESEND_API_KEY);
 
   const { error } = await resend.emails.send({
-    from: 'PawCase <onboarding@resend.dev>',
+    from: 'PawCase <hello@pawcase.eu>',
     to: email,
     subject: `Your PawCase order ${orderNum} is confirmed! 🐾`,
     html,

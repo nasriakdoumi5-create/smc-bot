@@ -7,7 +7,7 @@ export async function GET() {
     const { Resend } = await import('resend');
     const resend = new Resend(key);
     const r = await resend.emails.send({
-      from: 'PawCase <onboarding@resend.dev>',
+      from: 'PawCase <hello@pawcase.eu>',
       to: 'nasriakdoumi5@gmail.com',
       subject: '✅ PawCase Test Email',
       html: '<h1>✅ يعمل! Check Gmail now</h1>',
@@ -93,7 +93,7 @@ export async function POST(req) {
     const { Resend } = await import('resend');
     const resend = new Resend(resendKey);
     await resend.emails.send({
-      from: 'PawCase <onboarding@resend.dev>',
+      from: 'PawCase <hello@pawcase.eu>',
       to: email,
       subject: `${firstName}, your cart is saved — 10% off inside 🐾`,
       html,
