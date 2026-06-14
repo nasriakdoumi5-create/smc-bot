@@ -82,7 +82,7 @@ function PaymentForm({ finalTotal, orderMeta, orderNum, onBack, discount, shippi
   );
 }
 
-export default function StripePaymentStep({ totalAmount, orderMeta, onBack, discount, shipping, finalTotal }) {
+export default function StripePaymentStep({ totalAmount, orderMeta, onBack, discount, shipping, finalTotal, cartItems = [] }) {
   const stripePromise = getStripe();
   const [clientSecret, setClientSecret] = useState('');
   const [orderNum] = useState('PW' + Date.now().toString().slice(-6));
@@ -101,6 +101,13 @@ export default function StripePaymentStep({ totalAmount, orderMeta, onBack, disc
           email: orderMeta.email,
           name: orderMeta.name,
           orderNum,
+          address: orderMeta.address || '',
+          city: orderMeta.city || '',
+          country: orderMeta.country || '',
+          zip: orderMeta.zip || '',
+          items: JSON.stringify(
+            cartItems.map((i) => ({ id: i.id, model: i.model || '', qty: i.qty, price: i.price }))
+          ).slice(0, 490),
         },
       }),
     })

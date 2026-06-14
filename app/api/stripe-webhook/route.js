@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createPrintfulOrder } from '@/lib/printful';
 
 export async function POST(req) {
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -23,9 +24,25 @@ export async function POST(req) {
 
   if (event.type === 'payment_intent.succeeded') {
     const pi = event.data.object;
-    const email = pi.metadata?.email;
-    const orderNum = pi.metadata?.orderNum || 'PW' + Date.now().toString().slice(-6);
+    const { email, name, orderNum: rawOrderNum, address, city, country, zip, items: itemsJson } = pi.metadata || {};
+    const orderNum = rawOrderNum || 'PW' + Date.now().toString().slice(-6);
 
+    // 1 — Create Printful fulfillment order
+    if (process.env.PRINTFUL_API_KEY && itemsJson && address) {
+      try {
+        const items = JSON.parse(itemsJson);
+        await createPrintfulOrder({
+          orderNum,
+          recipient: { name, email, address, city, country, zip },
+          items,
+        });
+        console.log(`Printful order created for ${orderNum}`);
+      } catch (e) {
+        console.error('Printful fulfillment failed:', e.message);
+      }
+    }
+
+    // 2 — Send confirmation email
     if (email) {
       try {
         await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/send-order-email`, {
@@ -35,7 +52,7 @@ export async function POST(req) {
             email,
             orderNum,
             amount: (pi.amount / 100).toFixed(2),
-            name: pi.metadata?.name || '',
+            name: name || '',
           }),
         });
       } catch (e) {

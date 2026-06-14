@@ -111,6 +111,30 @@ function CheckoutContent() {
     if (!validate2()) return;
     setLoading(true);
     const orderNum = 'PW' + Date.now().toString().slice(-6);
+
+    // Send to Printful for fulfillment
+    try {
+      await fetch('/api/create-printful-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderNum,
+          recipient: {
+            name: `${form.firstName} ${form.lastName}`,
+            email: form.email,
+            address: form.address,
+            city: form.city,
+            country: form.country,
+            zip: form.zip,
+          },
+          items: items.map(i => ({ id: i.id, model: i.model || '', qty: i.qty, price: i.price })),
+        }),
+      });
+    } catch (e) {
+      console.error('Printful order failed:', e);
+    }
+
+    // Send confirmation email
     try {
       await fetch('/api/send-order-email', {
         method: 'POST',
@@ -249,6 +273,7 @@ function CheckoutContent() {
                     discount={discount}
                     shipping={shipping}
                     finalTotal={finalTotal}
+                    cartItems={items}
                   />
                 </Suspense>
               ) : (
