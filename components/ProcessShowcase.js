@@ -33,7 +33,7 @@ const steps = [
   {
     id: 4,
     emoji: '📦',
-    title: 'Delivered in 3–5 Days',
+    title: 'Delivered in 3-5 Days',
     desc: 'Fully tracked, ships from within the EU',
     color: 'from-orange-400 to-red-500',
     bg: 'bg-orange-50',
@@ -59,10 +59,10 @@ export default function ProcessShowcase() {
             How It Works
           </span>
           <h2 className="text-3xl font-extrabold text-dark">
-            From Your Phone to a Masterpiece in 4 Steps
+            From Your Photo to a Masterpiece in 4 Steps
           </h2>
           <p className="text-gray-500 mt-2 text-base">
-            Every PawCase is handcrafted with love — here's how it happens
+            Every PawCase is handcrafted with love
           </p>
         </div>
 
@@ -71,24 +71,18 @@ export default function ProcessShowcase() {
             <button
               key={step.id}
               onClick={() => setActive(i)}
-              className={`rounded-2xl p-5 text-left transition-all duration-300 border-2 cursor-pointer ${
+              className={`rounded-2xl p-5 text-left transition-all duration-300 border-2 cursor-pointer w-full ${
                 active === i
-                  ? `${step.bg} ${step.border} shadow-md scale-[1.03]`
+                  ? step.bg + ' ' + step.border + ' shadow-md scale-[1.03]'
                   : 'bg-gray-50 border-transparent hover:border-gray-200'
               }`}
             >
-              <div
-                className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center text-2xl mb-3`}
-              >
+              <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center text-2xl mb-3`}>
                 {step.emoji}
               </div>
-              <div
-                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mb-2 text-xs font-bold ${
-                  active === i
-                    ? 'bg-primary border-primary text-white'
-                    : 'border-gray-300 text-gray-400'
-                }`}
-              >
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mb-2 text-xs font-bold ${
+                active === i ? 'bg-primary border-primary text-white' : 'border-gray-300 text-gray-400'
+              }`}>
                 {step.id}
               </div>
               <h3 className="font-bold text-dark text-sm mb-1">{step.title}</h3>
@@ -114,7 +108,7 @@ export default function ProcessShowcase() {
             href="/product/custom-pet-phone-case"
             className="bg-accent text-white px-8 py-3.5 rounded-xl font-bold text-base hover:bg-orange-600 transition-colors inline-flex items-center gap-2 shadow-lg shadow-orange-200"
           >
-            Create My Custom Case ✨
+            Create My Custom Case
           </Link>
           <p className="text-gray-400 text-xs mt-3">
             Digital preview sent within 24 hours · No print until you approve
