@@ -23,7 +23,7 @@ export const products = [
     reviewCount: 312,
     stock: 8,
     viewerCount: 14,
-    models: ['iPhone 15 Pro', 'iPhone 14 Pro', 'iPhone 13 Pro', 'iPhone 12 Pro', 'Samsung S24', 'Samsung S23', 'Samsung S22'],
+    models: ['iPhone 16 Pro', 'iPhone 16', 'iPhone 15 Pro', 'iPhone 15', 'iPhone 14 Pro', 'iPhone 14', 'iPhone 13 Pro', 'iPhone 13', 'iPhone 12 Pro', 'iPhone 12', 'Samsung S26', 'Samsung S25', 'Samsung S24', 'Samsung S23', 'Samsung S22'],
     features: [
       'That golden face, printed in vivid museum-quality detail',
       'Slim matte finish — looks stunning, feels premium',
@@ -57,7 +57,7 @@ export const products = [
     reviewCount: 156,
     stock: 15,
     viewerCount: 9,
-    models: ['iPhone 15 Pro', 'iPhone 14 Pro', 'iPhone 13 Pro', 'iPhone 12 Pro', 'Samsung S24', 'Samsung S23', 'Samsung S22'],
+    models: ['iPhone 16 Pro', 'iPhone 16', 'iPhone 15 Pro', 'iPhone 15', 'iPhone 14 Pro', 'iPhone 14', 'iPhone 13 Pro', 'iPhone 13', 'iPhone 12 Pro', 'iPhone 12', 'Samsung S26', 'Samsung S25', 'Samsung S24', 'Samsung S23', 'Samsung S22'],
     features: [
       'Striking black cat artwork in razor-sharp UV detail',
       'Premium matte finish — sleek and fingerprint-free',
@@ -91,7 +91,7 @@ export const products = [
     reviewCount: 203,
     stock: 6,
     viewerCount: 17,
-    models: ['iPhone 15 Pro', 'iPhone 14 Pro', 'iPhone 13 Pro', 'iPhone 12 Pro', 'Samsung S24', 'Samsung S23', 'Samsung S22'],
+    models: ['iPhone 16 Pro', 'iPhone 16', 'iPhone 15 Pro', 'iPhone 15', 'iPhone 14 Pro', 'iPhone 14', 'iPhone 13 Pro', 'iPhone 13', 'iPhone 12 Pro', 'iPhone 12', 'Samsung S26', 'Samsung S25', 'Samsung S24', 'Samsung S23', 'Samsung S22'],
     features: [
       'That iconic Frenchie face in full, vivid UV-printed detail',
       'Premium matte finish — feels as good as it looks',
@@ -125,7 +125,7 @@ export const products = [
     reviewCount: 89,
     stock: 23,
     viewerCount: 7,
-    models: ['iPhone 15 Pro', 'iPhone 14 Pro', 'iPhone 13 Pro', 'iPhone 12 Pro', 'Samsung S24', 'Samsung S23', 'Samsung S22'],
+    models: ['iPhone 16 Pro', 'iPhone 16', 'iPhone 15 Pro', 'iPhone 15', 'iPhone 14 Pro', 'iPhone 14', 'iPhone 13 Pro', 'iPhone 13', 'iPhone 12 Pro', 'iPhone 12', 'Samsung S26', 'Samsung S25', 'Samsung S24', 'Samsung S23', 'Samsung S22'],
     features: [
       'Warm tabby artwork printed in stunning UV detail',
       'Premium matte finish — as refined as your cat thinks it is',
@@ -160,7 +160,7 @@ export const products = [
     reviewCount: 127,
     stock: 3,
     viewerCount: 19,
-    models: ['iPhone 15 Pro', 'iPhone 14 Pro', 'iPhone 13 Pro', 'iPhone 12 Pro', 'Samsung S24', 'Samsung S23', 'Samsung S22'],
+    models: ['iPhone 16 Pro', 'iPhone 16', 'iPhone 15 Pro', 'iPhone 15', 'iPhone 14 Pro', 'iPhone 14', 'iPhone 13 Pro', 'iPhone 13', 'iPhone 12 Pro', 'iPhone 12', 'Samsung S26', 'Samsung S25', 'Samsung S24', 'Samsung S23', 'Samsung S22'],
     features: [
       'Your pet\'s actual photo — every hair, every detail, perfectly printed',
       'Digital mockup sent within 24 hours for your approval',
