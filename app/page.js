@@ -3,28 +3,10 @@ import Link from 'next/link';
 import { getFeaturedProducts, products } from '@/data/products';
 import ProductCard from '@/components/ProductCard';
 import NewsletterSection from '@/components/NewsletterSection';
+import ProcessShowcase from '@/components/ProcessShowcase';
 import { useState, useEffect } from 'react';
 
 const featured = getFeaturedProducts().slice(0, 4);
-
-function UrgencyCounter() {
-  const [count, setCount] = useState(47);
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCount(c => {
-        const delta = Math.random() > 0.5 ? 1 : -1;
-        return Math.max(30, Math.min(80, c + delta));
-      });
-    }, 8000);
-    return () => clearInterval(interval);
-  }, []);
-  return (
-    <div className="inline-flex items-center gap-2 bg-white/15 rounded-full px-4 py-1.5 text-sm">
-      <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-      <span><strong>{count}</strong> people shopping right now</span>
-    </div>
-  );
-}
 
 function RecentlyViewed() {
   const [viewed, setViewed] = useState([]);
@@ -58,7 +40,10 @@ export default function HomePage() {
               <span className="text-yellow-300">⭐⭐⭐⭐⭐</span>
               <span>4.9/5 from 5,000+ pet lovers</span>
             </div>
-            <UrgencyCounter />
+            <div className="inline-flex items-center gap-2 bg-white/15 rounded-full px-4 py-1.5 text-sm">
+              <span className="text-green-300">✓</span>
+              <span>Digital preview within 24h · Free EU shipping on €40+</span>
+            </div>
           </div>
           <h1 className="text-4xl md:text-6xl font-extrabold mb-6 leading-tight">
             Carry Your Best Friend<br />
@@ -113,6 +98,8 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      <ProcessShowcase />
 
       {/* As Seen In */}
       <section className="bg-secondary py-8">
@@ -216,36 +203,54 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Real PawCase Customers */}
+      {/* Real PawCase Customers — UGC Gallery */}
       <section className="max-w-6xl mx-auto px-4 py-16">
-        <h2 className="text-3xl font-bold text-center mb-2">See Real PawCase Customers</h2>
-        <p className="text-center text-gray-500 mb-10">Thousands of pet lovers showing off their cases every day</p>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="text-center mb-10">
+          <span className="inline-block bg-accent/10 text-accent text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-widest mb-3">
+            Real Customers
+          </span>
+          <h2 className="text-3xl font-bold">Shared With Love on Instagram</h2>
+          <p className="text-center text-gray-500 mt-2">Join thousands of pet lovers showing off their PawCase every day</p>
+        </div>
+        <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
           {[
-            { seed: 'customer1', name: 'Sofia M.', caption: 'My golden boy on my phone 🐕' },
-            { seed: 'customer2', name: 'Lucas K.', caption: 'Custom case came out perfect! ✨' },
-            { seed: 'customer3', name: 'Emma V.', caption: 'The best gift for cat mums 🐈' },
-            { seed: 'customer4', name: 'Marie D.', caption: 'Obsessed with my frenchie case 💕' },
-            { seed: 'customer5', name: 'Anna S.', caption: 'My tabby is famous now 🐾' },
-            { seed: 'customer6', name: 'James R.', caption: 'Quality is insane, worth every €' },
+            { seed: 'customer1', handle: '@sofiapets', caption: 'My golden boy on my phone 🐕', stars: 5 },
+            { seed: 'customer2', handle: '@lucas.k', caption: 'Custom case came out perfect! ✨', stars: 5 },
+            { seed: 'customer3', handle: '@emmav_nl', caption: 'The best gift for cat mums 🐈', stars: 5 },
+            { seed: 'customer4', handle: '@mariedparis', caption: 'Obsessed with my frenchie case 💕', stars: 5 },
+            { seed: 'customer5', handle: '@annasthlm', caption: 'My tabby is famous now 🐾', stars: 5 },
+            { seed: 'customer6', handle: '@jamesr_uk', caption: 'Quality is insane, worth every €', stars: 5 },
+            { seed: 'ugc1', handle: '@petlover_de', caption: 'Second case for my sister 🎁', stars: 5 },
+            { seed: 'ugc2', handle: '@catlady_be', caption: 'Everyone asks where I got this 😍', stars: 5 },
+            { seed: 'ugc3', handle: '@dogdad_es', caption: 'Ships so fast, I was shocked', stars: 5 },
+            { seed: 'ugc4', handle: '@pawmom_fr', caption: 'The colours are unreal 🎨', stars: 5 },
+            { seed: 'ugc5', handle: '@petcase_it', caption: 'Already ordering a third one', stars: 5 },
+            { seed: 'ugc6', handle: '@goldenlife', caption: 'Best purchase of 2025 🏆', stars: 5 },
           ].map((c, i) => (
-            <div key={i} className="card overflow-hidden group">
-              <div className="relative overflow-hidden">
-                <img
-                  src={`https://picsum.photos/seed/${c.seed}/400/400`}
-                  alt={c.caption}
-                  className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
-                  <p className="text-white text-xs font-medium">{c.caption}</p>
-                </div>
+            <div key={i} className="rounded-xl overflow-hidden relative group cursor-pointer aspect-square">
+              <img
+                src={`https://picsum.photos/seed/${c.seed}/400/400`}
+                alt={c.caption}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2.5">
+                <p className="text-white text-xs font-bold">{c.handle}</p>
+                <p className="text-white/80 text-xs leading-tight">{c.caption}</p>
+                <p className="text-yellow-400 text-xs mt-0.5">{'★'.repeat(c.stars)}</p>
               </div>
-              <div className="p-3">
-                <p className="text-sm font-semibold text-dark">{c.name}</p>
-                <p className="text-xs text-yellow-400">★★★★★</p>
+              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="bg-white/90 rounded-full p-1">
+                  <svg className="w-3 h-3 text-pink-500" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                  </svg>
+                </div>
               </div>
             </div>
           ))}
+        </div>
+        <div className="text-center mt-8">
+          <p className="text-gray-500 text-sm">Tag us <span className="font-semibold text-primary">@pawcase.eu</span> for a chance to be featured</p>
         </div>
       </section>
 

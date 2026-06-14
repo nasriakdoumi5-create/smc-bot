@@ -67,10 +67,6 @@ export default function ProductCard({ product }) {
           </div>
         )}
 
-        {product.viewerCount > 0 && product.stock > 5 && (
-          <p className="text-xs text-orange-500 font-medium mb-2">🔥 {product.viewerCount} people viewing</p>
-        )}
-
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xl font-bold text-accent">€{product.price}</span>
           {product.originalPrice && (

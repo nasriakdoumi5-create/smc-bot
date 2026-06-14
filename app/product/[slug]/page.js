@@ -10,7 +10,7 @@ import BundleOffer from '@/components/BundleOffer';
 import StickyATC from '@/components/StickyATC';
 import RecentPurchaseNotification from '@/components/RecentPurchaseNotification';
 import WishlistButton from '@/components/WishlistButton';
-import { ShoppingCart, Zap, CheckCircle, Upload, Users, Shield, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { ShoppingCart, Zap, CheckCircle, Upload, Shield, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 import { trackViewContent } from '@/components/MetaPixel';
 import { ttqViewContent } from '@/components/TikTokPixel';
@@ -176,12 +176,6 @@ export default function ProductPage() {
 
             <div className="flex items-center gap-4 mb-4 flex-wrap">
               <StarRating rating={product.rating} count={product.reviewCount} size="md" />
-              {product.viewerCount && (
-                <span className="text-xs text-orange-500 font-semibold bg-orange-50 px-2 py-1 rounded-full flex items-center gap-1">
-                  <Users className="w-3 h-3" />
-                  {product.viewerCount} people viewing now
-                </span>
-              )}
             </div>
 
             {product.stock <= 5 && (
@@ -240,6 +234,21 @@ export default function ProductPage() {
                 <p className="text-xs font-bold text-green-700">30-Day Money-Back Guarantee</p>
                 <p className="text-xs text-green-600">Not in love with it? Full refund. No questions asked.</p>
               </div>
+            </div>
+
+            {/* USP strip */}
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {[
+                { icon: '⚡', text: 'Preview within 24h' },
+                { icon: '🖨️', text: 'Premium UV print' },
+                { icon: '🚚', text: 'EU ships 3–5 days' },
+                { icon: '🏆', text: '30-day guarantee' },
+              ].map(usp => (
+                <div key={usp.text} className="flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                  <span>{usp.icon}</span>
+                  <span className="font-medium">{usp.text}</span>
+                </div>
+              ))}
             </div>
 
             <div className="flex gap-3 mb-5">

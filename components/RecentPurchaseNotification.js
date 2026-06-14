@@ -3,13 +3,13 @@ import { useEffect, useState } from 'react';
 import { ShoppingBag } from 'lucide-react';
 
 const notifications = [
-  { name: 'Sofia M.', location: 'Madrid', product: 'Golden Retriever Case', time: '2 min ago' },
-  { name: 'Lucas K.', location: 'Berlin', product: 'Custom Pet Case', time: '5 min ago' },
-  { name: 'Emma V.', location: 'Amsterdam', product: 'Black Cat Case', time: '8 min ago' },
-  { name: 'Marie D.', location: 'Paris', product: 'French Bulldog Case', time: '12 min ago' },
-  { name: 'Anna S.', location: 'Stockholm', product: 'Tabby Cat Case', time: '15 min ago' },
-  { name: 'James R.', location: 'London', product: 'Golden Retriever Case', time: '18 min ago' },
-  { name: 'Clara B.', location: 'Brussels', product: 'Custom Pet Case', time: '22 min ago' },
+  { name: 'Sofia M.', location: 'Madrid', product: 'Golden Retriever Case', time: 'Recently' },
+  { name: 'Lucas K.', location: 'Berlin', product: 'Custom Pet Case', time: 'Recently' },
+  { name: 'Emma V.', location: 'Amsterdam', product: 'Black Cat Case', time: 'Recently' },
+  { name: 'Marie D.', location: 'Paris', product: 'French Bulldog Case', time: 'Recently' },
+  { name: 'Anna S.', location: 'Stockholm', product: 'Tabby Cat Case', time: 'Recently' },
+  { name: 'James R.', location: 'London', product: 'Golden Retriever Case', time: 'Recently' },
+  { name: 'Clara B.', location: 'Brussels', product: 'Custom Pet Case', time: 'Recently' },
 ];
 
 export default function RecentPurchaseNotification() {
@@ -42,7 +42,7 @@ export default function RecentPurchaseNotification() {
       </div>
       <div>
         <p className="text-xs font-bold text-dark">{n.name} from {n.location}</p>
-        <p className="text-xs text-gray-500">Just purchased <span className="font-medium text-primary">{n.product}</span></p>
+        <p className="text-xs text-gray-500">Ordered a <span className="font-medium text-primary">{n.product}</span></p>
         <p className="text-xs text-gray-400">{n.time}</p>
       </div>
       <button onClick={() => setVisible(false)} className="absolute top-1.5 right-1.5 text-gray-300 hover:text-gray-500 text-xs">✕</button>
