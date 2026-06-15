@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 
-const PHONE = (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '34600000000').replace(/\D/g, '');
+const PHONE = (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '+34631151893').replace(/\D/g, '');
 
 export default function WhatsAppButton() {
   const [tooltip, setTooltip] = useState(true);
