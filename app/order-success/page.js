@@ -5,12 +5,14 @@ import { useSearchParams } from 'next/navigation';
 import { CheckCircle, Truck, Mail, ArrowRight } from 'lucide-react';
 import { trackPurchase } from '@/components/MetaPixel';
 import { ttqPurchase } from '@/components/TikTokPixel';
+import { useCart } from '@/context/CartContext';
 
 function OrderSuccessContent() {
   const params = useSearchParams();
   const orderNum = params.get('order') || 'PW' + Date.now().toString().slice(-6);
   const email = params.get('email') || '';
   const amount = parseFloat(params.get('amount') || '0');
+  const { clearCart } = useCart();
 
   const deliveryDate = (() => {
     const d = new Date();
@@ -21,11 +23,12 @@ function OrderSuccessContent() {
   })();
 
   useEffect(() => {
-    if (orderNum && amount > 0) {
+    if (amount > 0) {
+      clearCart();
       trackPurchase(orderNum, amount);
       ttqPurchase(orderNum, amount);
     }
-  }, [orderNum, amount]);
+  }, []);
 
   return (
     <div className="max-w-lg mx-auto px-4 py-16 text-center">

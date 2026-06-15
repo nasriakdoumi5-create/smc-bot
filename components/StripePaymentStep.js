@@ -105,9 +105,13 @@ export default function StripePaymentStep({ totalAmount, orderMeta, onBack, disc
           city: orderMeta.city || '',
           country: orderMeta.country || '',
           zip: orderMeta.zip || '',
-          items: JSON.stringify(
-            cartItems.map((i) => ({ id: i.id, model: i.model || '', qty: i.qty, price: i.price }))
-          ).slice(0, 490),
+          ic: String(cartItems.length),
+          ...Object.fromEntries(
+            cartItems.map((i, idx) => [
+              `i${idx}`,
+              `${i.id}|${(i.model || '').replace(/\|/g, '_')}|${i.qty}|${i.price}`,
+            ])
+          ),
         },
       }),
     })
