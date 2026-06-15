@@ -1,0 +1,15 @@
+{
+  "slug": "job_application_tracker",
+  "name": "Job Application Tracker",
+  "excel": "/home/user/smc-bot/output/job_application_tracker/job_application_tracker.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/job_application_tracker/job_application_tracker_01_hero.jpg",
+    "/home/user/smc-bot/output/job_application_tracker/job_application_tracker_02_included.jpg",
+    "/home/user/smc-bot/output/job_application_tracker/job_application_tracker_03_how.jpg",
+    "/home/user/smc-bot/output/job_application_tracker/job_application_tracker_04_features.jpg",
+    "/home/user/smc-bot/output/job_application_tracker/job_application_tracker_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/job_application_tracker/job_application_tracker_guide.pdf",
+  "listing": "/home/user/smc-bot/output/job_application_tracker/job_application_tracker_listing.txt",
+  "built_at": "2026-06-15T22:57:01.884588"
+}

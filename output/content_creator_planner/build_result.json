@@ -1,0 +1,15 @@
+{
+  "slug": "content_creator_planner",
+  "name": "Content Creator Planner",
+  "excel": "/home/user/smc-bot/output/content_creator_planner/content_creator_planner.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/content_creator_planner/content_creator_planner_01_hero.jpg",
+    "/home/user/smc-bot/output/content_creator_planner/content_creator_planner_02_included.jpg",
+    "/home/user/smc-bot/output/content_creator_planner/content_creator_planner_03_how.jpg",
+    "/home/user/smc-bot/output/content_creator_planner/content_creator_planner_04_features.jpg",
+    "/home/user/smc-bot/output/content_creator_planner/content_creator_planner_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/content_creator_planner/content_creator_planner_guide.pdf",
+  "listing": "/home/user/smc-bot/output/content_creator_planner/content_creator_planner_listing.txt",
+  "built_at": "2026-06-15T22:57:00.815631"
+}

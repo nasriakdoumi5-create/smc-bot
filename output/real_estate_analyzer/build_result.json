@@ -1,0 +1,15 @@
+{
+  "slug": "real_estate_analyzer",
+  "name": "Real Estate Deal Analyzer",
+  "excel": "/home/user/smc-bot/output/real_estate_analyzer/real_estate_analyzer.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/real_estate_analyzer/real_estate_analyzer_01_hero.jpg",
+    "/home/user/smc-bot/output/real_estate_analyzer/real_estate_analyzer_02_included.jpg",
+    "/home/user/smc-bot/output/real_estate_analyzer/real_estate_analyzer_03_how.jpg",
+    "/home/user/smc-bot/output/real_estate_analyzer/real_estate_analyzer_04_features.jpg",
+    "/home/user/smc-bot/output/real_estate_analyzer/real_estate_analyzer_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/real_estate_analyzer/real_estate_analyzer_guide.pdf",
+  "listing": "/home/user/smc-bot/output/real_estate_analyzer/real_estate_analyzer_listing.txt",
+  "built_at": "2026-06-15T22:57:01.136604"
+}
