@@ -16,20 +16,15 @@ const SYMBOLS = [
   { id: 'CGC', name: 'Canopy Growth',               emoji: '🌿' },
 ];
 
-const COND_LABELS = {
-  asiaRangeDefined:    'Asia Range محدد',
-  manipulationUp:      'Stop Hunt فوق Asia High',
-  manipulationDown:    'Stop Hunt تحت Asia Low',
-  nySession:           'جلسة NY نشطة',
-  priceBelowAsiaHigh:  'السعر عاد تحت Asia High',
-  priceAboveAsiaLow:   'السعر عاد فوق Asia Low',
-  sweepReverted:       'السعر انعكس بعد الـ Sweep',
-};
+// مفتاح اليوم بتوقيت مدريد (YYYY-MM-DD)
+function todayMadrid() {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' });
+}
 
 const STATE_FILE = '/tmp/smc_state.json';
 function loadState() {
   try { if (existsSync(STATE_FILE)) return JSON.parse(readFileSync(STATE_FILE, 'utf8')); } catch {}
-  return { signals: {}, lastNewsKey: '', lastHeartbeat: 0 };
+  return { dailySignals: {}, lastNewsKey: '', lastHeartbeat: 0 };
 }
 function saveState(s) { try { writeFileSync(STATE_FILE, JSON.stringify(s)); } catch {} }
 
@@ -51,37 +46,49 @@ async function checkSymbol(sym, state, newsActive) {
 
   if (result.error) { console.log(`[${sym.id}]`, result.error); return; }
 
-  const { price, session, asiaHigh, asiaLow, asiaSize, manipHigh, manipLow, manipPrice, signal } = result;
-  const manipTxt = manipHigh
-    ? `🔴 Manip↑${manipPrice}`
-    : manipLow ? `🟢 Manip↓${manipPrice}` : '⏳ لا يوجد';
+  const {
+    price, session, asiaHigh, asiaLow, asiaSize,
+    mUp, mDn, mUpClosed, mDnClosed, manipPrice,
+    dispBull, dispBear, htfBias, longScore, shortScore, signal,
+  } = result;
 
-  console.log(`[${sym.id}] @ ${price} | ${session} | Asia[${asiaLow}–${asiaHigh}] | ${manipTxt}`);
+  const manipTxt = mUp
+    ? `🔴 Hunt↑${manipPrice ?? asiaHigh}`
+    : mDn ? `🟢 Hunt↓${manipPrice ?? asiaLow}` : '⏳ لا يوجد';
+
+  console.log(`[${sym.id}] @ ${price} | ${session} | Asia[${asiaLow}–${asiaHigh}] | ${manipTxt} | L:${longScore} S:${shortScore}`);
 
   if (!signal) return;
   if (newsActive) { console.log(`[${sym.id}] خبر جارٍ — تجاهل`); return; }
 
-  // تجنب التكرار 30 دقيقة لكل رمز
-  const sigKey   = `${signal.type}_${Math.round(signal.price / 10)}`;
-  const sigState = state.signals[sym.id] || {};
-  const nowMs    = Date.now();
+  // إشارة واحدة فقط يومياً لكل رمز
+  const today = todayMadrid();
+  if (!state.dailySignals) state.dailySignals = {};
+  const symDay = state.dailySignals[sym.id];
 
-  if (sigKey === sigState.lastKey && (nowMs - sigState.lastTime) < 30 * 60 * 1000) {
-    console.log(`[${sym.id}] تكرار — تجاهل`); return;
+  if (symDay && symDay.date === today) {
+    console.log(`[${sym.id}] إشارة اليوم أُرسلت مسبقاً (${symDay.type} @ ${symDay.price}) — تجاهل`);
+    return;
   }
 
-  state.signals[sym.id] = { lastKey: sigKey, lastTime: nowMs };
+  // تسجيل الإشارة
+  state.dailySignals[sym.id] = { date: today, type: signal.type, price: signal.price };
 
-  const isBull   = signal.type === 'LONG';
-  const risk     = Math.abs(signal.price - signal.sl);
-  const rr       = risk > 0 ? (Math.abs(signal.tp1 - signal.price) / risk).toFixed(1) : '?';
-  const ofBlock  = orderFlowText(of);
-  const condList = Object.entries(signal.conditions)
-    .map(([k, v]) => `${v ? '✅' : '❌'} ${COND_LABELS[k] || k}`)
-    .join('\n');
+  const isBull  = signal.type === 'LONG';
+  const risk    = Math.abs(signal.price - signal.sl);
+  const rr      = risk > 0 ? (Math.abs(signal.tp1 - signal.price) / risk).toFixed(1) : '?';
+  const ofBlock = orderFlowText(of);
+
+  const htfLine  = htfBias === 'bull' ? '📈 HTF: صاعد ✅' : htfBias === 'bear' ? '📉 HTF: هابط ✅' : '📊 HTF: محايد';
+  const dispLine = isBull
+    ? `${dispBull ? '✅' : '❌'} Displacement صعودي`
+    : `${dispBear ? '✅' : '❌'} Displacement هبوطي`;
+  const huntLine = isBull
+    ? `${mDn && mDnClosed ? '✅' : '❌'} Hunt DN + إغلاق داخل النطاق`
+    : `${mUp && mUpClosed ? '✅' : '❌'} Hunt UP + إغلاق داخل النطاق`;
 
   await tg(
-`${isBull ? '📈' : '📉'} <b>AMD — ${signal.type} | ${sym.emoji} ${sym.name}</b>
+`${isBull ? '📈' : '📉'} <b>AMD SNIPER — ${signal.type} | ${sym.emoji} ${sym.name}</b>
 
 ━━━━━━━━━━━━━━━━
 🎭 <b>المرحلة: ${signal.phase}</b>
@@ -89,21 +96,24 @@ async function checkSymbol(sym, state, newsActive) {
 
 ━━━━━━━━━━━━━━━━
 💰 الدخول:  <b>${signal.price}</b>
-🛑 SL:      <b>${signal.sl}</b>  (${risk.toFixed(2)} نقطة)
-🎯 TP1:     <b>${signal.tp1}</b>
-🎯 TP2:     <b>${signal.tp2}</b>  ← ${isBull ? 'Asia High' : 'Asia Low'}
+🛑 SL:      <b>${signal.sl}</b>  (${risk.toFixed(4)} نقطة)
+🎯 TP1:     <b>${signal.tp1}</b>  (1.5:1)
+🎯 TP2:     <b>${signal.tp2}</b>  (3:1)
 ⚖️  R:R:    <b>${rr}:1</b>
 
 ━━━━━━━━━━━━━━━━
 📊 Asia Range: ${asiaLow} – ${asiaHigh}  (${asiaSize} نقطة)
+🏆 Score: <b>${signal.score}</b>
 
-${condList}${ofBlock ? '\n\n' + ofBlock : ''}
+${htfLine}
+${huntLine}
+${dispLine}${ofBlock ? '\n\n' + ofBlock : ''}
 
-<i>⚠️ القرار النهائي لك</i>
-🕐 ${new Date().toLocaleString('ar-DZ')}`
+<i>⚠️ إشارة واحدة يومياً — القرار النهائي لك</i>
+🕐 ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}`
   );
 
-  console.log(`✅ [${sym.id}] إشارة AMD ${signal.type} @ ${signal.price}`);
+  console.log(`✅ [${sym.id}] إشارة AMD SNIPER ${signal.type} @ ${signal.price} | Score: ${signal.score}`);
 }
 
 // ══ الدالة الرئيسية ═══════════════════════════
@@ -135,19 +145,23 @@ async function check() {
       if (!bars) return `${sym.emoji} ${sym.id}: ❌ لا بيانات`;
       const r = analyzeAMD(bars);
       if (r.error) return `${sym.emoji} ${sym.id}: ⚠️ ${r.error}`;
-      const manip = r.manipHigh
-        ? `🔴 Hunt↑${r.manipPrice}`
-        : r.manipLow ? `🟢 Hunt↓${r.manipPrice}` : '⏳ لا يوجد';
-      return `${sym.emoji} <b>${sym.id}</b> @ ${r.price}\n   ${r.session} | ${manip}\n   Asia: ${r.asiaLow}–${r.asiaHigh}`;
+      const manip = r.mUp
+        ? `🔴 Hunt↑${r.manipPrice ?? r.asiaHigh}`
+        : r.mDn ? `🟢 Hunt↓${r.manipPrice ?? r.asiaLow}` : '⏳ لا يوجد';
+      const today = todayMadrid();
+      const sent  = state.dailySignals?.[sym.id]?.date === today
+        ? `📨 إشارة أُرسلت: ${state.dailySignals[sym.id].type}`
+        : '⏳ لا إشارة بعد';
+      return `${sym.emoji} <b>${sym.id}</b> @ ${r.price}\n   ${r.session} | ${manip}\n   Asia: ${r.asiaLow}–${r.asiaHigh} | L:${r.longScore} S:${r.shortScore}\n   ${sent}`;
     }));
 
     await tg(
-`🤖 <b>AMD Bot — تقرير الساعة</b>
+`🤖 <b>AMD SNIPER Bot — تقرير الساعة</b>
 
 ${statuses.join('\n\n')}
 
 ${newsActive ? '⛔ خبر جارٍ الآن' : '✅ لا أخبار نشطة'}
-🕐 ${new Date().toLocaleString('ar-DZ')}`
+🕐 ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}`
     ).catch(() => {});
   }
 
