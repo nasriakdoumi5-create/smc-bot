@@ -9,8 +9,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from factory import build_product
-from products import CATALOG
+from nasritools.factory import build_product
+from nasritools.products import CATALOG
 
 
 def menu():
