@@ -153,23 +153,36 @@ def main():
         "code_challenge":        challenge,
         "code_challenge_method": "S256",
     }
+    url = AUTH_URL + "?" + urllib.parse.urlencode(params)
 
     print("\n" + "═" * 60)
     print("  NasriTools — Etsy Authorization")
     print("═" * 60)
-    print("\n  اختر الطريقة:")
-    print("  1 — تلقائي (يفتح المتصفح ويلتقط الرمز بنفسه) [موصى به]")
-    print("  2 — يدوي  (تنسخ الرابط وتلصقه هنا)")
-    choice = input("\n  اختر (1 أو 2): ").strip()
+    print("\n  خطوة 1: يفتح المتصفح تلقائياً على صفحة Etsy")
+    print("  خطوة 2: اضغط 'Allow Access' في المتصفح")
+    print("  خطوة 3: ارجع هنا — سيكمل البرنامج تلقائياً")
+    print("\n  جارٍ فتح المتصفح...")
 
-    if choice == "2":
-        code = _manual_mode(params, verifier)
-    else:
-        code = _auto_mode(params, verifier)
+    webbrowser.open(url)
+
+    print("  في انتظار موافقتك في المتصفح (دقيقتان)...\n")
+
+    global _auth_code
+    server = HTTPServer(("", 3003), _Handler)
+    server.timeout = 120
+    server.handle_request()
+
+    code = _auth_code
+
+    if not code:
+        print("\n  لم يصل الرمز تلقائياً.")
+        print("  انسخ فقط الرقم بعد كلمة 'code=' من شريط المتصفح والصقه هنا:")
+        raw = input("  code= ").strip()
+        code = raw.split("code=")[-1].split("&")[0] if "code=" in raw else raw
 
     if not code:
         print("\n  ✗ لم يُستلم رمز التفويض.")
-        print("  تأكد أن التطبيق مسجّل على: etsy.com/developers/your-apps")
+        print("  السبب: التطبيق لا يزال Pending Approval على Etsy.")
         return
 
     print("\n  ✅ جارٍ تحويل الرمز إلى Access Token...")
@@ -177,12 +190,11 @@ def main():
         token = _exchange(code, verifier)
     except Exception as e:
         print(f"\n  ✗ فشل: {e}")
-        print("  السبب الأكثر احتمالاً: التطبيق لا يزال Pending Approval.")
-        print("  انتظر موافقة Etsy ثم حاول مجدداً.")
+        print("  السبب: التطبيق لا يزال Pending Approval على Etsy.")
         return
 
     TOKEN_FILE.write_text(json.dumps(token, indent=2))
-    print(f"  ✅ Token محفوظ في: {TOKEN_FILE}")
+    print(f"  ✅ Token محفوظ!")
     print("  الآن شغّل: python nasritools/build_and_publish.py\n")
 
 
