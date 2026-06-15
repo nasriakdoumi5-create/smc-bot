@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createPrintfulOrder } from '@/lib/printful';
+import { sendWhatsApp } from '@/lib/whatsapp';
 
 export async function POST(req) {
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -81,7 +82,22 @@ export async function POST(req) {
       }
     }
 
-    // 3 — Admin notification
+    // 3 — Admin WhatsApp notification
+    if (process.env.ADMIN_WHATSAPP) {
+      try {
+        const itemLines = items
+          .map((i) => `• ${i.model || i.id} × ${i.qty} — €${Number(i.price).toFixed(2)}`)
+          .join('\n');
+        await sendWhatsApp(
+          process.env.ADMIN_WHATSAPP,
+          `🐾 *New PawCase Order!*\n\n*Order:* ${orderNum}\n*Amount:* €${amountEur}\n*Customer:* ${name || 'N/A'}\n*Email:* ${email || 'N/A'}\n*Address:* ${[address, city, zip, country].filter(Boolean).join(', ')}\n\n*Items:*\n${itemLines || 'No item data'}`
+        );
+      } catch (e) {
+        console.error('WhatsApp admin notification failed:', e);
+      }
+    }
+
+    // 4 — Admin email notification
     if (process.env.RESEND_API_KEY) {
       try {
         const { Resend } = await import('resend');

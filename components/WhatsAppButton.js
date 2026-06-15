@@ -1,6 +1,8 @@
 'use client';
 import { useState } from 'react';
 
+const PHONE = (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '34600000000').replace(/\D/g, '');
+
 export default function WhatsAppButton() {
   const [tooltip, setTooltip] = useState(true);
 
@@ -13,7 +15,7 @@ export default function WhatsAppButton() {
         </div>
       )}
       <a
-        href="https://wa.me/34600000000?text=Hi%20PawCase!%20I%20have%20a%20question%20about%20my%20order."
+        href={`https://wa.me/${PHONE}?text=Hi%20PawCase!%20I%20have%20a%20question%20about%20my%20order.`}
         target="_blank"
         rel="noopener noreferrer"
         onClick={() => setTooltip(false)}
