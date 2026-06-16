@@ -19,7 +19,7 @@ const INTERVALS = {
 };
 
 async function fetchYahoo(symbol, interval, range) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=${interval}&range=${range}&includePrePost=false`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=${interval}&range=${range}&includePrePost=true`;
   const res = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0' }
   });
