@@ -1,17 +1,19 @@
 //@version=5
 indicator("SMC Elite — BOS+OTE [Nasri]", shorttitle="SMC [Nasri]", overlay=true, max_bars_back=500)
 
-// ══ INPUTS ══════════════════════════════════════
-swingLen = input.int(10, "Swing Length",     minval=5, maxval=30, group="Settings")
-rsiLen   = input.int(14, "RSI Length",       minval=5,            group="Settings")
-volLen   = input.int(20, "Volume MA Length", minval=5,            group="Settings")
+// ══ INPUTS ══════════════════════════════════════════════
+swingLen = input.int(10,    "Swing Length",   minval=5, maxval=30, group="Settings")
+rsiLen   = input.int(14,    "RSI Length",     minval=5,            group="Settings")
+volLen   = input.int(20,    "Volume MA",      minval=5,            group="Settings")
+useRSI   = input.bool(true, "RSI Filter",                          group="Filters")
+useVol   = input.bool(false,"Volume Filter ⚠️ (OFF for Futures)",   group="Filters")
 
-// ══ RSI & VOLUME ════════════════════════════════
+// ══ RSI & VOLUME ════════════════════════════════════════
 rsiVal = ta.rsi(close, rsiLen)
 volMA  = ta.sma(volume, volLen)
-volOK  = volume > volMA
+volOK  = useVol ? volume > volMA : true
 
-// ══ SWING DETECTION ═════════════════════════════
+// ══ SWING DETECTION ═════════════════════════════════════
 ph = ta.pivothigh(high, swingLen, swingLen)
 pl = ta.pivotlow(low,  swingLen, swingLen)
 
@@ -23,15 +25,15 @@ if not na(ph)
 if not na(pl)
     lastSL := pl
 
-// ══ BREAK OF STRUCTURE ══════════════════════════
+// ══ BREAK OF STRUCTURE ══════════════════════════════════
 bullBOS = not na(lastSH) and not na(lastSL) and close > lastSH and close[1] <= lastSH
 bearBOS = not na(lastSH) and not na(lastSL) and close < lastSL and close[1] >= lastSL
 
-// ══ WAVE STATE ══════════════════════════════════
-var int   waveDir     = 0
-var float waveHigh    = na
-var float waveLow     = na
-var bool  sigFired    = false
+// ══ WAVE STATE ══════════════════════════════════════════
+var int   waveDir  = 0
+var float waveHigh = na
+var float waveLow  = na
+var bool  sigFired = false
 
 if bullBOS
     waveDir  := 1
@@ -45,37 +47,36 @@ if bearBOS
     waveLow  := lastSL
     sigFired := false
 
-// ══ OTE FIBONACCI (internal — not drawn) ════════
-rng = not na(waveHigh) and not na(waveLow) ? waveHigh - waveLow : na
-
+// ══ OTE FIBONACCI — داخلي فقط ══════════════════════════
+rng     = not na(waveHigh) and not na(waveLow) ? waveHigh - waveLow : na
 bull618 = not na(rng) ? waveHigh - 0.618 * rng : na
 bull786 = not na(rng) ? waveHigh - 0.786 * rng : na
 bear618 = not na(rng) ? waveLow  + 0.618 * rng : na
 bear786 = not na(rng) ? waveLow  + 0.786 * rng : na
 
-// ══ CONDITION 1 — Price inside OTE zone ═════════
+// ══ CONDITION 1 — OTE Zone ══════════════════════════════
 inBullOTE = waveDir == 1  and not na(bull786) and not na(bull618) and close >= bull786 and close <= bull618
 inBearOTE = waveDir == -1 and not na(bear618) and not na(bear786) and close >= bear618 and close <= bear786
 
-// ══ CONDITION 2 — Engulfing candle only ══════════
+// ══ CONDITION 2 — Engulfing ═════════════════════════════
 bullEngulf = close > open and open[1] > close[1] and close >= open[1] and open <= close[1]
 bearEngulf = close < open and open[1] < close[1] and close <= open[1] and open >= close[1]
 
-// ══ CONDITION 3 — RSI ════════════════════════════
-rsiLong  = rsiVal >= 40 and rsiVal <= 55 and rsiVal > rsiVal[1]
-rsiShort = rsiVal >= 45 and rsiVal <= 60 and rsiVal < rsiVal[1]
+// ══ CONDITION 3 — RSI (اتجاه فقط — نطاق واسع) ══════════
+rsiLong  = useRSI ? rsiVal < 60 and rsiVal > rsiVal[1] : true
+rsiShort = useRSI ? rsiVal > 40 and rsiVal < rsiVal[1] : true
 
-// ══ SIGNAL — ALL conditions must be true ════════
+// ══ SIGNAL ══════════════════════════════════════════════
 longCond  = inBullOTE and bullEngulf and rsiLong  and volOK and not sigFired
 shortCond = inBearOTE and bearEngulf and rsiShort and volOK and not sigFired
 
 if longCond or shortCond
     sigFired := true
 
-// ══ PLOT ════════════════════════════════════════
+// ══ PLOT ════════════════════════════════════════════════
 plotshape(longCond,  title="BUY",  style=shape.labelup,   location=location.belowbar, color=color.new(#00C853, 0), textcolor=color.white, text="BUY",  size=size.normal)
 plotshape(shortCond, title="SELL", style=shape.labeldown, location=location.abovebar, color=color.new(#D50000, 0), textcolor=color.white, text="SELL", size=size.normal)
 
-// ══ ALERTS ══════════════════════════════════════
+// ══ ALERTS ══════════════════════════════════════════════
 alertcondition(longCond,  "SMC BUY",  "BUY — {{ticker}} @ {{close}}")
 alertcondition(shortCond, "SMC SELL", "SELL — {{ticker}} @ {{close}}")
