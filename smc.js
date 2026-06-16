@@ -281,7 +281,7 @@ export function analyze(bars5m, bars1h) {
   const price = last.close;
   let signal = null;
 
-  if (scoreLong >= 5 && scoreLong > scoreShort) {
+  if (scoreLong >= 5 && scoreLong > scoreShort && htfBull) {
     const sl   = bullOB_bot ? bullOB_bot - atr1h * 0.5 : price - atr1h;
     const risk = Math.abs(price - sl);
     signal = {
@@ -300,7 +300,7 @@ export function analyze(bars5m, bars1h) {
         recentBullFVG, fibOTE_bull, rsiOversold, volSpike, bullMomentum
       }
     };
-  } else if (scoreShort >= 5 && scoreShort > scoreLong) {
+  } else if (scoreShort >= 5 && scoreShort > scoreLong && htfBear) {
     const sl   = bearOB_top ? bearOB_top + atr1h * 0.5 : price + atr1h;
     const risk = Math.abs(sl - price);
     signal = {

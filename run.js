@@ -11,7 +11,7 @@ import { readFileSync, writeFileSync, existsSync }  from 'fs';
 
 const TOKEN   = process.env.TELEGRAM_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-const SYMBOLS = ['MNQ', 'MGC', 'MCL', 'MES'];
+const SYMBOLS = ['MNQ', 'MCL']; // MGC/MES موقف مؤقتاً — نسبة نجاح ضعيفة في الـ Backtest
 
 // ══ إعدادات إدارة المال ══════════════════════
 const ACCOUNT_BALANCE  = 50_000;   // حجم الحساب الممول
