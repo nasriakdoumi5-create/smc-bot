@@ -1,0 +1,149 @@
+//@version=5
+indicator("SMC Elite — BOS+OTE [Nasri]", shorttitle="SMC [Nasri]", overlay=true, max_bars_back=500)
+
+//══════════════════════════════════════════════════════════════════════════════
+// INPUTS
+//══════════════════════════════════════════════════════════════════════════════
+swingLen = input.int(10, "Swing Length",     minval=5, maxval=30, group="⚙️ Settings",
+           tooltip="عدد الشمعات لتحديد السوينغ الهيكلي — زيادة القيمة = إشارات أقل وأدق")
+rsiLen   = input.int(14, "RSI Length",       minval=5,            group="⚙️ Settings")
+volLen   = input.int(20, "Volume MA Length", minval=5,            group="⚙️ Settings")
+
+//══════════════════════════════════════════════════════════════════════════════
+// RSI & VOLUME
+//══════════════════════════════════════════════════════════════════════════════
+rsi   = ta.rsi(close, rsiLen)
+volMA = ta.sma(volume, volLen)
+volOK = volume > volMA
+
+//══════════════════════════════════════════════════════════════════════════════
+// SWING STRUCTURE DETECTION
+//══════════════════════════════════════════════════════════════════════════════
+ph = ta.pivothigh(high, swingLen, swingLen)
+pl = ta.pivotlow(low,  swingLen, swingLen)
+
+var float lastSH = na
+var float lastSL = na
+
+if not na(ph)
+    lastSH := ph
+if not na(pl)
+    lastSL := pl
+
+//══════════════════════════════════════════════════════════════════════════════
+// BREAK OF STRUCTURE (BOS)
+// Bull BOS : إغلاق فوق آخر قمة هيكلية
+// Bear BOS : إغلاق تحت آخر قاع هيكلي
+//══════════════════════════════════════════════════════════════════════════════
+bullBOSnow = not na(lastSH) and not na(lastSL) and close > lastSH and close[1] <= lastSH
+bearBOSnow = not na(lastSH) and not na(lastSL) and close < lastSL and close[1] >= lastSL
+
+//══════════════════════════════════════════════════════════════════════════════
+// WAVE STATE MACHINE
+// يتتبع الموجة الحالية بعد BOS ويمنع تكرار الإشارة
+//══════════════════════════════════════════════════════════════════════════════
+var int   waveDir     = 0      // 1 = صاعد  |  -1 = هابط  |  0 = لا موجة
+var float waveHigh    = na     // قمة الموجة (top of impulse)
+var float waveLow     = na     // قاع الموجة (bottom of impulse)
+var bool  signalFired = false  // إشارة واحدة فقط لكل BOS
+
+if bullBOSnow
+    waveDir     := 1
+    waveHigh    := lastSH
+    waveLow     := lastSL
+    signalFired := false
+
+if bearBOSnow
+    waveDir     := -1
+    waveHigh    := lastSH
+    waveLow     := lastSL
+    signalFired := false
+
+//══════════════════════════════════════════════════════════════════════════════
+// OTE FIBONACCI — داخلي فقط (لا يُرسم على الشارت)
+//
+// إدارة المخاطر:
+//   SL  : خلف مستوى 0.786 مباشرة
+//   TP1 : آخر قمة/قاع قبل التصحيح
+//   TP2 : امتداد 1.272
+//   TP3 : امتداد 1.618
+//══════════════════════════════════════════════════════════════════════════════
+range_ = not na(waveHigh) and not na(waveLow) ? waveHigh - waveLow : na
+
+// Bull OTE — السعر يتراجع نحو الأسفل بعد BOS صاعد
+bull618 = not na(range_) ? waveHigh - 0.618 * range_ : na   // حد أعلى منطقة OTE
+bull786 = not na(range_) ? waveHigh - 0.786 * range_ : na   // حد أدنى منطقة OTE (وراء SL)
+
+// Bear OTE — السعر يرتد نحو الأعلى بعد BOS هابط
+bear618 = not na(range_) ? waveLow + 0.618 * range_ : na    // حد أدنى منطقة OTE
+bear786 = not na(range_) ? waveLow + 0.786 * range_ : na    // حد أعلى منطقة OTE (وراء SL)
+
+//══════════════════════════════════════════════════════════════════════════════
+// الشرط 1 — السعر داخل منطقة OTE (0.618 – 0.786)
+//══════════════════════════════════════════════════════════════════════════════
+inBullOTE = waveDir == 1 and not na(bull786) and not na(bull618) and
+            close >= bull786 and close <= bull618
+
+inBearOTE = waveDir == -1 and not na(bear618) and not na(bear786) and
+            close >= bear618 and close <= bear786
+
+//══════════════════════════════════════════════════════════════════════════════
+// الشرط 2 — شمعة Engulfing فقط (بدون باقي الأنماط)
+//══════════════════════════════════════════════════════════════════════════════
+bullEngulf = close > open        and   // شمعة خضراء
+             open[1] > close[1]  and   // سابقة حمراء
+             close >= open[1]    and   // الإغلاق فوق أعلى الجسم السابق
+             open  <= close[1]         // الافتتاح تحت أدنى الجسم السابق
+
+bearEngulf = close < open        and   // شمعة حمراء
+             open[1] < close[1]  and   // سابقة خضراء
+             close <= open[1]    and   // الإغلاق تحت أدنى الجسم السابق
+             open  >= close[1]         // الافتتاح فوق أعلى الجسم السابق
+
+//══════════════════════════════════════════════════════════════════════════════
+// الشرط 3 — RSI في نطاق محدد ويتحرك في الاتجاه الصحيح
+//══════════════════════════════════════════════════════════════════════════════
+rsiLong  = rsi >= 40 and rsi <= 55 and rsi > rsi[1]   // صعود من منطقة تشبع البيع
+rsiShort = rsi >= 45 and rsi <= 60 and rsi < rsi[1]   // هبوط من منطقة تشبع الشراء
+
+//══════════════════════════════════════════════════════════════════════════════
+// الشرط 4 — حجم أعلى من المتوسط (20 شمعة)
+//══════════════════════════════════════════════════════════════════════════════
+// volOK محسوبة مسبقاً أعلاه
+
+//══════════════════════════════════════════════════════════════════════════════
+// SIGNAL — كل الشروط يجب أن تتحقق معاً (AND)
+// Silent mode : إذا فشل أي شرط = لا إشارة
+//══════════════════════════════════════════════════════════════════════════════
+longCond  = inBullOTE and bullEngulf and rsiLong  and volOK and not signalFired
+shortCond = inBearOTE and bearEngulf and rsiShort and volOK and not signalFired
+
+if longCond or shortCond
+    signalFired := true
+
+//══════════════════════════════════════════════════════════════════════════════
+// PLOT — إشارات BUY / SELL فقط (بدون خطوط أو أشكال إضافية)
+//══════════════════════════════════════════════════════════════════════════════
+plotshape(longCond,
+          title     = "BUY",
+          style     = shape.labelup,
+          location  = location.belowbar,
+          color     = color.new(#00C853, 0),
+          textcolor = color.white,
+          text      = "BUY",
+          size      = size.normal)
+
+plotshape(shortCond,
+          title     = "SELL",
+          style     = shape.labeldown,
+          location  = location.abovebar,
+          color     = color.new(#D50000, 0),
+          textcolor = color.white,
+          text      = "SELL",
+          size      = size.normal)
+
+//══════════════════════════════════════════════════════════════════════════════
+// ALERTS
+//══════════════════════════════════════════════════════════════════════════════
+alertcondition(longCond,  "SMC BUY Signal",  "▲ BUY — {{ticker}} @ {{close}}")
+alertcondition(shortCond, "SMC SELL Signal", "▼ SELL — {{ticker}} @ {{close}}")
