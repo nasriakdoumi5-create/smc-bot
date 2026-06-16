@@ -97,7 +97,34 @@ export async function POST(req) {
       }
     }
 
-    // 4 — Admin email notification
+    // 4 — Telegram bot notification
+    if (process.env.TELEGRAM_BOT_URL) {
+      try {
+        await fetch(`${process.env.TELEGRAM_BOT_URL}/order`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-webhook-secret': process.env.WEBHOOK_SECRET || 'pawcase-secret-2024',
+          },
+          body: JSON.stringify({
+            orderId: orderNum,
+            customerName: name || 'عميل',
+            customerEmail: email || '—',
+            total: amountEur,
+            items: items.map((i) => ({
+              name: i.model ? `${i.model} Case` : 'Phone Case',
+              quantity: i.qty,
+              price: i.price,
+            })),
+            address: { city, country, zip },
+          }),
+        });
+      } catch (e) {
+        console.error('Telegram notification failed:', e.message);
+      }
+    }
+
+    // 5 — Admin email notification
     if (process.env.RESEND_API_KEY) {
       try {
         const { Resend } = await import('resend');
