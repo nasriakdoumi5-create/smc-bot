@@ -1,0 +1,15 @@
+{
+  "slug": "print_on_demand_tracker",
+  "name": "Print on Demand Business Tracker",
+  "excel": "/home/user/smc-bot/output/print_on_demand_tracker/print_on_demand_tracker.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/print_on_demand_tracker/print_on_demand_tracker_01_hero.jpg",
+    "/home/user/smc-bot/output/print_on_demand_tracker/print_on_demand_tracker_02_included.jpg",
+    "/home/user/smc-bot/output/print_on_demand_tracker/print_on_demand_tracker_03_how.jpg",
+    "/home/user/smc-bot/output/print_on_demand_tracker/print_on_demand_tracker_04_features.jpg",
+    "/home/user/smc-bot/output/print_on_demand_tracker/print_on_demand_tracker_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/print_on_demand_tracker/print_on_demand_tracker_guide.pdf",
+  "listing": "/home/user/smc-bot/output/print_on_demand_tracker/print_on_demand_tracker_listing.txt",
+  "built_at": "2026-06-16T07:19:29.418791"
+}

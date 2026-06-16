@@ -1,0 +1,15 @@
+{
+  "slug": "teacher_grade_book",
+  "name": "Teacher Grade Book & Class Manager",
+  "excel": "/home/user/smc-bot/output/teacher_grade_book/teacher_grade_book.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/teacher_grade_book/teacher_grade_book_01_hero.jpg",
+    "/home/user/smc-bot/output/teacher_grade_book/teacher_grade_book_02_included.jpg",
+    "/home/user/smc-bot/output/teacher_grade_book/teacher_grade_book_03_how.jpg",
+    "/home/user/smc-bot/output/teacher_grade_book/teacher_grade_book_04_features.jpg",
+    "/home/user/smc-bot/output/teacher_grade_book/teacher_grade_book_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/teacher_grade_book/teacher_grade_book_guide.pdf",
+  "listing": "/home/user/smc-bot/output/teacher_grade_book/teacher_grade_book_listing.txt",
+  "built_at": "2026-06-16T07:19:23.636973"
+}

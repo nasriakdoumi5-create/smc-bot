@@ -1,0 +1,15 @@
+{
+  "slug": "goals_planner",
+  "name": "Annual Goals & OKR Planner",
+  "excel": "/home/user/smc-bot/output/goals_planner/goals_planner.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/goals_planner/goals_planner_01_hero.jpg",
+    "/home/user/smc-bot/output/goals_planner/goals_planner_02_included.jpg",
+    "/home/user/smc-bot/output/goals_planner/goals_planner_03_how.jpg",
+    "/home/user/smc-bot/output/goals_planner/goals_planner_04_features.jpg",
+    "/home/user/smc-bot/output/goals_planner/goals_planner_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/goals_planner/goals_planner_guide.pdf",
+  "listing": "/home/user/smc-bot/output/goals_planner/goals_planner_listing.txt",
+  "built_at": "2026-06-16T07:19:19.391572"
+}

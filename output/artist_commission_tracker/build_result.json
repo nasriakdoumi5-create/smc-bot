@@ -1,0 +1,15 @@
+{
+  "slug": "artist_commission_tracker",
+  "name": "Artist Commission Tracker",
+  "excel": "/home/user/smc-bot/output/artist_commission_tracker/artist_commission_tracker.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/artist_commission_tracker/artist_commission_tracker_01_hero.jpg",
+    "/home/user/smc-bot/output/artist_commission_tracker/artist_commission_tracker_02_included.jpg",
+    "/home/user/smc-bot/output/artist_commission_tracker/artist_commission_tracker_03_how.jpg",
+    "/home/user/smc-bot/output/artist_commission_tracker/artist_commission_tracker_04_features.jpg",
+    "/home/user/smc-bot/output/artist_commission_tracker/artist_commission_tracker_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/artist_commission_tracker/artist_commission_tracker_guide.pdf",
+  "listing": "/home/user/smc-bot/output/artist_commission_tracker/artist_commission_tracker_listing.txt",
+  "built_at": "2026-06-16T07:19:44.740769"
+}

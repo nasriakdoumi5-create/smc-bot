@@ -1,0 +1,15 @@
+{
+  "slug": "email_marketing_tracker",
+  "name": "Email Marketing Campaign Tracker",
+  "excel": "/home/user/smc-bot/output/email_marketing_tracker/email_marketing_tracker.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/email_marketing_tracker/email_marketing_tracker_01_hero.jpg",
+    "/home/user/smc-bot/output/email_marketing_tracker/email_marketing_tracker_02_included.jpg",
+    "/home/user/smc-bot/output/email_marketing_tracker/email_marketing_tracker_03_how.jpg",
+    "/home/user/smc-bot/output/email_marketing_tracker/email_marketing_tracker_04_features.jpg",
+    "/home/user/smc-bot/output/email_marketing_tracker/email_marketing_tracker_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/email_marketing_tracker/email_marketing_tracker_guide.pdf",
+  "listing": "/home/user/smc-bot/output/email_marketing_tracker/email_marketing_tracker_listing.txt",
+  "built_at": "2026-06-16T07:19:30.550080"
+}

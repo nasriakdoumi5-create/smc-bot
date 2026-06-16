@@ -1,0 +1,15 @@
+{
+  "slug": "airbnb_host_tracker",
+  "name": "Airbnb Host Revenue Tracker",
+  "excel": "/home/user/smc-bot/output/airbnb_host_tracker/airbnb_host_tracker.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/airbnb_host_tracker/airbnb_host_tracker_01_hero.jpg",
+    "/home/user/smc-bot/output/airbnb_host_tracker/airbnb_host_tracker_02_included.jpg",
+    "/home/user/smc-bot/output/airbnb_host_tracker/airbnb_host_tracker_03_how.jpg",
+    "/home/user/smc-bot/output/airbnb_host_tracker/airbnb_host_tracker_04_features.jpg",
+    "/home/user/smc-bot/output/airbnb_host_tracker/airbnb_host_tracker_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/airbnb_host_tracker/airbnb_host_tracker_guide.pdf",
+  "listing": "/home/user/smc-bot/output/airbnb_host_tracker/airbnb_host_tracker_listing.txt",
+  "built_at": "2026-06-16T07:19:23.182184"
+}

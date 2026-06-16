@@ -1,0 +1,15 @@
+{
+  "slug": "baby_tracker",
+  "name": "Baby Milestone & Development Tracker",
+  "excel": "/home/user/smc-bot/output/baby_tracker/baby_tracker.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/baby_tracker/baby_tracker_01_hero.jpg",
+    "/home/user/smc-bot/output/baby_tracker/baby_tracker_02_included.jpg",
+    "/home/user/smc-bot/output/baby_tracker/baby_tracker_03_how.jpg",
+    "/home/user/smc-bot/output/baby_tracker/baby_tracker_04_features.jpg",
+    "/home/user/smc-bot/output/baby_tracker/baby_tracker_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/baby_tracker/baby_tracker_guide.pdf",
+  "listing": "/home/user/smc-bot/output/baby_tracker/baby_tracker_listing.txt",
+  "built_at": "2026-06-16T07:19:36.696636"
+}

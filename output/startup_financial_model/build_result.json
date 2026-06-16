@@ -1,0 +1,15 @@
+{
+  "slug": "startup_financial_model",
+  "name": "Startup Financial Model",
+  "excel": "/home/user/smc-bot/output/startup_financial_model/startup_financial_model.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/startup_financial_model/startup_financial_model_01_hero.jpg",
+    "/home/user/smc-bot/output/startup_financial_model/startup_financial_model_02_included.jpg",
+    "/home/user/smc-bot/output/startup_financial_model/startup_financial_model_03_how.jpg",
+    "/home/user/smc-bot/output/startup_financial_model/startup_financial_model_04_features.jpg",
+    "/home/user/smc-bot/output/startup_financial_model/startup_financial_model_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/startup_financial_model/startup_financial_model_guide.pdf",
+  "listing": "/home/user/smc-bot/output/startup_financial_model/startup_financial_model_listing.txt",
+  "built_at": "2026-06-16T07:19:39.446010"
+}

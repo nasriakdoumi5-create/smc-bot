@@ -1,0 +1,15 @@
+{
+  "slug": "skill_development_plan",
+  "name": "Skill Development Plan",
+  "excel": "/home/user/smc-bot/output/skill_development_plan/skill_development_plan.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/skill_development_plan/skill_development_plan_01_hero.jpg",
+    "/home/user/smc-bot/output/skill_development_plan/skill_development_plan_02_included.jpg",
+    "/home/user/smc-bot/output/skill_development_plan/skill_development_plan_03_how.jpg",
+    "/home/user/smc-bot/output/skill_development_plan/skill_development_plan_04_features.jpg",
+    "/home/user/smc-bot/output/skill_development_plan/skill_development_plan_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/skill_development_plan/skill_development_plan_guide.pdf",
+  "listing": "/home/user/smc-bot/output/skill_development_plan/skill_development_plan_listing.txt",
+  "built_at": "2026-06-16T07:19:48.751319"
+}

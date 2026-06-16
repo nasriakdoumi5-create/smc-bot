@@ -1,0 +1,15 @@
+{
+  "slug": "marketing_roi_tracker",
+  "name": "Marketing ROI Tracker",
+  "excel": "/home/user/smc-bot/output/marketing_roi_tracker/marketing_roi_tracker.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/marketing_roi_tracker/marketing_roi_tracker_01_hero.jpg",
+    "/home/user/smc-bot/output/marketing_roi_tracker/marketing_roi_tracker_02_included.jpg",
+    "/home/user/smc-bot/output/marketing_roi_tracker/marketing_roi_tracker_03_how.jpg",
+    "/home/user/smc-bot/output/marketing_roi_tracker/marketing_roi_tracker_04_features.jpg",
+    "/home/user/smc-bot/output/marketing_roi_tracker/marketing_roi_tracker_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/marketing_roi_tracker/marketing_roi_tracker_guide.pdf",
+  "listing": "/home/user/smc-bot/output/marketing_roi_tracker/marketing_roi_tracker_listing.txt",
+  "built_at": "2026-06-16T07:19:40.909103"
+}

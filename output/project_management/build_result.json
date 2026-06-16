@@ -1,0 +1,15 @@
+{
+  "slug": "project_management",
+  "name": "Project Management Dashboard",
+  "excel": "/home/user/smc-bot/output/project_management/project_management.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/project_management/project_management_01_hero.jpg",
+    "/home/user/smc-bot/output/project_management/project_management_02_included.jpg",
+    "/home/user/smc-bot/output/project_management/project_management_03_how.jpg",
+    "/home/user/smc-bot/output/project_management/project_management_04_features.jpg",
+    "/home/user/smc-bot/output/project_management/project_management_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/project_management/project_management_guide.pdf",
+  "listing": "/home/user/smc-bot/output/project_management/project_management_listing.txt",
+  "built_at": "2026-06-16T07:19:18.337728"
+}

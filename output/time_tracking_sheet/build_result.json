@@ -1,0 +1,15 @@
+{
+  "slug": "time_tracking_sheet",
+  "name": "Time Tracking & Timesheet",
+  "excel": "/home/user/smc-bot/output/time_tracking_sheet/time_tracking_sheet.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/time_tracking_sheet/time_tracking_sheet_01_hero.jpg",
+    "/home/user/smc-bot/output/time_tracking_sheet/time_tracking_sheet_02_included.jpg",
+    "/home/user/smc-bot/output/time_tracking_sheet/time_tracking_sheet_03_how.jpg",
+    "/home/user/smc-bot/output/time_tracking_sheet/time_tracking_sheet_04_features.jpg",
+    "/home/user/smc-bot/output/time_tracking_sheet/time_tracking_sheet_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/time_tracking_sheet/time_tracking_sheet_guide.pdf",
+  "listing": "/home/user/smc-bot/output/time_tracking_sheet/time_tracking_sheet_listing.txt",
+  "built_at": "2026-06-16T07:19:37.848007"
+}

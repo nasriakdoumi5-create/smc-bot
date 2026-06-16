@@ -1,0 +1,15 @@
+{
+  "slug": "school_supply_budget",
+  "name": "School Supply Budget",
+  "excel": "/home/user/smc-bot/output/school_supply_budget/school_supply_budget.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/school_supply_budget/school_supply_budget_01_hero.jpg",
+    "/home/user/smc-bot/output/school_supply_budget/school_supply_budget_02_included.jpg",
+    "/home/user/smc-bot/output/school_supply_budget/school_supply_budget_03_how.jpg",
+    "/home/user/smc-bot/output/school_supply_budget/school_supply_budget_04_features.jpg",
+    "/home/user/smc-bot/output/school_supply_budget/school_supply_budget_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/school_supply_budget/school_supply_budget_guide.pdf",
+  "listing": "/home/user/smc-bot/output/school_supply_budget/school_supply_budget_listing.txt",
+  "built_at": "2026-06-16T07:19:49.912162"
+}

@@ -1,0 +1,15 @@
+{
+  "slug": "home_renovation_tracker",
+  "name": "Home Renovation Project Tracker",
+  "excel": "/home/user/smc-bot/output/home_renovation_tracker/home_renovation_tracker.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/home_renovation_tracker/home_renovation_tracker_01_hero.jpg",
+    "/home/user/smc-bot/output/home_renovation_tracker/home_renovation_tracker_02_included.jpg",
+    "/home/user/smc-bot/output/home_renovation_tracker/home_renovation_tracker_03_how.jpg",
+    "/home/user/smc-bot/output/home_renovation_tracker/home_renovation_tracker_04_features.jpg",
+    "/home/user/smc-bot/output/home_renovation_tracker/home_renovation_tracker_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/home_renovation_tracker/home_renovation_tracker_guide.pdf",
+  "listing": "/home/user/smc-bot/output/home_renovation_tracker/home_renovation_tracker_listing.txt",
+  "built_at": "2026-06-16T07:19:22.800652"
+}

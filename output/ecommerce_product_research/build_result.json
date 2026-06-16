@@ -1,0 +1,15 @@
+{
+  "slug": "ecommerce_product_research",
+  "name": "Ecommerce Product Research",
+  "excel": "/home/user/smc-bot/output/ecommerce_product_research/ecommerce_product_research.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/ecommerce_product_research/ecommerce_product_research_01_hero.jpg",
+    "/home/user/smc-bot/output/ecommerce_product_research/ecommerce_product_research_02_included.jpg",
+    "/home/user/smc-bot/output/ecommerce_product_research/ecommerce_product_research_03_how.jpg",
+    "/home/user/smc-bot/output/ecommerce_product_research/ecommerce_product_research_04_features.jpg",
+    "/home/user/smc-bot/output/ecommerce_product_research/ecommerce_product_research_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/ecommerce_product_research/ecommerce_product_research_guide.pdf",
+  "listing": "/home/user/smc-bot/output/ecommerce_product_research/ecommerce_product_research_listing.txt",
+  "built_at": "2026-06-16T07:19:51.656465"
+}

@@ -1,0 +1,15 @@
+{
+  "slug": "construction_estimate",
+  "name": "Construction Estimate",
+  "excel": "/home/user/smc-bot/output/construction_estimate/construction_estimate.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/construction_estimate/construction_estimate_01_hero.jpg",
+    "/home/user/smc-bot/output/construction_estimate/construction_estimate_02_included.jpg",
+    "/home/user/smc-bot/output/construction_estimate/construction_estimate_03_how.jpg",
+    "/home/user/smc-bot/output/construction_estimate/construction_estimate_04_features.jpg",
+    "/home/user/smc-bot/output/construction_estimate/construction_estimate_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/construction_estimate/construction_estimate_guide.pdf",
+  "listing": "/home/user/smc-bot/output/construction_estimate/construction_estimate_listing.txt",
+  "built_at": "2026-06-16T07:19:46.359067"
+}

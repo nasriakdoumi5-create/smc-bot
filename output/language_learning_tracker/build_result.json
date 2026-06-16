@@ -1,0 +1,15 @@
+{
+  "slug": "language_learning_tracker",
+  "name": "Language Learning Progress Tracker",
+  "excel": "/home/user/smc-bot/output/language_learning_tracker/language_learning_tracker.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/language_learning_tracker/language_learning_tracker_01_hero.jpg",
+    "/home/user/smc-bot/output/language_learning_tracker/language_learning_tracker_02_included.jpg",
+    "/home/user/smc-bot/output/language_learning_tracker/language_learning_tracker_03_how.jpg",
+    "/home/user/smc-bot/output/language_learning_tracker/language_learning_tracker_04_features.jpg",
+    "/home/user/smc-bot/output/language_learning_tracker/language_learning_tracker_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/language_learning_tracker/language_learning_tracker_guide.pdf",
+  "listing": "/home/user/smc-bot/output/language_learning_tracker/language_learning_tracker_listing.txt",
+  "built_at": "2026-06-16T07:19:31.318687"
+}

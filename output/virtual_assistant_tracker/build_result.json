@@ -1,0 +1,15 @@
+{
+  "slug": "virtual_assistant_tracker",
+  "name": "Virtual Assistant Business Tracker",
+  "excel": "/home/user/smc-bot/output/virtual_assistant_tracker/virtual_assistant_tracker.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/virtual_assistant_tracker/virtual_assistant_tracker_01_hero.jpg",
+    "/home/user/smc-bot/output/virtual_assistant_tracker/virtual_assistant_tracker_02_included.jpg",
+    "/home/user/smc-bot/output/virtual_assistant_tracker/virtual_assistant_tracker_03_how.jpg",
+    "/home/user/smc-bot/output/virtual_assistant_tracker/virtual_assistant_tracker_04_features.jpg",
+    "/home/user/smc-bot/output/virtual_assistant_tracker/virtual_assistant_tracker_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/virtual_assistant_tracker/virtual_assistant_tracker_guide.pdf",
+  "listing": "/home/user/smc-bot/output/virtual_assistant_tracker/virtual_assistant_tracker_listing.txt",
+  "built_at": "2026-06-16T07:19:32.828097"
+}

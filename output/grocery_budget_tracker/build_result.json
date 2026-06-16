@@ -1,0 +1,15 @@
+{
+  "slug": "grocery_budget_tracker",
+  "name": "Grocery & Pantry Budget Tracker",
+  "excel": "/home/user/smc-bot/output/grocery_budget_tracker/grocery_budget_tracker.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/grocery_budget_tracker/grocery_budget_tracker_01_hero.jpg",
+    "/home/user/smc-bot/output/grocery_budget_tracker/grocery_budget_tracker_02_included.jpg",
+    "/home/user/smc-bot/output/grocery_budget_tracker/grocery_budget_tracker_03_how.jpg",
+    "/home/user/smc-bot/output/grocery_budget_tracker/grocery_budget_tracker_04_features.jpg",
+    "/home/user/smc-bot/output/grocery_budget_tracker/grocery_budget_tracker_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/grocery_budget_tracker/grocery_budget_tracker_guide.pdf",
+  "listing": "/home/user/smc-bot/output/grocery_budget_tracker/grocery_budget_tracker_listing.txt",
+  "built_at": "2026-06-16T07:19:32.063993"
+}

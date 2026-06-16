@@ -1,0 +1,15 @@
+{
+  "slug": "podcast_planner",
+  "name": "Podcast Episode Planner",
+  "excel": "/home/user/smc-bot/output/podcast_planner/podcast_planner.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/podcast_planner/podcast_planner_01_hero.jpg",
+    "/home/user/smc-bot/output/podcast_planner/podcast_planner_02_included.jpg",
+    "/home/user/smc-bot/output/podcast_planner/podcast_planner_03_how.jpg",
+    "/home/user/smc-bot/output/podcast_planner/podcast_planner_04_features.jpg",
+    "/home/user/smc-bot/output/podcast_planner/podcast_planner_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/podcast_planner/podcast_planner_guide.pdf",
+  "listing": "/home/user/smc-bot/output/podcast_planner/podcast_planner_listing.txt",
+  "built_at": "2026-06-16T07:19:27.806257"
+}

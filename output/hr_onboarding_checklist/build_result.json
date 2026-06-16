@@ -1,0 +1,15 @@
+{
+  "slug": "hr_onboarding_checklist",
+  "name": "HR Employee Onboarding Checklist",
+  "excel": "/home/user/smc-bot/output/hr_onboarding_checklist/hr_onboarding_checklist.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/hr_onboarding_checklist/hr_onboarding_checklist_01_hero.jpg",
+    "/home/user/smc-bot/output/hr_onboarding_checklist/hr_onboarding_checklist_02_included.jpg",
+    "/home/user/smc-bot/output/hr_onboarding_checklist/hr_onboarding_checklist_03_how.jpg",
+    "/home/user/smc-bot/output/hr_onboarding_checklist/hr_onboarding_checklist_04_features.jpg",
+    "/home/user/smc-bot/output/hr_onboarding_checklist/hr_onboarding_checklist_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/hr_onboarding_checklist/hr_onboarding_checklist_guide.pdf",
+  "listing": "/home/user/smc-bot/output/hr_onboarding_checklist/hr_onboarding_checklist_listing.txt",
+  "built_at": "2026-06-16T07:19:29.799253"
+}

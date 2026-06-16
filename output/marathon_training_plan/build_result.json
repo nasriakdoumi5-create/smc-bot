@@ -1,0 +1,15 @@
+{
+  "slug": "marathon_training_plan",
+  "name": "Marathon Training Plan",
+  "excel": "/home/user/smc-bot/output/marathon_training_plan/marathon_training_plan.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/marathon_training_plan/marathon_training_plan_01_hero.jpg",
+    "/home/user/smc-bot/output/marathon_training_plan/marathon_training_plan_02_included.jpg",
+    "/home/user/smc-bot/output/marathon_training_plan/marathon_training_plan_03_how.jpg",
+    "/home/user/smc-bot/output/marathon_training_plan/marathon_training_plan_04_features.jpg",
+    "/home/user/smc-bot/output/marathon_training_plan/marathon_training_plan_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/marathon_training_plan/marathon_training_plan_guide.pdf",
+  "listing": "/home/user/smc-bot/output/marathon_training_plan/marathon_training_plan_listing.txt",
+  "built_at": "2026-06-16T07:19:43.128274"
+}

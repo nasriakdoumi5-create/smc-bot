@@ -1,0 +1,15 @@
+{
+  "slug": "stock_trading_journal",
+  "name": "Stock Trading Journal & P&L",
+  "excel": "/home/user/smc-bot/output/stock_trading_journal/stock_trading_journal.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/stock_trading_journal/stock_trading_journal_01_hero.jpg",
+    "/home/user/smc-bot/output/stock_trading_journal/stock_trading_journal_02_included.jpg",
+    "/home/user/smc-bot/output/stock_trading_journal/stock_trading_journal_03_how.jpg",
+    "/home/user/smc-bot/output/stock_trading_journal/stock_trading_journal_04_features.jpg",
+    "/home/user/smc-bot/output/stock_trading_journal/stock_trading_journal_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/stock_trading_journal/stock_trading_journal_guide.pdf",
+  "listing": "/home/user/smc-bot/output/stock_trading_journal/stock_trading_journal_listing.txt",
+  "built_at": "2026-06-16T07:19:35.150394"
+}

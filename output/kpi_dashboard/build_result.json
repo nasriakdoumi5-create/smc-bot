@@ -1,0 +1,15 @@
+{
+  "slug": "kpi_dashboard",
+  "name": "KPI Dashboard",
+  "excel": "/home/user/smc-bot/output/kpi_dashboard/kpi_dashboard.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/kpi_dashboard/kpi_dashboard_01_hero.jpg",
+    "/home/user/smc-bot/output/kpi_dashboard/kpi_dashboard_02_included.jpg",
+    "/home/user/smc-bot/output/kpi_dashboard/kpi_dashboard_03_how.jpg",
+    "/home/user/smc-bot/output/kpi_dashboard/kpi_dashboard_04_features.jpg",
+    "/home/user/smc-bot/output/kpi_dashboard/kpi_dashboard_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/kpi_dashboard/kpi_dashboard_guide.pdf",
+  "listing": "/home/user/smc-bot/output/kpi_dashboard/kpi_dashboard_listing.txt",
+  "built_at": "2026-06-16T07:19:53.325955"
+}

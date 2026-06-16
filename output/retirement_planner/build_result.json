@@ -1,0 +1,15 @@
+{
+  "slug": "retirement_planner",
+  "name": "Retirement Savings Planner",
+  "excel": "/home/user/smc-bot/output/retirement_planner/retirement_planner.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/retirement_planner/retirement_planner_01_hero.jpg",
+    "/home/user/smc-bot/output/retirement_planner/retirement_planner_02_included.jpg",
+    "/home/user/smc-bot/output/retirement_planner/retirement_planner_03_how.jpg",
+    "/home/user/smc-bot/output/retirement_planner/retirement_planner_04_features.jpg",
+    "/home/user/smc-bot/output/retirement_planner/retirement_planner_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/retirement_planner/retirement_planner_guide.pdf",
+  "listing": "/home/user/smc-bot/output/retirement_planner/retirement_planner_listing.txt",
+  "built_at": "2026-06-16T07:19:25.828058"
+}

@@ -1,0 +1,15 @@
+{
+  "slug": "tax_prep_organizer",
+  "name": "Tax Preparation Organizer",
+  "excel": "/home/user/smc-bot/output/tax_prep_organizer/tax_prep_organizer.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/tax_prep_organizer/tax_prep_organizer_01_hero.jpg",
+    "/home/user/smc-bot/output/tax_prep_organizer/tax_prep_organizer_02_included.jpg",
+    "/home/user/smc-bot/output/tax_prep_organizer/tax_prep_organizer_03_how.jpg",
+    "/home/user/smc-bot/output/tax_prep_organizer/tax_prep_organizer_04_features.jpg",
+    "/home/user/smc-bot/output/tax_prep_organizer/tax_prep_organizer_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/tax_prep_organizer/tax_prep_organizer_guide.pdf",
+  "listing": "/home/user/smc-bot/output/tax_prep_organizer/tax_prep_organizer_listing.txt",
+  "built_at": "2026-06-16T07:19:25.471142"
+}

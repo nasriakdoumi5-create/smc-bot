@@ -1,0 +1,15 @@
+{
+  "slug": "supply_chain_tracker",
+  "name": "Supply Chain Tracker",
+  "excel": "/home/user/smc-bot/output/supply_chain_tracker/supply_chain_tracker.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/supply_chain_tracker/supply_chain_tracker_01_hero.jpg",
+    "/home/user/smc-bot/output/supply_chain_tracker/supply_chain_tracker_02_included.jpg",
+    "/home/user/smc-bot/output/supply_chain_tracker/supply_chain_tracker_03_how.jpg",
+    "/home/user/smc-bot/output/supply_chain_tracker/supply_chain_tracker_04_features.jpg",
+    "/home/user/smc-bot/output/supply_chain_tracker/supply_chain_tracker_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/supply_chain_tracker/supply_chain_tracker_guide.pdf",
+  "listing": "/home/user/smc-bot/output/supply_chain_tracker/supply_chain_tracker_listing.txt",
+  "built_at": "2026-06-16T07:19:45.933806"
+}

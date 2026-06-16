@@ -1,0 +1,15 @@
+{
+  "slug": "small_business_finances",
+  "name": "Small Business Finance Tracker",
+  "excel": "/home/user/smc-bot/output/small_business_finances/small_business_finances.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/small_business_finances/small_business_finances_01_hero.jpg",
+    "/home/user/smc-bot/output/small_business_finances/small_business_finances_02_included.jpg",
+    "/home/user/smc-bot/output/small_business_finances/small_business_finances_03_how.jpg",
+    "/home/user/smc-bot/output/small_business_finances/small_business_finances_04_features.jpg",
+    "/home/user/smc-bot/output/small_business_finances/small_business_finances_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/small_business_finances/small_business_finances_guide.pdf",
+  "listing": "/home/user/smc-bot/output/small_business_finances/small_business_finances_listing.txt",
+  "built_at": "2026-06-16T07:19:16.901083"
+}

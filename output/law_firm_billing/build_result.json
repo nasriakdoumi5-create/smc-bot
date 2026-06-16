@@ -1,0 +1,15 @@
+{
+  "slug": "law_firm_billing",
+  "name": "Law Firm Billing Tracker",
+  "excel": "/home/user/smc-bot/output/law_firm_billing/law_firm_billing.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/law_firm_billing/law_firm_billing_01_hero.jpg",
+    "/home/user/smc-bot/output/law_firm_billing/law_firm_billing_02_included.jpg",
+    "/home/user/smc-bot/output/law_firm_billing/law_firm_billing_03_how.jpg",
+    "/home/user/smc-bot/output/law_firm_billing/law_firm_billing_04_features.jpg",
+    "/home/user/smc-bot/output/law_firm_billing/law_firm_billing_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/law_firm_billing/law_firm_billing_guide.pdf",
+  "listing": "/home/user/smc-bot/output/law_firm_billing/law_firm_billing_listing.txt",
+  "built_at": "2026-06-16T07:19:46.787691"
+}

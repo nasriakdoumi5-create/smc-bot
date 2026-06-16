@@ -1,0 +1,15 @@
+{
+  "slug": "influencer_rate_calculator",
+  "name": "Influencer Media Kit & Rate Calculator",
+  "excel": "/home/user/smc-bot/output/influencer_rate_calculator/influencer_rate_calculator.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/influencer_rate_calculator/influencer_rate_calculator_01_hero.jpg",
+    "/home/user/smc-bot/output/influencer_rate_calculator/influencer_rate_calculator_02_included.jpg",
+    "/home/user/smc-bot/output/influencer_rate_calculator/influencer_rate_calculator_03_how.jpg",
+    "/home/user/smc-bot/output/influencer_rate_calculator/influencer_rate_calculator_04_features.jpg",
+    "/home/user/smc-bot/output/influencer_rate_calculator/influencer_rate_calculator_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/influencer_rate_calculator/influencer_rate_calculator_guide.pdf",
+  "listing": "/home/user/smc-bot/output/influencer_rate_calculator/influencer_rate_calculator_listing.txt",
+  "built_at": "2026-06-16T07:19:34.743215"
+}

@@ -1,0 +1,15 @@
+{
+  "slug": "cash_flow_forecast",
+  "name": "Cash Flow Forecast",
+  "excel": "/home/user/smc-bot/output/cash_flow_forecast/cash_flow_forecast.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/cash_flow_forecast/cash_flow_forecast_01_hero.jpg",
+    "/home/user/smc-bot/output/cash_flow_forecast/cash_flow_forecast_02_included.jpg",
+    "/home/user/smc-bot/output/cash_flow_forecast/cash_flow_forecast_03_how.jpg",
+    "/home/user/smc-bot/output/cash_flow_forecast/cash_flow_forecast_04_features.jpg",
+    "/home/user/smc-bot/output/cash_flow_forecast/cash_flow_forecast_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/cash_flow_forecast/cash_flow_forecast_guide.pdf",
+  "listing": "/home/user/smc-bot/output/cash_flow_forecast/cash_flow_forecast_listing.txt",
+  "built_at": "2026-06-16T07:19:39.794643"
+}

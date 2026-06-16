@@ -1,0 +1,15 @@
+{
+  "slug": "event_planner",
+  "name": "Event Planning Checklist & Budget",
+  "excel": "/home/user/smc-bot/output/event_planner/event_planner.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/event_planner/event_planner_01_hero.jpg",
+    "/home/user/smc-bot/output/event_planner/event_planner_02_included.jpg",
+    "/home/user/smc-bot/output/event_planner/event_planner_03_how.jpg",
+    "/home/user/smc-bot/output/event_planner/event_planner_04_features.jpg",
+    "/home/user/smc-bot/output/event_planner/event_planner_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/event_planner/event_planner_guide.pdf",
+  "listing": "/home/user/smc-bot/output/event_planner/event_planner_listing.txt",
+  "built_at": "2026-06-16T07:19:28.216575"
+}

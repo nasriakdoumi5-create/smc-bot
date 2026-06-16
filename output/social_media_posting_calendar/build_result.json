@@ -1,0 +1,15 @@
+{
+  "slug": "social_media_posting_calendar",
+  "name": "Social Media Posting Calendar",
+  "excel": "/home/user/smc-bot/output/social_media_posting_calendar/social_media_posting_calendar.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/social_media_posting_calendar/social_media_posting_calendar_01_hero.jpg",
+    "/home/user/smc-bot/output/social_media_posting_calendar/social_media_posting_calendar_02_included.jpg",
+    "/home/user/smc-bot/output/social_media_posting_calendar/social_media_posting_calendar_03_how.jpg",
+    "/home/user/smc-bot/output/social_media_posting_calendar/social_media_posting_calendar_04_features.jpg",
+    "/home/user/smc-bot/output/social_media_posting_calendar/social_media_posting_calendar_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/social_media_posting_calendar/social_media_posting_calendar_guide.pdf",
+  "listing": "/home/user/smc-bot/output/social_media_posting_calendar/social_media_posting_calendar_listing.txt",
+  "built_at": "2026-06-16T07:19:52.115672"
+}
