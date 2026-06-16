@@ -3,6 +3,8 @@ NasriTools Product Catalog
 Each entry is a full product config ready for factory.build_product()
 """
 
+from nasritools.products2 import CATALOG2
+
 CATALOG = [
 
     # ─── 1. Personal Budget Tracker ──────────────────────────────────
@@ -619,3 +621,5 @@ CATALOG = [
     },
 
 ]
+
+CATALOG = CATALOG + CATALOG2
