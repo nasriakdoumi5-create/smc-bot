@@ -1,17 +1,19 @@
 /**
  * AMD SNIPER Engine — إشارة واحدة يومياً
  *
- * الإصلاح: PDH/PDL بدل Pre-market (Yahoo لا يعطي بيانات قبل السوق)
+ * مُحسَّن لـ NQ (ناسداك فيوتشرز) و NG (الغاز الطبيعي)
  *
- * دورة AMD للأسهم الكندية/الأمريكية:
- *   Accumulation = نطاق يوم أمس (PDH/PDL)
- *   Manipulation = كسر PDH أو PDL في أول ساعة
- *   Distribution = NY Open Killzone: 09:30-11:30 ET = 13:30-15:30 UTC
+ * دورة AMD للفيوتشرز:
+ *   Accumulation = نطاق آخر جلسة آسيا (00:00-07:00 UTC)
+ *   Manipulation = لندن + Pre-NY يكسر النطاق (07:00-13:30 UTC)
+ *   Distribution = NY Open Killzone (أقوى نقطة): 13:30-15:30 UTC
+ *                  + London Close KZ: 10:00-12:00 UTC (ثانوي)
  */
 
-// NY Open Killzone: 09:30–11:30 ET = 13:30–15:30 UTC
-const KZ_START = 13 * 60 + 30;
-const KZ_END   = 15 * 60 + 30;
+// NY Open Killzone: 09:30–11:30 ET = 13:30–15:30 UTC (الأقوى)
+// London Close KZ:  10:00–12:00 UTC (ثانوي للغاز)
+const KZ_START = 13 * 60 + 30; // 13:30 UTC
+const KZ_END   = 15 * 60 + 30; // 15:30 UTC
 
 function minsUTC(bar) {
   const d = new Date(bar.time * 1000);

@@ -4,13 +4,12 @@
  */
 
 const SYMBOLS = {
-  MNQ: 'NQ=F',   // Micro Nasdaq
-  MGC: 'GC=F',   // Micro Gold
-  MCL: 'CL=F',   // Micro Crude Oil
-  MES: 'ES=F',   // Micro S&P 500
-  CNQ: 'CNQ',    // Canadian Natural Resources
-  CML: 'CML',    // CML
-  CGC: 'CGC',    // Canopy Growth
+  NQ:  'NQ=F',   // Nasdaq Futures
+  NG:  'NG=F',   // Natural Gas Futures
+  MNQ: 'NQ=F',   // Micro Nasdaq (alias)
+  ES:  'ES=F',   // S&P 500 Futures
+  GC:  'GC=F',   // Gold Futures
+  CL:  'CL=F',   // Crude Oil Futures
 };
 
 const INTERVALS = {

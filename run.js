@@ -11,9 +11,8 @@ if (!TOKEN || !CHAT_ID) { console.error('❌ TOKEN مفقود'); process.exit(1)
 
 // ── الرموز المراقبة ───────────────────────────
 const SYMBOLS = [
-  { id: 'CNQ', name: 'Canadian Natural Resources', emoji: '🍁' },
-  { id: 'CML', name: 'CML',                        emoji: '📊' },
-  { id: 'CGC', name: 'Canopy Growth',               emoji: '🌿' },
+  { id: 'NQ', name: 'Nasdaq Futures', emoji: '📊' },
+  { id: 'NG', name: 'Natural Gas',    emoji: '🔥' },
 ];
 
 // مفتاح اليوم بتوقيت مدريد (YYYY-MM-DD)
