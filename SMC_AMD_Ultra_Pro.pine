@@ -1,6 +1,6 @@
 //@version=5
-strategy("SMC + AMD ULTRA PRO AUTO TRADING SYSTEM",
-     shorttitle        = "SMC+AMD ULTRA",
+strategy("AMD SNIPER — NQ & NG | 1 Signal/Day",
+     shorttitle        = "AMD SNIPER",
      overlay           = true,
      default_qty_type  = strategy.percent_of_equity,
      default_qty_value = 2,
@@ -12,40 +12,37 @@ strategy("SMC + AMD ULTRA PRO AUTO TRADING SYSTEM",
 // ══════════════════════════════════════════════
 // INPUTS
 // ══════════════════════════════════════════════
-g_smc = "⚡ SMC"
-swLen  = input.int(10,    "Swing Lookback",      minval=3,    maxval=50,  group=g_smc)
-liqBuf = input.float(0.05,"Liquidity Buffer %",  minval=0.01, step=0.05, group=g_smc) / 100
+g_amd = "🌍 AMD Sessions (UTC)"
+asiaStart = input.int(0,  "Asia Start UTC",  minval=0, maxval=23, group=g_amd)
+asiaEnd   = input.int(7,  "Asia End UTC",    minval=0, maxval=23, group=g_amd)
+kzStart   = input.int(13, "NY KZ Start UTC", minval=0, maxval=23, group=g_amd)
+kzEnd     = input.int(16, "NY KZ End UTC",   minval=0, maxval=23, group=g_amd)
 
-g_amd = "🌍 AMD"
-asiaS = input.int(2,  "Asia Start (Madrid)", minval=0, maxval=23, group=g_amd)
-asiaE = input.int(10, "Asia End (Madrid)",   minval=0, maxval=23, group=g_amd)
-mPct  = input.float(0.1,"Manipulation %",   minval=0.01, step=0.05, group=g_amd) / 100
-
-g_sess = "🕐 Sessions (Madrid Time)"
-lonS = input.int(8,  "London Start", minval=0, maxval=23, group=g_sess)
-lonE = input.int(17, "London End",   minval=0, maxval=23, group=g_sess)
-nyS  = input.int(14, "NY Start",     minval=0, maxval=23, group=g_sess)
-nyE  = input.int(23, "NY End",       minval=0, maxval=23, group=g_sess)
+g_filter = "🎯 Filters"
+minScore  = input.int(4,    "Min Score (max 7)", minval=3, maxval=7,  group=g_filter)
+dispMult  = input.float(1.5,"Displacement × ATR",minval=0.5, step=0.1, group=g_filter)
+sweepPct  = input.float(0.2,"Min Sweep % of Range", minval=0.05, step=0.05, group=g_filter)
 
 g_risk = "💰 Risk"
 atrP = input.int(14,    "ATR Period",      minval=1,   group=g_risk)
-atrM = input.float(1.5, "ATR SL Mult",     minval=0.5, step=0.25, group=g_risk)
-rrR  = input.float(2.5, "R:R (TP)",        minval=1.0, step=0.25, group=g_risk)
-
-g_vis = "🎨 Visuals"
-showL  = input.bool(true, "Labels",       group=g_vis)
-showZ  = input.bool(true, "FVG/OB Zones", group=g_vis)
-showSW = input.bool(true, "Swings",       group=g_vis)
+slM  = input.float(0.3, "SL Buffer × ATR", minval=0.1, step=0.1, group=g_risk)
+tp1R = input.float(1.5, "TP1 R:R",         minval=1.0, step=0.25, group=g_risk)
+tp2R = input.float(3.0, "TP2 R:R",         minval=1.5, step=0.25, group=g_risk)
 
 // ══════════════════════════════════════════════
-// SESSIONS  (Europe/Madrid — auto DST)
+// SESSIONS (UTC)
 // ══════════════════════════════════════════════
-mHr = hour(time, "Europe/Madrid")
+hrUTC = hour(time, "UTC")
 
-inAsia()    => mHr >= asiaS and mHr < asiaE
-inLondon()  => mHr >= lonS  and mHr < lonE
-inNY()      => mHr >= nyS   and mHr < nyE
-inTrading() => inLondon() or inNY()
+inAsia() => hrUTC >= asiaStart and hrUTC < asiaEnd
+inKZ()   => hrUTC >= kzStart   and hrUTC < kzEnd
+
+// ══════════════════════════════════════════════
+// ONE SIGNAL PER DAY
+// ══════════════════════════════════════════════
+var bool todayDone = false
+if dayofmonth != dayofmonth[1]
+    todayDone := false
 
 // ══════════════════════════════════════════════
 // ATR
@@ -55,58 +52,86 @@ atrV = ta.atr(atrP)
 // ══════════════════════════════════════════════
 // AMD — ASIA RANGE (Accumulation)
 // ══════════════════════════════════════════════
-var float aHigh  = na
-var float aLow   = na
-var float asiaHF = na
-var float asiaLF = na
+var float aH     = na
+var float aL     = na
+var float asiaH  = na
+var float asiaL  = na
 var bool  asiaOk = false
 
 asOn  = inAsia()
 wasAs = inAsia()[1]
 
 if asOn and not wasAs
-    aHigh  := high
-    aLow   := low
+    aH     := high
+    aL     := low
     asiaOk := false
 
 if asOn
-    aHigh := math.max(aHigh, high)
-    aLow  := math.min(aLow,  low)
+    aH := math.max(aH, high)
+    aL := math.min(aL, low)
 
 if not asOn and wasAs
-    asiaHF := aHigh
-    asiaLF := aLow
+    asiaH  := aH
+    asiaL  := aL
     asiaOk := true
 
-asiaRng = asiaOk ? asiaHF - asiaLF : float(na)
-mBuf    = asiaOk ? asiaRng * mPct  : float(na)
+if dayofmonth != dayofmonth[1]
+    asiaOk := false
+    asiaH  := na
+    asiaL  := na
 
-// AMD — MANIPULATION (London sweeps Asia range)
-var bool  mUp = false
-var bool  mDn = false
-var float mHP = na
-var float mLP = na
+asiaRng  = asiaOk ? asiaH - asiaL : float(na)
+rangePct = asiaOk and asiaL > 0 ? asiaRng / asiaL : float(na)
+rangeOK  = not na(rangePct) and rangePct >= 0.002
 
-if asiaOk and not na(mBuf) and not asOn
-    if high > asiaHF + mBuf and not mUp
-        mUp := true
-        mHP := high
-    if low < asiaLF - mBuf and not mDn
-        mDn := true
-        mLP := low
+// ══════════════════════════════════════════════
+// HTF BIAS — Previous Day Direction
+// ══════════════════════════════════════════════
+pdClose = request.security(syminfo.tickerid, "D", close[1], lookahead=barmerge.lookahead_off)
+pdOpen  = request.security(syminfo.tickerid, "D", open[1],  lookahead=barmerge.lookahead_off)
+htfBull = not na(pdClose) and pdClose > pdOpen
+htfBear = not na(pdClose) and pdClose < pdOpen
+
+// ══════════════════════════════════════════════
+// AMD — MANIPULATION (Hunt above/below Asia Range)
+// ══════════════════════════════════════════════
+var bool  mUp  = false
+var bool  mDn  = false
+var float mHP  = na
+var float mLP  = na
+var bool  mUpC = false
+var bool  mDnC = false
+
+minSweep = asiaOk and not na(asiaRng) ? asiaRng * sweepPct : float(na)
+
+if asiaOk and not asOn and not na(minSweep)
+    if not mUp and high > asiaH + minSweep
+        mUp  := true
+        mHP  := high
+        mUpC := close < asiaH
+    if not mDn and low < asiaL - minSweep
+        mDn  := true
+        mLP  := low
+        mDnC := close > asiaL
+    if mUp and not mUpC and close < asiaH
+        mUpC := true
+    if mDn and not mDnC and close > asiaL
+        mDnC := true
 
 if dayofmonth != dayofmonth[1]
-    mUp    := false
-    mDn    := false
-    mHP    := na
-    mLP    := na
-    asiaOk := false
+    mUp  := false
+    mDn  := false
+    mHP  := na
+    mLP  := na
+    mUpC := false
+    mDnC := false
 
 // ══════════════════════════════════════════════
 // SMC — SWING HIGHS / LOWS
 // ══════════════════════════════════════════════
-swH = ta.pivothigh(high, swLen, swLen)
-swL = ta.pivotlow(low,  swLen, swLen)
+swLen = 10
+swH   = ta.pivothigh(high, swLen, swLen)
+swL   = ta.pivotlow(low,  swLen, swLen)
 
 var float lastSH = na
 var float lastSL = na
@@ -119,8 +144,8 @@ if not na(swL)
 // ══════════════════════════════════════════════
 // SMC — LIQUIDITY SWEEPS
 // ══════════════════════════════════════════════
-bssSweep = not na(lastSH) and high > lastSH * (1 + liqBuf) and close < lastSH
-sssSweep = not na(lastSL) and low  < lastSL * (1 - liqBuf) and close > lastSL
+bssSweep = not na(lastSH) and high > lastSH * 1.001 and close < lastSH
+sssSweep = not na(lastSL) and low  < lastSL * 0.999 and close > lastSL
 
 var bool hadBSS = false
 var bool hadSSS = false
@@ -133,24 +158,22 @@ if bssSweep
 if sssSweep
     hadSSS := true
     sssB   := bar_index
-
-if bar_index - bssB > 30
+if bar_index - bssB > 40
     hadBSS := false
-if bar_index - sssB > 30
+if bar_index - sssB > 40
     hadSSS := false
 
 // ══════════════════════════════════════════════
 // SMC — MARKET STRUCTURE (BOS / CHoCH)
 // ══════════════════════════════════════════════
-var int mStr = 0  // 1=bullish, -1=bearish
+var int mStr = 0
 
-bullBrk = not na(lastSH) and close > lastSH and not (close[1] > lastSH)
-bearBrk = not na(lastSL) and close < lastSL and not (close[1] < lastSL)
-
-bullBOS   = mStr[1] == 1  and bullBrk
-bearBOS   = mStr[1] == -1 and bearBrk
+bullBrk   = not na(lastSH) and close > lastSH and not (close[1] > lastSH)
+bearBrk   = not na(lastSL) and close < lastSL and not (close[1] < lastSL)
 bullCHoCH = mStr[1] == -1 and bullBrk
-bearCHoCH = mStr[1] == 1  and bearBrk
+bearCHoCH = mStr[1] ==  1 and bearBrk
+bullBOS   = mStr[1] ==  1 and bullBrk
+bearBOS   = mStr[1] == -1 and bearBrk
 
 if bullBrk
     mStr := 1
@@ -158,7 +181,25 @@ else if bearBrk
     mStr := -1
 
 // ══════════════════════════════════════════════
-// SMC — FAIR VALUE GAP (FVG)
+// DISPLACEMENT (شمعة قوية بعد Hunt)
+// ══════════════════════════════════════════════
+body      = math.abs(close - open)
+dspThres  = atrV * dispMult
+
+var bool dspL = false
+var bool dspB = false
+
+if mDn and mDnC and close > open and body > dspThres and not dspL
+    dspL := true
+if mUp and mUpC and open > close and body > dspThres and not dspB
+    dspB := true
+
+if dayofmonth != dayofmonth[1]
+    dspL := false
+    dspB := false
+
+// ══════════════════════════════════════════════
+// FVG — Fair Value Gap
 // ══════════════════════════════════════════════
 bullFVG = low > high[2]
 bearFVG = high < low[2]
@@ -179,176 +220,145 @@ inBFVG = not na(bFT) and close <= bFT and close >= bFB
 inSFVG = not na(sFT) and close <= sFT and close >= sFB
 
 // ══════════════════════════════════════════════
-// SMC — ORDER BLOCK (OB)
+// SCORE SYSTEM — 7 نقاط
 // ══════════════════════════════════════════════
-bullDisp = (close - open) > atrV * 1.2 and close > high[1]
-bearDisp = (open - close) > atrV * 1.2 and close < low[1]
+// LONG: Hunt DN → Disp UP → KZ → HTF Bull → SMC → FVG
+lS1 = inKZ()                          ? 1 : 0  // NY Killzone
+lS2 = mDn and not mUp and rangeOK     ? 1 : 0  // Hunt DN + Range كافٍ
+lS3 = mDnC                            ? 1 : 0  // Hunt أغلق داخل النطاق ✅
+lS4 = dspL                            ? 1 : 0  // Displacement صعودي
+lS5 = htfBull                         ? 1 : 0  // أمس كان صاعداً
+lS6 = hadSSS or bullCHoCH or bullBOS  ? 1 : 0  // SMC Structure
+lS7 = inBFVG                          ? 1 : 0  // FVG Zone
+longScore = lS1 + lS2 + lS3 + lS4 + lS5 + lS6 + lS7
 
-var float bOT = na
-var float bOB2 = na
-var float sOT = na
-var float sOB2 = na
-
-if bullDisp and open[1] > close[1]
-    bOT  := open[1]
-    bOB2 := close[1]
-if bearDisp and close[1] > open[1]
-    sOT  := close[1]
-    sOB2 := open[1]
-
-inBOB = not na(bOT) and close <= bOT and close >= bOB2
-inSOB = not na(sOT) and close <= sOT and close >= sOB2
-
-// ══════════════════════════════════════════════
-// ENTRY CONDITIONS
-// ══════════════════════════════════════════════
-smcLong  = hadSSS and (bullBOS or bullCHoCH) and (inBFVG or inBOB) and inTrading()
-smcShort = hadBSS and (bearBOS or bearCHoCH) and (inSFVG or inSOB) and inTrading()
-amdLong  = inNY() and asiaOk and mDn and not mUp and close > asiaLF
-amdShort = inNY() and asiaOk and mUp and not mDn and close < asiaHF
-
-longSig  = smcLong  or amdLong
-shortSig = smcShort or amdShort
+// SHORT: Hunt UP → Disp DN → KZ → HTF Bear → SMC → FVG
+sS1 = inKZ()                          ? 1 : 0
+sS2 = mUp and not mDn and rangeOK     ? 1 : 0
+sS3 = mUpC                            ? 1 : 0
+sS4 = dspB                            ? 1 : 0
+sS5 = htfBear                         ? 1 : 0
+sS6 = hadBSS or bearCHoCH or bearBOS  ? 1 : 0
+sS7 = inSFVG                          ? 1 : 0
+shortScore = sS1 + sS2 + sS3 + sS4 + sS5 + sS6 + sS7
 
 // ══════════════════════════════════════════════
-// STRATEGY EXECUTION + ALERTS
+// CONFIRMATION CANDLE
 // ══════════════════════════════════════════════
-sessTxt = inNY() ? "New York" : inLondon() ? "London" : "Other"
+bullConfirm = close > open and (open - low) > (high - close) * 0.5
+bearConfirm = close < open and (high - open) > (close - low) * 0.5
 
-if longSig and strategy.position_size == 0
-    _sl  = close - atrV * atrM
+// ══════════════════════════════════════════════
+// ENTRY — إشارة واحدة يومياً
+// ══════════════════════════════════════════════
+longSig  = longScore  >= minScore and mDn and mDnC and bullConfirm and not todayDone and strategy.position_size == 0
+shortSig = shortScore >= minScore and mUp and mUpC and bearConfirm and not todayDone and strategy.position_size == 0
+
+if longSig
+    todayDone := true
+    _sl  = mLP - atrV * slM
     _rsk = close - _sl
-    _tp  = close + _rsk * rrR
-    _lbl = smcLong ? "SMC" : "AMD"
-    strategy.entry("LONG", strategy.long, comment=_lbl + " LONG")
-    strategy.exit("LX", "LONG", stop=_sl, limit=_tp)
-    if showL
-        label.new(bar_index, low,
-                  "📈 " + _lbl + " LONG\nSL: " + str.tostring(_sl, "#.##") +
-                  "\nTP: " + str.tostring(_tp, "#.##"),
-                  color=color.green, textcolor=color.white,
-                  style=label.style_label_up, size=size.normal)
-    alert('{"signal":"BUY","symbol":"'   + syminfo.ticker             +
-          '","price":"'                  + str.tostring(close,"#.##") +
-          '","time":"'                   + str.tostring(time)         +
-          '","session":"'                + sessTxt                    +
-          '","strategy":"SMC+AMD ULTRA PRO"}',
-          alert.freq_once_per_bar_close)
+    _tp1 = close + _rsk * tp1R
+    _tp2 = close + _rsk * tp2R
+    strategy.entry("LONG", strategy.long)
+    strategy.exit("LX1", "LONG", qty_percent=50,  stop=_sl, limit=_tp1)
+    strategy.exit("LX2", "LONG", qty_percent=100, stop=_sl, limit=_tp2)
+    label.new(bar_index, low - atrV * 0.5,
+              "🎯 LONG " + str.tostring(longScore) + "/7",
+              color=color.new(color.green, 0), textcolor=color.white,
+              style=label.style_triangleup, size=size.small)
+    line.new(bar_index, _sl,  bar_index + 30, _sl,  color=color.red,   width=1, style=line.style_dashed)
+    line.new(bar_index, _tp1, bar_index + 30, _tp1, color=color.green, width=1, style=line.style_dashed)
+    line.new(bar_index, _tp2, bar_index + 30, _tp2, color=color.lime,  width=2)
+    alert("🎯 AMD SNIPER LONG | " + syminfo.ticker + " | Score:" + str.tostring(longScore) + "/7 | @ " + str.tostring(close, "#.##"), alert.freq_once_per_bar_close)
 
-if shortSig and strategy.position_size == 0
-    _sl  = close + atrV * atrM
+if shortSig
+    todayDone := true
+    _sl  = mHP + atrV * slM
     _rsk = _sl - close
-    _tp  = close - _rsk * rrR
-    _lbl = smcShort ? "SMC" : "AMD"
-    strategy.entry("SHORT", strategy.short, comment=_lbl + " SHORT")
-    strategy.exit("SX", "SHORT", stop=_sl, limit=_tp)
-    if showL
-        label.new(bar_index, high,
-                  "📉 " + _lbl + " SHORT\nSL: " + str.tostring(_sl, "#.##") +
-                  "\nTP: " + str.tostring(_tp, "#.##"),
-                  color=color.red, textcolor=color.white,
-                  style=label.style_label_down, size=size.normal)
-    alert('{"signal":"SELL","symbol":"'  + syminfo.ticker             +
-          '","price":"'                  + str.tostring(close,"#.##") +
-          '","time":"'                   + str.tostring(time)         +
-          '","session":"'                + sessTxt                    +
-          '","strategy":"SMC+AMD ULTRA PRO"}',
-          alert.freq_once_per_bar_close)
+    _tp1 = close - _rsk * tp1R
+    _tp2 = close - _rsk * tp2R
+    strategy.entry("SHORT", strategy.short)
+    strategy.exit("SX1", "SHORT", qty_percent=50,  stop=_sl, limit=_tp1)
+    strategy.exit("SX2", "SHORT", qty_percent=100, stop=_sl, limit=_tp2)
+    label.new(bar_index, high + atrV * 0.5,
+              "🎯 SHORT " + str.tostring(shortScore) + "/7",
+              color=color.new(color.red, 0), textcolor=color.white,
+              style=label.style_triangledown, size=size.small)
+    line.new(bar_index, _sl,  bar_index + 30, _sl,  color=color.red,   width=1, style=line.style_dashed)
+    line.new(bar_index, _tp1, bar_index + 30, _tp1, color=color.green, width=1, style=line.style_dashed)
+    line.new(bar_index, _tp2, bar_index + 30, _tp2, color=color.lime,  width=2)
+    alert("🎯 AMD SNIPER SHORT | " + syminfo.ticker + " | Score:" + str.tostring(shortScore) + "/7 | @ " + str.tostring(close, "#.##"), alert.freq_once_per_bar_close)
 
-alertcondition(longSig,  title="SMC+AMD LONG",
-     message='{"signal":"BUY","symbol":"{{ticker}}","price":"{{close}}","time":"{{time}}","session":"London/NY","strategy":"SMC+AMD ULTRA PRO"}')
-alertcondition(shortSig, title="SMC+AMD SHORT",
-     message='{"signal":"SELL","symbol":"{{ticker}}","price":"{{close}}","time":"{{time}}","session":"London/NY","strategy":"SMC+AMD ULTRA PRO"}')
+alertcondition(longSig,  title="AMD SNIPER LONG",  message="🎯 LONG {{ticker}} @ {{close}} | AMD SNIPER")
+alertcondition(shortSig, title="AMD SNIPER SHORT", message="🎯 SHORT {{ticker}} @ {{close}} | AMD SNIPER")
 
 // ══════════════════════════════════════════════
 // VISUALS
 // ══════════════════════════════════════════════
-bgcolor(inAsia()   ? color.new(color.blue,   96) : na, title="Asia")
-bgcolor(inLondon() ? color.new(color.orange, 96) : na, title="London")
-bgcolor(inNY()     ? color.new(color.green,  96) : na, title="NY")
+bgcolor(inAsia() ? color.new(color.blue,  94) : na, title="Asia Session")
+bgcolor(inKZ()   ? color.new(color.green, 92) : na, title="NY Open Killzone")
 
-plot(asiaOk ? asiaHF : na, "Asia H", color=color.blue, linewidth=1, style=plot.style_linebr)
-plot(asiaOk ? asiaLF : na, "Asia L", color=color.blue, linewidth=1, style=plot.style_linebr)
+plot(asiaOk ? asiaH : na, "Asia H", color=color.blue, linewidth=1, style=plot.style_linebr)
+plot(asiaOk ? asiaL : na, "Asia L", color=color.blue, linewidth=1, style=plot.style_linebr)
 
-var box asiaBox = na
-if asiaOk and not wasAs
-    asiaBox := box.new(bar_index - 1, asiaHF, bar_index, asiaLF,
-                       border_color=color.blue, border_width=1,
-                       bgcolor=color.new(color.blue, 90))
-if not na(asiaBox) and asiaOk
-    box.set_right(asiaBox, bar_index)
+bgcolor(mUp and not mDn ? color.new(color.red,  93) : na, title="Hunt↑")
+bgcolor(mDn and not mUp ? color.new(color.lime, 93) : na, title="Hunt↓")
 
-bgcolor(mUp and not mDn ? color.new(color.red,  93) : na, title="Manip↑")
-bgcolor(mDn and not mUp ? color.new(color.lime, 93) : na, title="Manip↓")
+plotshape(bssSweep, "BSS Sweep", shape.xcross, location.abovebar, color.red,  size=size.small)
+plotshape(sssSweep, "SSS Sweep", shape.xcross, location.belowbar, color.lime, size=size.small)
 
-plotshape(showSW and not na(swH), "Swing H", shape.diamond, location.abovebar, color.red,  size=size.tiny)
-plotshape(showSW and not na(swL), "Swing L", shape.diamond, location.belowbar, color.lime, size=size.tiny)
+if bullBOS
+    label.new(bar_index, lastSH, "BOS↑",   color=color.green,  textcolor=color.white, style=label.style_label_left, size=size.tiny)
+if bearBOS
+    label.new(bar_index, lastSL, "BOS↓",   color=color.red,    textcolor=color.white, style=label.style_label_left, size=size.tiny)
+if bullCHoCH
+    label.new(bar_index, lastSH, "CHoCH↑", color=color.teal,   textcolor=color.white, style=label.style_label_left, size=size.tiny)
+if bearCHoCH
+    label.new(bar_index, lastSL, "CHoCH↓", color=color.orange, textcolor=color.white, style=label.style_label_left, size=size.tiny)
 
-plotshape(bssSweep, "Buy-Side Sweep",  shape.xcross, location.abovebar, color.red,  size=size.small)
-plotshape(sssSweep, "Sell-Side Sweep", shape.xcross, location.belowbar, color.lime, size=size.small)
+if mUp and not mUp[1]
+    label.new(bar_index, high, "🔴 Hunt↑", color=color.red,  textcolor=color.white, style=label.style_label_down, size=size.small)
+if mDn and not mDn[1]
+    label.new(bar_index, low,  "🟢 Hunt↓", color=color.lime, textcolor=color.white, style=label.style_label_up,   size=size.small)
 
-if showL
-    if bullBOS
-        label.new(bar_index, lastSH, "BOS↑",   color=color.green,  textcolor=color.white, style=label.style_label_left, size=size.tiny)
-    if bearBOS
-        label.new(bar_index, lastSL, "BOS↓",   color=color.red,    textcolor=color.white, style=label.style_label_left, size=size.tiny)
-    if bullCHoCH
-        label.new(bar_index, lastSH, "CHoCH↑", color=color.teal,   textcolor=color.white, style=label.style_label_left, size=size.tiny)
-    if bearCHoCH
-        label.new(bar_index, lastSL, "CHoCH↓", color=color.orange, textcolor=color.white, style=label.style_label_left, size=size.tiny)
-    if mUp and not mUp[1]
-        label.new(bar_index, high, "🔴 Stop Hunt↑\n" + str.tostring(high, "#.##"),
-                  color=color.red,  textcolor=color.white, style=label.style_label_down, size=size.small)
-    if mDn and not mDn[1]
-        label.new(bar_index, low,  "🟢 Stop Hunt↓\n" + str.tostring(low,  "#.##"),
-                  color=color.lime, textcolor=color.white, style=label.style_label_up,   size=size.small)
-
-if showZ
-    if bullFVG
-        box.new(bar_index - 2, bFT, bar_index + 15, bFB,
-                border_color=color.teal,   border_width=1, bgcolor=color.new(color.teal,   80))
-    if bearFVG
-        box.new(bar_index - 2, sFT, bar_index + 15, sFB,
-                border_color=color.orange, border_width=1, bgcolor=color.new(color.orange, 80))
-    if bullDisp and open[1] > close[1]
-        box.new(bar_index - 1, bOT,  bar_index + 20, bOB2,
-                border_color=color.green, border_width=2, bgcolor=color.new(color.green, 75))
-    if bearDisp and close[1] > open[1]
-        box.new(bar_index - 1, sOT,  bar_index + 20, sOB2,
-                border_color=color.red,   border_width=2, bgcolor=color.new(color.red,   75))
+if bullFVG
+    box.new(bar_index - 2, bFT, bar_index + 20, bFB, border_color=color.teal,   border_width=1, bgcolor=color.new(color.teal,   82))
+if bearFVG
+    box.new(bar_index - 2, sFT, bar_index + 20, sFB, border_color=color.orange, border_width=1, bgcolor=color.new(color.orange, 82))
 
 // ══════════════════════════════════════════════
 // INFO TABLE
 // ══════════════════════════════════════════════
-var table tbl = table.new(position.top_right, 2, 9,
+var table tbl = table.new(position.top_right, 2, 10,
                            border_color=color.gray, border_width=1,
                            bgcolor=color.new(color.black, 72))
 
 if barstate.islast
-    _sess  = inAsia()   ? "🌏 Asia"     :
-             inLondon() ? "🇬🇧 London"  :
-             inNY()     ? "🇺🇸 NY"      : "⏸ Closed"
-    _str   = mStr ==  1 ? "🟢 Bull"     : mStr == -1 ? "🔴 Bear" : "⚪ Neutral"
-    _manip = mUp        ? "🔴 Hunt↑"    : mDn        ? "🟢 Hunt↓" : "⏳ —"
-    _sweep = hadBSS     ? "🔴 Buy-Side" : hadSSS     ? "🟢 Sell-Side" : "—"
-    _zone  = (inBFVG or inBOB) ? "🟢 Bull Zone" : (inSFVG or inSOB) ? "🔴 Bear Zone" : "—"
-    _sig   = longSig    ? "📈 LONG"     : shortSig   ? "📉 SHORT" : "—"
+    _sess = inAsia() ? "🌏 Asia" : inKZ() ? "🎯 NY Open KZ" : "⏸ Outside"
+    _manip = mUp ? "🔴 Hunt↑" + (mUpC ? " ✅" : " ⏳") : mDn ? "🟢 Hunt↓" + (mDnC ? " ✅" : " ⏳") : "—"
+    _htf   = htfBull ? "🟢 Bull" : htfBear ? "🔴 Bear" : "⚪ Neutral"
+    _done  = todayDone ? "✅ أُرسلت" : "⏳ لا إشارة"
+    _lsc   = str.tostring(longScore)  + "/7"
+    _ssc   = str.tostring(shortScore) + "/7"
 
-    table.cell(tbl, 0, 0, "SMC+AMD ULTRA PRO", bgcolor=color.new(color.navy,20), text_color=color.white, text_halign=text.align_center)
-    table.cell(tbl, 1, 0, _sess,               bgcolor=color.new(color.navy,20), text_color=color.white)
-    table.cell(tbl, 0, 1, "Structure",  text_color=color.gray, text_halign=text.align_left)
-    table.cell(tbl, 1, 1, _str,         text_color=mStr==1 ? color.green : mStr==-1 ? color.red : color.gray)
-    table.cell(tbl, 0, 2, "Sweep",      text_color=color.gray, text_halign=text.align_left)
-    table.cell(tbl, 1, 2, _sweep,       text_color=hadBSS ? color.red : hadSSS ? color.lime : color.gray)
-    table.cell(tbl, 0, 3, "Manip",      text_color=color.gray, text_halign=text.align_left)
-    table.cell(tbl, 1, 3, _manip,       text_color=mUp ? color.red : mDn ? color.lime : color.gray)
-    table.cell(tbl, 0, 4, "Asia H",     text_color=color.gray, text_halign=text.align_left)
-    table.cell(tbl, 1, 4, asiaOk ? str.tostring(asiaHF, "#.##") : "—", text_color=color.blue)
-    table.cell(tbl, 0, 5, "Asia L",     text_color=color.gray, text_halign=text.align_left)
-    table.cell(tbl, 1, 5, asiaOk ? str.tostring(asiaLF, "#.##") : "—", text_color=color.blue)
-    table.cell(tbl, 0, 6, "FVG / OB",   text_color=color.gray, text_halign=text.align_left)
-    table.cell(tbl, 1, 6, _zone,        text_color=(inBFVG or inBOB) ? color.lime : (inSFVG or inSOB) ? color.red : color.gray)
+    table.cell(tbl, 0, 0, "AMD SNIPER", bgcolor=color.new(color.navy, 20), text_color=color.white, text_halign=text.align_center)
+    table.cell(tbl, 1, 0, _sess,        bgcolor=color.new(color.navy, 20), text_color=color.white)
+    table.cell(tbl, 0, 1, "Hunt",       text_color=color.gray, text_halign=text.align_left)
+    table.cell(tbl, 1, 1, _manip,       text_color=mUp ? color.red : mDn ? color.lime : color.gray)
+    table.cell(tbl, 0, 2, "HTF Bias",   text_color=color.gray, text_halign=text.align_left)
+    table.cell(tbl, 1, 2, _htf,         text_color=htfBull ? color.green : htfBear ? color.red : color.gray)
+    table.cell(tbl, 0, 3, "Asia H",     text_color=color.gray, text_halign=text.align_left)
+    table.cell(tbl, 1, 3, asiaOk ? str.tostring(asiaH, "#.##") : "—", text_color=color.blue)
+    table.cell(tbl, 0, 4, "Asia L",     text_color=color.gray, text_halign=text.align_left)
+    table.cell(tbl, 1, 4, asiaOk ? str.tostring(asiaL, "#.##") : "—", text_color=color.blue)
+    table.cell(tbl, 0, 5, "Long  Score",text_color=color.gray, text_halign=text.align_left)
+    table.cell(tbl, 1, 5, _lsc,         text_color=longScore  >= minScore ? color.green : color.gray)
+    table.cell(tbl, 0, 6, "Short Score",text_color=color.gray, text_halign=text.align_left)
+    table.cell(tbl, 1, 6, _ssc,         text_color=shortScore >= minScore ? color.red   : color.gray)
     table.cell(tbl, 0, 7, "ATR",        text_color=color.gray, text_halign=text.align_left)
-    table.cell(tbl, 1, 7, str.tostring(atrV, "#.##"), text_color=color.white)
-    table.cell(tbl, 0, 8, "Signal",     text_color=color.gray, text_halign=text.align_left)
-    table.cell(tbl, 1, 8, _sig,         text_color=longSig ? color.green : shortSig ? color.red : color.gray)
+    table.cell(tbl, 1, 7, str.tostring(atrV, "#.####"), text_color=color.white)
+    table.cell(tbl, 0, 8, "Today",      text_color=color.gray, text_halign=text.align_left)
+    table.cell(tbl, 1, 8, _done,        text_color=todayDone ? color.green : color.gray)
+    table.cell(tbl, 0, 9, "Use TF",     text_color=color.gray, text_halign=text.align_left)
+    table.cell(tbl, 1, 9, "15m ← أفضل", text_color=color.yellow)
