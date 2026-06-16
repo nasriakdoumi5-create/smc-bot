@@ -1,38 +1,33 @@
 /**
  * AMD SNIPER Engine — إشارة واحدة يومياً
- * نفس منطق Pine Script: Displacement + Score + Killzone
+ *
+ * الإصلاح: PDH/PDL بدل Pre-market (Yahoo لا يعطي بيانات قبل السوق)
+ *
+ * دورة AMD للأسهم الكندية/الأمريكية:
+ *   Accumulation = نطاق يوم أمس (PDH/PDL)
+ *   Manipulation = كسر PDH أو PDL في أول ساعة
+ *   Distribution = NY Open Killzone: 09:30-11:30 ET = 13:30-15:30 UTC
  */
 
-// Sessions UTC  (Madrid summer = UTC+2)
-// Pre-market / Accumulation: قبل افتتاح السوق
-// Killzone: 15:00–17:00 Madrid = 13:00–15:00 UTC
-const SESSIONS = {
-  asia:  { start: 0,            end: 13 * 60 + 30 }, // قبل الافتتاح
-  kill:  { start: 13 * 60,      end: 15 * 60 },       // 13:00–15:00 UTC
-  mktEnd:{ start: 20 * 60,      end: 24 * 60 },       // بعد إغلاق السوق
-};
+// NY Open Killzone: 09:30–11:30 ET = 13:30–15:30 UTC
+const KZ_START = 13 * 60 + 30;
+const KZ_END   = 15 * 60 + 30;
 
 function minsUTC(bar) {
   const d = new Date(bar.time * 1000);
   return d.getUTCHours() * 60 + d.getUTCMinutes();
 }
 
-function dateKey(bar) {
-  const d = new Date(bar.time * 1000);
-  return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
-}
-
-function inPreMkt(bar) {
-  const m = minsUTC(bar);
-  return m >= SESSIONS.asia.start && m < SESSIONS.asia.end;
+function dateUTC(ts) {
+  const d = new Date(ts);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 
 function inKillzone(bar) {
   const m = minsUTC(bar);
-  return m >= SESSIONS.kill.start && m < SESSIONS.kill.end;
+  return m >= KZ_START && m < KZ_END;
 }
 
-// ATR بسيط على آخر N شمعة
 function calcATR(bars, period = 14) {
   if (bars.length < period + 1) return null;
   let sum = 0;
@@ -47,144 +42,136 @@ function calcATR(bars, period = 14) {
   return sum / period;
 }
 
-// HTF bias: هل أمس كان يوم صاعد أم هابط؟
-function getDailyBias(bars) {
-  const todayKey = dateKey(bars[bars.length - 1]);
-  const yesterday = {};
-
+// نطاق يوم أمس (PDH/PDL) + اتجاهه
+function getPrevDay(bars, todayKey) {
+  const byDay = {};
   for (const b of bars) {
-    const k = dateKey(b);
+    const k = dateUTC(b.time * 1000);
     if (k === todayKey) continue;
-    if (!yesterday[k]) yesterday[k] = { open: b.open, close: b.close };
-    yesterday[k].close = b.close;
+    if (!byDay[k]) byDay[k] = { high: b.high, low: b.low, open: b.open, close: b.close };
+    byDay[k].high  = Math.max(byDay[k].high, b.high);
+    byDay[k].low   = Math.min(byDay[k].low,  b.low);
+    byDay[k].close = b.close;
   }
-
-  const keys = Object.keys(yesterday).sort();
+  const keys = Object.keys(byDay).sort();
   if (keys.length === 0) return null;
-  const last = yesterday[keys[keys.length - 1]];
-  return last.close > last.open ? 'bull' : 'bear';
+  const prev = byDay[keys[keys.length - 1]];
+  return {
+    high: +prev.high.toFixed(4),
+    low:  +prev.low.toFixed(4),
+    bias: prev.close > prev.open ? 'bull' : 'bear',
+  };
 }
 
 export function analyzeAMD(bars5m) {
-  if (!bars5m || bars5m.length < 120) return { error: 'not enough data' };
+  if (!bars5m || bars5m.length < 50) return { error: 'not enough data' };
 
-  const last  = bars5m[bars5m.length - 1];
-  const price = last.close;
-  const atr   = calcATR(bars5m, 14);
+  const last     = bars5m[bars5m.length - 1];
+  const price    = last.close;
+  const atr      = calcATR(bars5m, 14);
   if (!atr) return { error: 'ATR not ready' };
 
-  const todayKey = dateKey(last);
-  const htfBias  = getDailyBias(bars5m);
+  const todayKey = dateUTC(Date.now());
 
-  // ── بناء نطاق ما قبل السوق (Accumulation) ─────
-  const todayBarsPreMkt = bars5m.filter(b => dateKey(b) === todayKey && inPreMkt(b));
-  if (todayBarsPreMkt.length < 5) {
-    return { error: 'Pre-market range not ready', price };
-  }
+  // ── PDH/PDL = نطاق التراكم ────────────────────
+  const prev = getPrevDay(bars5m, todayKey);
+  if (!prev) return { error: 'No previous day data', price };
 
-  const asiaHigh = +Math.max(...todayBarsPreMkt.map(b => b.high)).toFixed(4);
-  const asiaLow  = +Math.min(...todayBarsPreMkt.map(b => b.low)).toFixed(4);
+  const asiaHigh = prev.high;
+  const asiaLow  = prev.low;
   const asiaSize = +(asiaHigh - asiaLow).toFixed(4);
   const rangePct = asiaLow > 0 ? asiaSize / asiaLow : 0;
+  const rangeOK  = rangePct >= 0.003; // ≥ 0.3%
+  const htfBias  = prev.bias;
 
-  // فلتر: Range لازم ≥ 0.3% من السعر
-  const rangeOK = rangePct >= 0.003;
+  // ── بارات اليوم فقط ───────────────────────────
+  const todayBars = bars5m.filter(b => dateUTC(b.time * 1000) === todayKey);
+  const minSweep  = asiaSize * 0.2; // 20% من نطاق أمس
 
-  // ── كشف الـ Hunt (Manipulation) ───────────────
-  const minSweep = asiaSize * 0.3; // الكسر لازم يكون 30% من حجم النطاق
-  const postAsiaBars = bars5m.filter(b => dateKey(b) === todayKey && !inPreMkt(b));
-
+  // ── كشف Hunt ──────────────────────────────────
   let mUp = false, mDn = false;
   let mUpBar = null, mDnBar = null;
   let mUpClosed = false, mDnClosed = false;
 
-  for (const b of postAsiaBars) {
-    if (b.high > asiaHigh + minSweep && !mUp) {
-      mUp    = true;
-      mUpBar = b;
-      mUpClosed = b.close < asiaHigh; // أغلق داخل النطاق في نفس الشمعة
+  for (const b of todayBars) {
+    if (!mUp && b.high > asiaHigh + minSweep) {
+      mUp = true; mUpBar = b;
+      mUpClosed = b.close < asiaHigh;
     }
-    if (b.low < asiaLow - minSweep && !mDn) {
-      mDn    = true;
-      mDnBar = b;
+    if (!mDn && b.low < asiaLow - minSweep) {
+      mDn = true; mDnBar = b;
       mDnClosed = b.close > asiaLow;
     }
-    // تحقق من الإغلاق في الشموع اللاحقة
     if (mUp && !mUpClosed && b.close < asiaHigh) mUpClosed = true;
     if (mDn && !mDnClosed && b.close > asiaLow)  mDnClosed = true;
   }
 
-  // ── كشف الـ Displacement (شمعة قوية 2× ATR) ──
-  let dispBull = false; // بعد Hunt DN → صعود قوي
-  let dispBear = false; // بعد Hunt UP → هبوط قوي
+  // ── Displacement (شمعة > 1.5× ATR بعد Hunt) ──
+  let dispBull = false;
+  let dispBear = false;
 
-  for (const b of postAsiaBars) {
+  for (const b of todayBars) {
     const body = Math.abs(b.close - b.open);
-    if (mDn && mDnClosed && !dispBull && b.close > b.open && body > atr * 2.0) dispBull = true;
-    if (mUp && mUpClosed && !dispBear && b.open > b.close && body > atr * 2.0) dispBear = true;
+    if (mDn && mDnClosed && !dispBull && b.close > b.open && body > atr * 1.5) dispBull = true;
+    if (mUp && mUpClosed && !dispBear && b.open > b.close && body > atr * 1.5) dispBear = true;
   }
 
-  // ── Killzone نشطة؟ ────────────────────────────
   const killActive = inKillzone(last);
 
-  // ── نظام النقاط ────────────────────────────────
-  // LONG: Hunt DN → Disp UP → Killzone → HTF Bull
-  const lS1 = killActive              ? 1 : 0; // Killzone
-  const lS2 = mDn && !mUp && rangeOK ? 1 : 0; // Hunt نظيف + Range كافٍ
-  const lS3 = mDnClosed              ? 1 : 0; // Hunt أغلق داخل النطاق
-  const lS4 = dispBull               ? 1 : 0; // Displacement قوي
-  const lS5 = htfBias === 'bull'     ? 1 : 0; // HTF يؤيد الصعود
+  // ── نظام النقاط (5 نقاط) ──────────────────────
+  const lS1 = killActive          ? 1 : 0; // توقيت NY Open
+  const lS2 = mDn && rangeOK     ? 1 : 0; // Hunt DN + Range كافٍ
+  const lS3 = mDnClosed          ? 1 : 0; // Hunt أغلق داخل النطاق ✅ الأهم
+  const lS4 = dispBull           ? 1 : 0; // Displacement صعودي
+  const lS5 = htfBias === 'bull' ? 1 : 0; // أمس كان صاعداً
   const longScore = lS1 + lS2 + lS3 + lS4 + lS5;
 
-  // SHORT: Hunt UP → Disp DN → Killzone → HTF Bear
-  const sS1 = killActive              ? 1 : 0;
-  const sS2 = mUp && !mDn && rangeOK ? 1 : 0;
-  const sS3 = mUpClosed              ? 1 : 0;
-  const sS4 = dispBear               ? 1 : 0;
-  const sS5 = htfBias === 'bear'     ? 1 : 0;
+  const sS1 = killActive          ? 1 : 0;
+  const sS2 = mUp && rangeOK     ? 1 : 0;
+  const sS3 = mUpClosed          ? 1 : 0;
+  const sS4 = dispBear           ? 1 : 0;
+  const sS5 = htfBias === 'bear' ? 1 : 0;
   const shortScore = sS1 + sS2 + sS3 + sS4 + sS5;
 
-  // ── الإشارة: تحتاج 4 نقاط من 5 ───────────────
+  // ── إشارة: Hunt+Closed إلزاميان + نقطتان أخريان ─
   let signal = null;
 
-  if (longScore >= 4 && price > asiaLow) {
-    const sl   = mDnBar ? +(mDnBar.low  - atr * 0.3).toFixed(4) : +(asiaLow  - atr * 1.5).toFixed(4);
+  if (mDn && mDnClosed && longScore >= 3 && price > asiaLow) {
+    const sl   = mDnBar ? +(mDnBar.low - atr * 0.3).toFixed(4) : +(asiaLow - atr * 1.5).toFixed(4);
     const risk = Math.abs(price - sl);
     signal = {
-      type:   'LONG',
-      price:  +price.toFixed(4),
+      type:         'LONG',
+      price:        +price.toFixed(4),
       sl,
-      tp1:    +(price + risk * 1.5).toFixed(4),
-      tp2:    +(price + risk * 3.0).toFixed(4),
-      score:  `${longScore}/5`,
-      phase:  'Distribution',
-      manipulation: `Hunt DN تحت Asia Low عند ${(mDnBar?.low || asiaLow).toFixed(4)}`,
+      tp1:          +(price + risk * 1.5).toFixed(4),
+      tp2:          +(price + risk * 3.0).toFixed(4),
+      score:        `${longScore}/5`,
+      phase:        'Distribution',
+      manipulation: `Hunt DN تحت PDL عند ${(mDnBar?.low || asiaLow).toFixed(4)}`,
     };
   }
 
-  if (shortScore >= 4 && price < asiaHigh) {
+  if (mUp && mUpClosed && shortScore >= 3 && price < asiaHigh) {
     const sl   = mUpBar ? +(mUpBar.high + atr * 0.3).toFixed(4) : +(asiaHigh + atr * 1.5).toFixed(4);
     const risk = Math.abs(sl - price);
     signal = {
-      type:   'SHORT',
-      price:  +price.toFixed(4),
+      type:         'SHORT',
+      price:        +price.toFixed(4),
       sl,
-      tp1:    +(price - risk * 1.5).toFixed(4),
-      tp2:    +(price - risk * 3.0).toFixed(4),
-      score:  `${shortScore}/5`,
-      phase:  'Distribution',
-      manipulation: `Hunt UP فوق Asia High عند ${(mUpBar?.high || asiaHigh).toFixed(4)}`,
+      tp1:          +(price - risk * 1.5).toFixed(4),
+      tp2:          +(price - risk * 3.0).toFixed(4),
+      score:        `${shortScore}/5`,
+      phase:        'Distribution',
+      manipulation: `Hunt UP فوق PDH عند ${(mUpBar?.high || asiaHigh).toFixed(4)}`,
     };
   }
 
-  const session = killActive ? 'NY Killzone 🎯' : 'Outside Killzone ⏸';
-
   return {
-    price:    +price.toFixed(4),
-    session,
+    price:     +price.toFixed(4),
+    session:   killActive ? 'NY Open Killzone 🎯' : 'Outside Killzone ⏸',
     asiaHigh,
     asiaLow,
-    asiaSize: +asiaSize.toFixed(4),
+    asiaSize,
     rangeOK,
     mUp, mDn,
     mUpClosed, mDnClosed,
