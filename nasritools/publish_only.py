@@ -104,34 +104,37 @@ def get_shop_id(token):
         SHOP_ID_FILE.write_text(str(sid))
         return sid
 
-    # Try by shop name using API key + shared secret (public endpoint)
-    print(f"  Looking up shop '{val}' ...")
-    r3 = requests.get(
-        f"{API}/shops",
-        params={"shop_name": val},
-        headers={"x-api-key": f"{CLIENT_ID}:{SHARED_SECRET}"},
-    )
-    print(f"    -> {r3.status_code}: {r3.text[:300]}")
-    if r3.ok:
-        data = r3.json()
-        results = data.get("results", [])
-        if results:
-            sid = int(results[0]["shop_id"])
+    # Scrape shop_id from public Etsy page (no auth needed)
+    import re
+    print(f"  Fetching public page for shop '{val}' ...")
+    try:
+        rp = requests.get(
+            f"https://www.etsy.com/shop/{val}/about",
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=15,
+        )
+        match = re.search(r'"shop_id"\s*:\s*(\d+)', rp.text)
+        if match:
+            sid = int(match.group(1))
+            print(f"  Found shop_id={sid} from page")
             SHOP_ID_FILE.write_text(str(sid))
             return sid
+        # Try alternate pattern
+        match2 = re.search(r"shop_id['\"]?\s*[=:]\s*['\"]?(\d+)", rp.text)
+        if match2:
+            sid = int(match2.group(1))
+            print(f"  Found shop_id={sid}")
+            SHOP_ID_FILE.write_text(str(sid))
+            return sid
+    except Exception as e:
+        print(f"  Page fetch failed: {e}")
 
-    # Last resort: try /shops/{name} with key:secret
-    r4 = requests.get(
-        f"{API}/shops/{val}",
-        headers={"x-api-key": f"{CLIENT_ID}:{SHARED_SECRET}"},
+    raise ValueError(
+        f"Could not find shop_id for '{val}'.\n"
+        "  Open https://www.etsy.com/shop/NasriTools/about in browser,\n"
+        "  press Ctrl+U (View Source), Ctrl+F 'shop_id',\n"
+        "  then re-run this script and enter the number directly."
     )
-    print(f"    -> {r4.status_code}: {r4.text[:300]}")
-    if r4.ok:
-        sid = int(r4.json()["shop_id"])
-        SHOP_ID_FILE.write_text(str(sid))
-        return sid
-
-    raise ValueError(f"Could not resolve shop: {val}")
 
 
 def create_listing(shop_id, item, token):
