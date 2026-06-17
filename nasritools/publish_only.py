@@ -53,88 +53,11 @@ def h(token):
     }
 
 
+SHOP_ID = 66526082  # NasriTools
+
+
 def get_shop_id(token):
-    # Check cached shop ID first
-    if SHOP_ID_FILE.exists():
-        sid = SHOP_ID_FILE.read_text().strip()
-        if sid.isdigit():
-            return int(sid)
-
-    # Try: user_id is the numeric prefix of the access token
-    user_id = token["access_token"].split(".")[0]
-    print(f"  Trying /users/{user_id}/shops ...")
-    r = requests.get(f"{API}/users/{user_id}/shops", headers=h(token))
-    print(f"    -> {r.status_code}")
-    if r.ok:
-        data = r.json()
-        results = data.get("results", [])
-        if results:
-            sid = int(results[0]["shop_id"])
-            SHOP_ID_FILE.write_text(str(sid))
-            return sid
-
-    # Try /users/me (needs profile_r scope, may fail)
-    print("  Trying /users/me ...")
-    r2 = requests.get(f"{API}/users/me", headers=h(token))
-    print(f"    -> {r2.status_code}")
-    if r2.ok:
-        shop_id = r2.json().get("shop_id")
-        if shop_id:
-            SHOP_ID_FILE.write_text(str(shop_id))
-            return int(shop_id)
-
-    # Manual fallback
-    print()
-    print("  Could not find your shop automatically.")
-    print()
-    print("  To find your Etsy Shop ID:")
-    print("  1. Open https://www.etsy.com/your/shops/me/tools/listings")
-    print("  2. Look at the URL - it will show your shop name")
-    print("  3. OR go to: https://www.etsy.com/shop/{YourShopName}/about")
-    print("     and the shop ID appears in the page source as 'shop_id'")
-    print()
-    print("  You can also find it here:")
-    print("  https://www.etsy.com/your/shops/me/dashboard")
-    print("  The number in the URL after /shops/ is your shop ID.")
-    print()
-    val = input("  Enter your Etsy Shop ID (numbers only) or Shop Name: ").strip()
-
-    if val.isdigit():
-        sid = int(val)
-        SHOP_ID_FILE.write_text(str(sid))
-        return sid
-
-    # Scrape shop_id from public Etsy page (no auth needed)
-    import re
-    print(f"  Fetching public page for shop '{val}' ...")
-    try:
-        rp = requests.get(
-            f"https://www.etsy.com/shop/{val}/about",
-            headers={"User-Agent": "Mozilla/5.0"},
-            timeout=15,
-        )
-        match = re.search(r'"shop_id"\s*:\s*(\d+)', rp.text)
-        if match:
-            sid = int(match.group(1))
-            print(f"  Found shop_id={sid} from page")
-            SHOP_ID_FILE.write_text(str(sid))
-            return sid
-        # Try alternate pattern
-        match2 = re.search(r"shop_id['\"]?\s*[=:]\s*['\"]?(\d+)", rp.text)
-        if match2:
-            sid = int(match2.group(1))
-            print(f"  Found shop_id={sid}")
-            SHOP_ID_FILE.write_text(str(sid))
-            return sid
-    except Exception as e:
-        print(f"  Page fetch failed: {e}")
-
-    raise ValueError(
-        f"Could not find shop_id for '{val}'.\n"
-        "  Open https://www.etsy.com/shop/NasriTools/about in browser,\n"
-        "  press Ctrl+U (View Source), Ctrl+F 'shop_id',\n"
-        "  then re-run this script and enter the number directly."
-    )
+    return SHOP_ID
 
 
 def create_listing(shop_id, item, token):
