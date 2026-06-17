@@ -104,8 +104,8 @@ def main():
     r2 = requests.get(API + "/shops/" + str(SHOP_ID), headers=auth(token))
     if r2.ok:
         shop = r2.json()
-        has_refund = bool(shop.get("policy_refunds", "").strip())
-        has_ship   = bool(shop.get("policy_shipping_info", "").strip())
+        has_refund = bool((shop.get("policy_refunds") or "").strip())
+        has_ship   = bool((shop.get("policy_shipping_info") or "").strip())
         print(f"  Refund policy   : {'SET' if has_refund else 'MISSING'}")
         print(f"  Shipping policy : {'SET' if has_ship else 'MISSING'}")
     else:
