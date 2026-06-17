@@ -8,6 +8,7 @@ Run: python rebuild_hero_images.py
 """
 import json, os, time, io, requests
 from pathlib import Path
+from collections import defaultdict
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 # ── Config ────────────────────────────────────────────
@@ -243,22 +244,32 @@ def etsy_auth(t):
     return {"Authorization": "Bearer " + t["access_token"], "x-api-key": CLIENT_ID + ":" + SECRET}
 
 # ── Pexels helper ─────────────────────────────────────
-def get_photo(query):
+PEXELS_CACHE = {}
+
+def get_photo_urls(query, per_page=15):
+    if query in PEXELS_CACHE:
+        return PEXELS_CACHE[query]
     r = requests.get("https://api.pexels.com/v1/search",
         headers={"Authorization": PEXELS_KEY},
-        params={"query": query, "per_page": 5, "orientation": "square"},
+        params={"query": query, "per_page": per_page, "orientation": "square"},
         timeout=15)
-    if not r.ok:
-        return None
-    photos = r.json().get("photos", [])
-    if not photos:
-        return None
-    for photo in photos:
-        url = photo["src"]["large2x"]
-        ir = requests.get(url, timeout=30)
-        if ir.ok:
-            return Image.open(io.BytesIO(ir.content)).convert("RGB")
+    if r.ok:
+        urls = [p["src"]["large2x"] for p in r.json().get("photos", [])]
+        PEXELS_CACHE[query] = urls
+        return urls
+    return []
+
+def download_photo(url):
+    ir = requests.get(url, timeout=30)
+    if ir.ok:
+        return Image.open(io.BytesIO(ir.content)).convert("RGB")
     return None
+
+def get_photo(query, pick=0):
+    urls = get_photo_urls(query)
+    if not urls:
+        return None
+    return download_photo(urls[pick % len(urls)])
 
 # ── Image builder ─────────────────────────────────────
 def crop_square(img):
@@ -383,7 +394,7 @@ def main():
     print(f"{'='*60}\n")
 
     ok_count = 0
-    category_photos = {}
+    category_count = defaultdict(int)
 
     for i, item in enumerate(listings, 1):
         slug  = item["slug"]
@@ -400,21 +411,27 @@ def main():
 
         print(f"[{i:03d}/{total}] {slug}")
 
-        # 1. Get photo from Pexels
+        # 1. Get photo from Pexels — unique per product
         category = SLUG_CATEGORY.get(slug, "Productivity & Planning")
         query = SEARCH_TERMS.get(slug, category.lower())
+        pick  = category_count[category]
         photo = None
 
         try:
-            photo = get_photo(query)
+            photo = get_photo(query, pick)
             time.sleep(0.4)
         except Exception as e:
             print(f"    photo error: {e}")
 
-        if not photo and category in category_photos:
-            photo = category_photos[category]
-        elif photo and category not in category_photos:
-            category_photos[category] = photo
+        # fallback: category generic search with same pick index
+        if not photo:
+            try:
+                photo = get_photo(category.lower(), pick)
+                time.sleep(0.4)
+            except Exception as e:
+                print(f"    fallback error: {e}")
+
+        category_count[category] += 1
 
         if not photo:
             print(f"    SKIP: no photo")
