@@ -21,7 +21,7 @@ SHOP_ID    = 66526082
 RAW        = "https://raw.githubusercontent.com/nasriakdoumi5-create/smc-bot/claude/digital-products-knowledge-yzpw50/output"
 TOKEN_FILE = Path(os.path.expanduser("~")) / "etsy_token.json"
 PUB_FILE   = Path(os.path.expanduser("~")) / "etsy_published.json"
-DATA_FILE  = Path(__file__).parent / "nasritools" / "listings_data.json"
+DATA_FILE  = Path(os.path.expanduser("~")) / "smc-bot" / "nasritools" / "listings_data.json"
 SLOTS      = ["_01_hero", "_02_included", "_03_how", "_04_features", "_05_cta"]
 
 
