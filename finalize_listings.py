@@ -60,6 +60,7 @@ for i, (slug, lid) in enumerate(items, 1):
         r = requests.post(
             API + "/shops/" + str(SHOP_ID) + "/listings/" + str(lid) + "/files",
             headers=auth(token),
+            data={"name": slug + ".xlsx"},
             files={"file": (slug + ".xlsx", xlsx_data.content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
         )
         if r.ok:
