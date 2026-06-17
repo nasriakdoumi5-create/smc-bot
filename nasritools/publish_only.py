@@ -50,16 +50,20 @@ def headers(token):
 
 # ── Shop ─────────────────────────────────────────────────────────────────
 def get_shop_id(token):
-    r = requests.get(f"{API}/users/me", headers=headers(token))
-    r.raise_for_status()
-    data = r.json()
-    shop_id = data.get("shop_id")
-    if not shop_id:
-        print("Trying shops endpoint...")
-        r2 = requests.get(f"{API}/shops", headers=headers(token), params={"shop_name": "NasriTools"})
-        r2.raise_for_status()
-        shop_id = r2.json()["results"][0]["shop_id"]
-    return int(shop_id)
+    # User ID is embedded as prefix in the access token (e.g. "1253926330.xxx")
+    user_id = token['access_token'].split('.')[0]
+    r = requests.get(f"{API}/users/{user_id}/shops", headers=headers(token))
+    if r.ok:
+        results = r.json().get("results", [])
+        if results:
+            return int(results[0]["shop_id"])
+    # Fallback: try /users/me
+    r2 = requests.get(f"{API}/users/me", headers=headers(token))
+    if r2.ok:
+        shop_id = r2.json().get("shop_id")
+        if shop_id:
+            return int(shop_id)
+    raise ValueError(f"Could not find shop. user_id={user_id}. Response: {r.text[:200]}")
 
 # ── Create listing ───────────────────────────────────────────────────────
 def create_listing(shop_id, item, token):
