@@ -30,13 +30,19 @@ auth_url = "https://www.etsy.com/oauth/connect?" + urlencode({
 print("\n" + "="*60)
 print("  NasriTools - Re-Authorization")
 print("="*60)
-print("\n1. Open this URL in your browser:\n")
+print("\nOpening browser automatically...")
+
+import webbrowser
+webbrowser.open(auth_url)
+
+print("\nIn the browser:")
+print("  1. Click 'Grant access'")
+print("  2. You'll see an error page (ERR_CONNECTION_REFUSED) - that's OK!")
+print("  3. Copy the FULL URL from the address bar (starts with localhost:3003)")
+print("\nIf browser didn't open, manually open:")
 print(auth_url)
-print("\n2. Click 'Grant access'")
-print("\n3. You'll see an error page (ERR_CONNECTION_REFUSED) - that's OK!")
-print("   Copy the FULL URL from the browser address bar and paste it here.")
 print("\n" + "-"*60)
-full_url = input("Paste the redirect URL here: ").strip()
+full_url = input("Paste the full localhost:3003/callback?code=... URL here: ").strip()
 
 qs = parse_qs(urlparse(full_url).query)
 code = qs.get("code", [None])[0]
