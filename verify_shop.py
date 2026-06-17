@@ -46,11 +46,11 @@ def auth(t):
 def check_listing(token, slug, lid):
     issues = []
 
-    # Get listing details
+    # Get listing details (images + section)
     r = requests.get(
         API + "/listings/" + str(lid),
         headers=auth(token),
-        params={"includes": "images,files"},
+        params={"includes": "images"},
     )
     if not r.ok:
         return [f"API error {r.status_code}: {r.text[:80]}"]
@@ -58,8 +58,14 @@ def check_listing(token, slug, lid):
     data = r.json()
     state = data.get("state", "unknown")
     images = data.get("images", [])
-    files  = data.get("files", [])
     section = data.get("shop_section_id")
+
+    # Get digital files via separate endpoint
+    r2 = requests.get(
+        API + "/shops/" + str(SHOP_ID) + "/listings/" + str(lid) + "/files",
+        headers=auth(token),
+    )
+    files = r2.json().get("results", []) if r2.ok else []
 
     if state != "active":
         issues.append(f"state={state} (not active)")
