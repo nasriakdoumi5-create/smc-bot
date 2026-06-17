@@ -18,8 +18,9 @@ except ImportError:
     exit(1)
 
 # Config
-CLIENT_ID    = "pluc0garrgcjzhim0hawxf0k"
-API          = "https://api.etsy.com/v3/application"
+CLIENT_ID     = "pluc0garrgcjzhim0hawxf0k"
+SHARED_SECRET = "hc89hlqkd6"
+API           = "https://api.etsy.com/v3/application"
 TOKEN_FILE   = Path(os.path.expanduser("~")) / "etsy_token.json"
 DATA_FILE    = Path(__file__).parent / "listings_data.json"
 RESULTS_FILE = Path(os.path.expanduser("~")) / "etsy_published.json"
@@ -103,12 +104,30 @@ def get_shop_id(token):
         SHOP_ID_FILE.write_text(str(sid))
         return sid
 
-    # Try by shop name
+    # Try by shop name using API key + shared secret (public endpoint)
     print(f"  Looking up shop '{val}' ...")
-    r3 = requests.get(f"{API}/shops/{val}", headers=h(token))
-    print(f"    -> {r3.status_code}: {r3.text[:200]}")
+    r3 = requests.get(
+        f"{API}/shops",
+        params={"shop_name": val},
+        headers={"x-api-key": f"{CLIENT_ID}:{SHARED_SECRET}"},
+    )
+    print(f"    -> {r3.status_code}: {r3.text[:300]}")
     if r3.ok:
-        sid = int(r3.json()["shop_id"])
+        data = r3.json()
+        results = data.get("results", [])
+        if results:
+            sid = int(results[0]["shop_id"])
+            SHOP_ID_FILE.write_text(str(sid))
+            return sid
+
+    # Last resort: try /shops/{name} with key:secret
+    r4 = requests.get(
+        f"{API}/shops/{val}",
+        headers={"x-api-key": f"{CLIENT_ID}:{SHARED_SECRET}"},
+    )
+    print(f"    -> {r4.status_code}: {r4.text[:300]}")
+    if r4.ok:
+        sid = int(r4.json()["shop_id"])
         SHOP_ID_FILE.write_text(str(sid))
         return sid
 
