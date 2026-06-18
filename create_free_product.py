@@ -29,8 +29,8 @@ SIZE = (2000, 2000)
 # ── Free product data ──────────────────────────────────
 FREE_PRODUCT = {
     "slug":  "free_budget_tracker_lite",
-    "title": "FREE Budget Tracker Google Sheets | Personal Finance Starter Template | Expense Planner | NasriTools",
-    "price": 0.20,
+    "title": "Budget Tracker Google Sheets | FREE Personal Finance Starter Template | Expense Planner | NasriTools",
+    "price": 0.99,
     "tags": [
         "free budget tracker",
         "google sheets budget",
@@ -65,10 +65,10 @@ HOW TO USE:
 4. Watch your financial picture update automatically
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
-WHY ONLY $0.20?
+WHY ONLY $0.99?
 ━━━━━━━━━━━━━━━━━━━━━━━━
-Less than a candy bar. We set this price because Etsy requires a minimum to process digital downloads.
-We want you to experience the NasriTools quality before you invest in a full template.
+Less than a cup of coffee. This is our way of letting you experience NasriTools quality
+before investing in a full template.
 If you love this template, explore our full collection of 100+ professional spreadsheets starting at $9.00:
 
 ✦ Advanced Budget Tracker (12-month view + debt payoff)
@@ -630,7 +630,7 @@ def build_hero_free():
 
     # FREE callout
     pf = font(62, bold=True)
-    centered("100% FREE  —  No Cost, No Catch", panel_y+140, pf, YELLOW, shadow=False)
+    centered("Only $0.99  —  Less Than a Cup of Coffee", panel_y+140, pf, YELLOW, shadow=False)
 
     # Instant download
     centered("Instant Download  •  No Signup  •  Yours Forever", panel_y+230, font(36), (170,170,200), shadow=False)
@@ -663,7 +663,7 @@ def main():
             DONE_FILE.unlink()  # incomplete run, retry
 
     print("\n" + "="*60)
-    print("  NasriTools - Create Free Product")
+    print("  NasriTools - Create Free Product  [v3 | price=$0.99]")
     print("="*60 + "\n")
 
     token = get_token()
@@ -678,20 +678,23 @@ def main():
     img_path = build_hero_free()
 
     # Step 3: Create listing
-    print("[3/4] Creating Etsy listing at $0.00...")
+    price = p["price"]
+    print(f"[3/4] Creating Etsy listing at ${price:.2f}...")
     payload = {
-        "title":       p["title"],
-        "description": p["description"],
-        "price":       0.00,
-        "quantity":    999,
-        "who_made":    "i_did",
-        "when_made":   WHEN_MADE,
-        "taxonomy_id": TAXONOMY_ID,
-        "type":        "download",
-        "is_digital":  True,
-        "tags":        p["tags"],
-        "state":       "active",
-        "shipping_profile_id": None,
+        "title":           p["title"],
+        "description":     p["description"],
+        "price":           price,
+        "quantity":        999,
+        "who_made":        "i_did",
+        "when_made":       WHEN_MADE,
+        "taxonomy_id":     TAXONOMY_ID,
+        "type":            "download",
+        "is_supply":       False,
+        "is_customizable": False,
+        "is_digital":      True,
+        "processing_min":  0,
+        "processing_max":  0,
+        "tags":            p["tags"],
     }
 
     r = requests.post(
@@ -702,17 +705,7 @@ def main():
     )
 
     if not r.ok:
-        # Retry without shipping_profile_id
-        payload.pop("shipping_profile_id", None)
-        r = requests.post(
-            API + f"/shops/{SHOP_ID}/listings",
-            headers={**etsy_auth(token), "Content-Type": "application/json"},
-            json=payload,
-            timeout=30,
-        )
-
-    if not r.ok:
-        print(f"  ERROR creating listing: {r.text[:200]}")
+        print(f"  ERROR creating listing: {r.text[:300]}")
         return
 
     lid = r.json()["listing_id"]
