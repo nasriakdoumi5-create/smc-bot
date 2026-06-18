@@ -441,15 +441,22 @@ def draw_features_frame(t, product):
         fy = feat_start_y + i * feat_gap
         fx = int(lerp(W + 100, 480, prog))
 
+        # Only draw when card is on-screen
+        if fx >= W - 60:
+            continue
+
         # Card
         draw.rounded_rectangle([fx, fy, W - 60, fy + 96], radius=16,
                                 fill=(255,255,255))
         # Check circle
-        draw.ellipse([fx + 18, fy + 18, fx + 62, fy + 62 + 14], fill=color)
-        draw.text((fx + 40, fy + 50), "✓", font=load_font(32),
-                  fill=(255,255,255), anchor="mm")
-        draw.text((fx + 88, fy + 50), feat, font=load_font(42),
-                  fill=(40, 40, 40), anchor="lm")
+        circ_x1 = min(fx + 62, W - 62)
+        draw.ellipse([fx + 18, fy + 18, circ_x1, fy + 76], fill=color)
+        if circ_x1 > fx + 18:
+            draw.text((fx + 40, fy + 50), "✓", font=load_font(32),
+                      fill=(255,255,255), anchor="mm")
+        if fx + 88 < W - 60:
+            draw.text((fx + 88, fy + 50), feat, font=load_font(42),
+                      fill=(40, 40, 40), anchor="lm")
 
     return img
 
