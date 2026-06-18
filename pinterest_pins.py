@@ -8,7 +8,7 @@ import json, os, time, requests, base64, sys
 from pathlib import Path
 
 # ── Config ─────────────────────────────────────────────
-ACCESS_TOKEN = "YOUR_ACCESS_TOKEN_HERE"   # replace after OAuth
+ACCESS_TOKEN = sys.argv[1] if len(sys.argv) > 1 else "YOUR_ACCESS_TOKEN_HERE"
 IMAGES_DIR   = Path(os.path.expanduser("~")) / "nasri_hero_images"
 DONE_FILE    = Path(os.path.expanduser("~")) / "pinterest_done.json"
 API          = "https://api.pinterest.com/v5"
