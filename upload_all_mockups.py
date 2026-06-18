@@ -16,7 +16,7 @@ MOCKUPS_DIR = Path(os.path.expanduser("~")) / "nasri_mockups"
 STOP_WORDS = {
     "google", "sheets", "template", "spreadsheet", "and", "the",
     "a", "an", "for", "to", "with", "in", "of", "your", "my",
-    "free", "best", "simple", "easy", "complete", "tracker",
+    "free", "best", "simple", "easy", "complete",
 }
 
 
