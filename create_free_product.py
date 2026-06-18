@@ -30,7 +30,7 @@ SIZE = (2000, 2000)
 FREE_PRODUCT = {
     "slug":  "free_budget_tracker_lite",
     "title": "FREE Budget Tracker Google Sheets | Personal Finance Starter Template | Expense Planner | NasriTools",
-    "price": 0.00,
+    "price": 0.20,
     "tags": [
         "free budget tracker",
         "google sheets budget",
@@ -65,9 +65,10 @@ HOW TO USE:
 4. Watch your financial picture update automatically
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
-WHY FREE?
+WHY ONLY $0.20?
 ━━━━━━━━━━━━━━━━━━━━━━━━
-We want you to experience the NasriTools quality before you buy.
+Less than a candy bar. We set this price because Etsy requires a minimum to process digital downloads.
+We want you to experience the NasriTools quality before you invest in a full template.
 If you love this template, explore our full collection of 100+ professional spreadsheets starting at $9.00:
 
 ✦ Advanced Budget Tracker (12-month view + debt payoff)
@@ -651,11 +652,15 @@ def build_hero_free():
 def main():
     if DONE_FILE.exists():
         info = json.loads(DONE_FILE.read_text())
-        print(f"\nFree product already created!")
-        print(f"  Listing ID: {info.get('listing_id')}")
-        print(f"  URL: https://www.etsy.com/listing/{info.get('listing_id')}")
-        print(f"\nDelete {DONE_FILE} to re-run.")
-        return
+        lid = info.get('listing_id')
+        if lid:
+            print(f"\nFree product already created!")
+            print(f"  Listing ID: {lid}")
+            print(f"  URL: https://www.etsy.com/listing/{lid}")
+            print(f"\nDelete {DONE_FILE} to re-run.")
+            return
+        else:
+            DONE_FILE.unlink()  # incomplete run, retry
 
     print("\n" + "="*60)
     print("  NasriTools - Create Free Product")
