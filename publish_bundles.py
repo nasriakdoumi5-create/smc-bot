@@ -1,9 +1,10 @@
 """
 NasriTools - Generate Bundle Images + Publish 5 Bundle Listings
 Creates a promotional image for each bundle then publishes them on Etsy
+Handles Ultimate Bundle 10-file limit by creating a ZIP archive
 Run: python publish_bundles.py
 """
-import json, os, time, requests, hashlib
+import json, os, time, requests, hashlib, zipfile
 from pathlib import Path
 from io import BytesIO
 try:
@@ -204,6 +205,15 @@ def make_bundle_image(bundle):
     return img
 
 
+TEMPLATES_DIR = Path(os.path.expanduser("~")) / "nasri_templates"
+
+ULTIMATE_SLUGS = [
+    "budget_tracker", "habit_tracker", "meal_planner", "wedding_planner",
+    "workout_tracker", "content_creator_planner", "freelancer_invoice_tracker",
+    "student_planner", "goals_planner", "weekly_planner",
+]
+
+
 def upload_image(token, listing_id, img):
     buf = BytesIO()
     img.save(buf, "JPEG", quality=94)
@@ -216,6 +226,81 @@ def upload_image(token, listing_id, img):
         timeout=60,
     )
     return r
+
+
+def get_listing_files(token, listing_id):
+    r = requests.get(
+        f"https://api.etsy.com/v3/application/shops/{SHOP_ID}/listings/{listing_id}/files",
+        headers=auth_headers(token),
+        timeout=15,
+    )
+    if r.ok:
+        return r.json().get("results", [])
+    return []
+
+
+def delete_listing_file(token, listing_id, file_id):
+    r = requests.delete(
+        f"https://api.etsy.com/v3/application/shops/{SHOP_ID}/listings/{listing_id}/files/{file_id}",
+        headers=auth_headers(token),
+        timeout=15,
+    )
+    return r
+
+
+def upload_zip_to_listing(token, listing_id, zip_path):
+    with open(zip_path, "rb") as f:
+        r = requests.post(
+            f"https://api.etsy.com/v3/application/shops/{SHOP_ID}/listings/{listing_id}/files",
+            headers=auth_headers(token),
+            files={"file": (zip_path.name, f, "application/zip")},
+            data={"name": zip_path.name, "rank": 1},
+            timeout=120,
+        )
+    return r
+
+
+def fix_ultimate_bundle(token, lid):
+    """Delete existing files, create ZIP of all 10, upload as one file."""
+    print(f"    Fixing Ultimate Bundle (10 files → 1 ZIP)...")
+
+    # Delete all existing files
+    existing = get_listing_files(token, lid)
+    for f in existing:
+        fid = f.get("listing_file_id")
+        if fid:
+            dr = delete_listing_file(token, lid, fid)
+            time.sleep(0.5)
+            print(f"      Deleted file {fid}: {'✓' if dr.ok else '✗'}")
+
+    # Create ZIP
+    zip_path = TEMPLATES_DIR / "NasriTools_Ultimate_Bundle_10_Templates.zip"
+    missing = []
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for slug in ULTIMATE_SLUGS:
+            xlsx = TEMPLATES_DIR / f"{slug}.xlsx"
+            if xlsx.exists():
+                label = slug.replace("_", " ").title()
+                zf.write(xlsx, f"NasriTools_{label}.xlsx")
+                print(f"      Added: {xlsx.name}")
+            else:
+                missing.append(slug)
+
+    if missing:
+        print(f"      ⚠  Missing files: {missing}")
+
+    print(f"      ZIP created: {zip_path.name} ({zip_path.stat().st_size//1024}KB)")
+
+    # Upload ZIP
+    print(f"      Uploading ZIP...", end=" ")
+    r = upload_zip_to_listing(token, lid, zip_path)
+    time.sleep(2)
+    if r.ok:
+        print("✓")
+        return True
+    else:
+        print(f"✗  {r.status_code}: {r.text[:120]}")
+        return False
 
 
 def publish_listing(token, listing_id):
@@ -240,6 +325,11 @@ def main():
         lid = bundle["listing"]
         print(f"  [{bundle['name']}]  listing {lid}")
 
+        # Fix Ultimate Bundle file limit
+        if bundle["key"] == "ultimate_bundle":
+            if not fix_ultimate_bundle(token, lid):
+                print(f"    ✗  Could not fix Ultimate Bundle files")
+
         # Generate image
         print(f"    Generating cover image...", end=" ")
         img = make_bundle_image(bundle)
@@ -248,12 +338,15 @@ def main():
         # Upload image
         print(f"    Uploading image...", end=" ")
         r = upload_image(token, lid, img)
-        time.sleep(1.5)
+        time.sleep(2)
         if r.ok:
             print("✓")
         else:
-            print(f"✗  {r.status_code}: {r.text[:100]}")
+            print(f"✗  {r.status_code}: {r.text[:120]}")
             continue
+
+        # Wait for Etsy to process the image
+        time.sleep(5)
 
         # Publish
         print(f"    Publishing...", end=" ")
@@ -263,9 +356,10 @@ def main():
             ok += 1
             print(f"✓  LIVE → https://www.etsy.com/listing/{lid}")
         else:
-            print(f"✗  {rp.status_code}: {rp.text[:100]}")
+            print(f"✗  {rp.status_code}: {rp.text[:120]}")
 
         print()
+        token = get_token()  # refresh token between bundles
 
     print(f"{'='*65}")
     print(f"  Done: {ok}/{len(BUNDLES)} bundles published")
