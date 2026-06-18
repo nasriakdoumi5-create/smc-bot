@@ -128,7 +128,7 @@ def create_pin(board_id, pin, img_path):
 
 # ── Main ────────────────────────────────────────────────
 def main():
-    if ACCESS_TOKEN == "YOUR_ACCESS_TOKEN_HERE":
+    if not ACCESS_TOKEN or ACCESS_TOKEN.startswith("YOUR_"):
         print("\n  ERROR: Replace ACCESS_TOKEN at the top of the script.")
         print("  Get it from: https://developers.pinterest.com/apps/\n")
         sys.exit(1)
