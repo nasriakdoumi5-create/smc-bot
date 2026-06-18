@@ -1,6 +1,6 @@
 """
-NasriTools - Make Budget Tracker Lite FREE on Etsy
-Sets price to €0 to maximize downloads and collect first reviews
+NasriTools - Set Budget Tracker Lite to €0.05 (review seed price)
+Low price triggers Etsy's automatic review-request email after purchase
 Run: python make_budget_free.py
 """
 import json, os, time, requests
@@ -42,14 +42,14 @@ def main():
 
     # Update title to make "FREE" prominent and add better tags
     title_update = {
-        "title": "FREE Budget Tracker Google Sheets Template | Monthly Income Expense Planner | Savings Goal | Bill Tracker",
-        "price": 0.00,
+        "title": "Budget Tracker Google Sheets Template | Monthly Income Expense Planner | Savings Goal | Bill Tracker",
+        "price": 0.05,
         "tags": [
-            "free budget tracker", "budget tracker", "expense tracker",
-            "monthly budget", "personal finance", "budget spreadsheet",
-            "income tracker", "free template", "financial tracker",
-            "money tracker", "household budget", "spending tracker",
-            "free google sheets",
+            "budget tracker", "expense tracker", "monthly budget",
+            "personal finance", "budget spreadsheet", "income tracker",
+            "financial tracker", "money tracker", "household budget",
+            "spending tracker", "google sheets", "instant download",
+            "digital download",
         ],
     }
 
@@ -61,11 +61,12 @@ def main():
     )
 
     if r.ok:
-        print(f"  Price    → FREE (€0.00)")
-        print(f"  Title    → updated with FREE prefix")
-        print(f"  Tags     → 13 SEO tags updated")
-        print(f"\n  Budget Tracker Lite is now completely free!")
-        print(f"  More downloads = more reviews = better ranking")
+        print(f"  Price    → €0.05")
+        print(f"  Title    → updated")
+        print(f"  Tags     → 13 SEO tags set")
+        print(f"\n  Done! Share this link with people:")
+        print(f"  https://www.etsy.com/listing/4523968643")
+        print(f"\n  Etsy will auto-send a review request email after each purchase.")
     else:
         print(f"  ERROR {r.status_code}: {r.text[:300]}")
 
