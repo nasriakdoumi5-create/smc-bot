@@ -440,7 +440,7 @@ def get_token() -> dict:
 def auth_headers(token: dict) -> dict:
     return {
         "Authorization": f"Bearer {token['access_token']}",
-        "x-api-key":     CLIENT_ID,
+        "x-api-key":     CLIENT_ID + ":" + SECRET,
     }
 
 # ─── Upload helper ────────────────────────────────────────────────────────────

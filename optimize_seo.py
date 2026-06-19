@@ -288,7 +288,7 @@ Questions? Message us on Etsy — we reply within 24 hours. ♥""",
     },
     {
         "listing": 4487745211,
-        "title": "Content Creator Planner Google Sheets | Social Media Calendar | Content Calendar Template | Instagram YouTube TikTok Planner | Instant Download",
+        "title": "Content Creator Planner Google Sheets | Social Media Calendar | Content Calendar Template | Instagram YouTube Planner | Instant Download",
         "tags": [
             "content planner", "social media calendar", "google sheets template",
             "content creator", "instagram planner", "youtube planner",
@@ -653,7 +653,7 @@ Questions? Message us on Etsy — we reply within 24 hours. ♥""",
     },
     {
         "listing": 4524283886,
-        "title": "Ultimate Bundle | All 10 Google Sheets Templates | Complete Life System | Save 65% | Productivity + Finance + Health + Business | Instant Download",
+        "title": "Ultimate Bundle | All 10 Google Sheets Templates | Save 65% | Finance + Health + Business + Productivity | Instant Download",
         "tags": [
             "ultimate bundle", "google sheets bundle", "template bundle",
             "budget tracker", "habit tracker", "meal planner",
