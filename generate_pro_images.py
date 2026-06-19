@@ -787,6 +787,48 @@ GENERATORS = [
     (7, "Trust",         make_trust),
 ]
 
+# Keywords to find each product in the active listings
+SEARCH_KEYWORDS = [
+    ["budget", "tracker"],
+    ["habit", "tracker"],
+    ["meal", "planner"],
+    ["wedding", "planner"],
+    ["workout", "tracker"],
+    ["content", "creator"],
+    ["invoice", "tracker"],
+    ["student", "planner"],
+    ["goals", "planner"],
+    ["weekly", "planner"],
+]
+
+
+def fetch_all_listings(token):
+    listings, offset = [], 0
+    while True:
+        r = requests.get(
+            f"https://api.etsy.com/v3/application/shops/{SHOP_ID}/listings/active",
+            headers=auth_headers(token),
+            params={"limit": 100, "offset": offset},
+            timeout=30,
+        )
+        if not r.ok:
+            break
+        batch = r.json().get("results", [])
+        listings.extend(batch)
+        if len(batch) < 100:
+            break
+        offset += 100
+        time.sleep(0.3)
+    return listings
+
+
+def find_listing_id(active_listings, keywords):
+    for lst in active_listings:
+        title = (lst.get("title") or "").lower()
+        if all(kw.lower() in title for kw in keywords):
+            return lst["listing_id"]
+    return None
+
 
 def main():
     done = {}
@@ -799,10 +841,22 @@ def main():
     print(f"  NasriTools - Pro Image System (7 images × {len(PRODUCTS)} products)")
     print(f"{'='*70}\n")
 
+    print("  Discovering listing IDs…")
+    active = fetch_all_listings(token)
+    print(f"  Found {len(active)} active listings\n")
+    token = get_token()
+
     total_ok = 0
-    for p in PRODUCTS:
-        pid = str(p["listing"])
-        print(f"\n  [{p['name']}]  listing {p['listing']}")
+    for i, p in enumerate(PRODUCTS):
+        keywords = SEARCH_KEYWORDS[i] if i < len(SEARCH_KEYWORDS) else []
+        lid = find_listing_id(active, keywords)
+
+        if lid is None:
+            print(f"\n  [{p['name']}] NOT FOUND (keywords: {keywords}) — skipping")
+            continue
+
+        pid = str(lid)
+        print(f"\n  [{p['name']}]  listing {lid}")
 
         for rank, label, generator in GENERATORS:
             img_key = f"{pid}_rank{rank}"
@@ -814,7 +868,7 @@ def main():
             print(f"    rank {rank} ({label}) … ", end="", flush=True)
             try:
                 img = generator(p)
-                r   = upload_image(token, p["listing"], img, rank)
+                r   = upload_image(token, lid, img, rank)
                 time.sleep(1.2)
                 if r.ok:
                     print("✓")

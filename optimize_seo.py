@@ -17,7 +17,7 @@ DONE_FILE  = Path(os.path.expanduser("~")) / "etsy_seo_done.json"
 # Each product: listing_id, optimized title, 13 tags, full description
 PRODUCTS = [
     {
-        "listing": 4487745643,
+        "keywords": ["budget", "tracker"],
         "title": "Budget Tracker Spreadsheet Google Sheets | Monthly Budget Planner | Expense Tracker | Personal Finance Template | Instant Download",
         "tags": [
             "budget tracker", "expense tracker", "google sheets template",
@@ -747,6 +747,59 @@ def update_listing_seo(token, product):
     return r
 
 
+def fetch_all_listings(token):
+    """Fetch all active listings from the shop."""
+    listings, offset = [], 0
+    while True:
+        r = requests.get(
+            f"https://api.etsy.com/v3/application/shops/{SHOP_ID}/listings/active",
+            headers=auth_headers(token),
+            params={"limit": 100, "offset": offset},
+            timeout=30,
+        )
+        if not r.ok:
+            break
+        batch = r.json().get("results", [])
+        listings.extend(batch)
+        if len(batch) < 100:
+            break
+        offset += 100
+        time.sleep(0.3)
+    return listings
+
+
+def find_listing_id(active_listings, search_keywords):
+    """Find listing ID by matching ALL keywords in the title (case-insensitive)."""
+    for lst in active_listings:
+        title = (lst.get("title") or "").lower()
+        if all(kw.lower() in title for kw in search_keywords):
+            return lst["listing_id"]
+    return None
+
+
+# Maps each product to search keywords that uniquely identify it
+PRODUCT_KEYWORDS = {
+    0: ["budget", "tracker"],           # Budget Tracker
+    1: ["habit", "tracker"],            # Habit Tracker
+    2: ["meal", "planner"],             # Meal Planner
+    3: ["wedding", "planner"],          # Wedding Planner
+    4: ["workout", "tracker"],          # Workout Tracker
+    5: ["content", "creator", "planner"],  # Content Creator
+    6: ["invoice", "tracker"],          # Invoice Tracker
+    7: ["student", "planner"],          # Student Planner
+    8: ["goals", "planner"],            # Goals Planner
+    9: ["weekly", "planner"],           # Weekly Planner
+}
+
+BUNDLE_KEYWORDS = {
+    0: ["finance", "bundle"],
+    1: ["health", "bundle"],
+    2: ["planner", "bundle"],
+    3: ["business", "bundle"],
+    4: ["ultimate", "bundle"],
+}
+
+
 def main():
     done = {}
     if DONE_FILE.exists():
@@ -754,36 +807,55 @@ def main():
 
     token = get_token()
 
-    all_products = PRODUCTS + BUNDLES
-    total = len(all_products)
-
     print(f"\n{'='*65}")
-    print(f"  NasriTools - SEO Optimizer ({total} listings)")
+    print(f"  NasriTools - SEO Optimizer (auto-discover listing IDs)")
     print(f"{'='*65}\n")
 
+    # Fetch all active listings once
+    print("  Fetching all active listings to discover IDs…")
+    active = fetch_all_listings(token)
+    print(f"  Found {len(active)} active listings\n")
+    token = get_token()
+
+    all_items = [
+        (PRODUCT_KEYWORDS, PRODUCTS),
+        (BUNDLE_KEYWORDS,  BUNDLES),
+    ]
+
     ok = 0
-    for p in all_products:
-        key  = str(p["listing"])
-        name = p["title"][:50] + "…"
+    total = len(PRODUCTS) + len(BUNDLES)
 
-        if done.get(key):
-            print(f"  [{p['listing']}] skipped (already updated)")
-            ok += 1
-            continue
+    for kw_map, item_list in all_items:
+        for idx, p in enumerate(item_list):
+            keywords = kw_map.get(idx, [])
+            lid = find_listing_id(active, keywords)
+            label = p["title"][:55] + "…"
 
-        print(f"  Updating {p['listing']}: {name}", end=" ")
-        r = update_listing_seo(token, p)
-        time.sleep(1)
+            if lid is None:
+                print(f"  [NOT FOUND] keywords={keywords} — {label}")
+                continue
 
-        if r.ok:
-            print("✓")
-            done[key] = True
-            ok += 1
-        else:
-            print(f"✗  {r.status_code}: {r.text[:120]}")
+            key = str(lid)
+            if done.get(key):
+                print(f"  [{lid}] skipped (already updated)")
+                ok += 1
+                continue
 
-        DONE_FILE.write_text(json.dumps(done, indent=2))
-        token = get_token()
+            print(f"  Updating {lid}: {label}", end=" ")
+            p_copy = dict(p)
+            p_copy["listing"] = lid
+            r = update_listing_seo(token, p_copy)
+            time.sleep(1)
+
+            if r.ok:
+                print("✓")
+                done[key] = True
+                ok += 1
+            else:
+                print(f"✗  {r.status_code}: {r.text[:120]}")
+
+            DONE_FILE.write_text(json.dumps(done, indent=2))
+            token = get_token()
 
     print(f"\n{'='*65}")
     print(f"  Done: {ok}/{total} listings updated")
