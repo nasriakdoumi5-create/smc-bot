@@ -1,6 +1,7 @@
 """
-NasriTools - Professional Bundle Cover Images (v2)
-Clean result-focused design matching individual product image style.
+NasriTools - Bundle Cover Images (v3)
+Matches the visual style of individual product images: circle-centered design,
+large bold result text, benefit pill, footer bar.
 Run: python generate_bundle_covers.py
 """
 import io, json, os, time, requests
@@ -15,73 +16,58 @@ TOKEN_FILE = Path(os.path.expanduser("~")) / "etsy_token.json"
 BUNDLES = [
     {
         "listing_id": 4524283886,
-        "headline1": "Total Financial Control.",
-        "headline2": "Budget. Invoices. Goals.",
-        "result": "Know where every euro goes. Get paid on time. Achieve every goal.",
-        "badge": "3 SYSTEMS • SAVE 33%",
-        "price": "€19.99  (worth €37)",
-        "items": ["Budget & Expense System", "Invoice & Client System", "Goals & 90-Day System"],
-        "bg":    (14, 35, 64),
-        "mid":   (22, 58, 108),
-        "accent":(41, 128, 185),
-        "tag_c": (255, 200, 0),
+        "color":  (20, 90, 50),
+        "light":  (220, 247, 233),
+        "emoji":  "💰",
+        "line1":  "Total Financial Control.",
+        "line2":  "Budget. Invoices. Goals.",
+        "badge_top":  "3 SYSTEMS BUNDLE",
+        "badge_bot":  "€19.99  ·  Save 33%",
+        "items":  ["Budget & Expense System", "Invoice & Client System", "Goals & 90-Day System"],
     },
     {
         "listing_id": 4524724720,
-        "headline1": "Transform Your Health.",
-        "headline2": "Workout. Eat. Build Habits.",
-        "result": "Track every session. Plan every meal. Build 30 habits — automatically.",
-        "badge": "3 SYSTEMS • SAVE 50%",
-        "price": "€17.99  (worth €36)",
-        "items": ["Gym & Workout Tracking", "Weekly Meal Planning", "30-Day Habit Building"],
-        "bg":    (10, 40, 20),
-        "mid":   (18, 68, 34),
-        "accent":(39, 174, 96),
-        "tag_c": (255, 220, 0),
+        "color":  (25, 110, 55),
+        "light":  (212, 248, 232),
+        "emoji":  "💪",
+        "line1":  "Transform Your Health.",
+        "line2":  "Workout. Eat. Build Habits.",
+        "badge_top":  "3 SYSTEMS BUNDLE",
+        "badge_bot":  "€17.99  ·  Save 50%",
+        "items":  ["Gym & Workout Tracking", "Weekly Meal Planning", "30-Day Habit Building"],
     },
     {
         "listing_id": 4524724758,
-        "headline1": "Master Your Time.",
-        "headline2": "Weekly. Academic. Goals.",
-        "result": "Plan your perfect week. Ace every semester. Achieve every goal.",
-        "badge": "3 SYSTEMS • SAVE 50%",
-        "price": "€17.99  (worth €36)",
-        "items": ["Weekly Productivity System", "Student Academic System", "Goals & 90-Day System"],
-        "bg":    (30, 10, 50),
-        "mid":   (55, 22, 90),
-        "accent":(142, 68, 173),
-        "tag_c": (255, 230, 0),
+        "color":  (72, 30, 110),
+        "light":  (237, 228, 252),
+        "emoji":  "📅",
+        "line1":  "Master Your Time.",
+        "line2":  "Weekly. Academic. Goals.",
+        "badge_top":  "3 SYSTEMS BUNDLE",
+        "badge_bot":  "€17.99  ·  Save 50%",
+        "items":  ["Weekly Productivity System", "Student Academic System", "Goals & 90-Day System"],
     },
     {
         "listing_id": 4524724798,
-        "headline1": "Run Your Business.",
-        "headline2": "Content. Invoices. Money.",
-        "result": "Grow your audience. Get paid. Know your numbers — all in one system.",
-        "badge": "3 SYSTEMS • SAVE 50%",
-        "price": "€21.99  (worth €43)",
-        "items": ["Content Creator System", "Invoice & Client System", "Budget & Expense System"],
-        "bg":    (55, 25, 5),
-        "mid":   (100, 45, 8),
-        "accent":(211, 84, 0),
-        "tag_c": (255, 240, 0),
+        "color":  (140, 50, 10),
+        "light":  (254, 235, 220),
+        "emoji":  "🚀",
+        "line1":  "Run Your Business.",
+        "line2":  "Content. Invoices. Budget.",
+        "badge_top":  "3 SYSTEMS BUNDLE",
+        "badge_bot":  "€21.99  ·  Save 50%",
+        "items":  ["Content Creator System", "Invoice & Client System", "Budget & Expense System"],
     },
     {
         "listing_id": 4524724846,
-        "headline1": "Systems That Run",
-        "headline2": "Your Entire Life.",
-        "result": "Finance. Health. Business. Planning. All 10 premium Google Sheets in one bundle.",
-        "badge": "10 SYSTEMS • SAVE 65%",
-        "price": "€39.99  (worth €120)",
-        "items": [
-            "Budget • Invoice • Goals",
-            "Workout • Meals • Habits",
-            "Content • Student • Weekly • Wedding",
-        ],
-        "bg":    (8, 8, 25),
-        "mid":   (15, 15, 50),
-        "accent":(52, 152, 219),
-        "tag_c": (255, 200, 0),
-        "is_ultimate": True,
+        "color":  (15, 25, 80),
+        "light":  (220, 230, 255),
+        "emoji":  "⭐",
+        "line1":  "Systems That Run",
+        "line2":  "Your Entire Life.",
+        "badge_top":  "10 SYSTEMS BUNDLE",
+        "badge_bot":  "€39.99  ·  Save 65%",
+        "items":  ["Finance · Health · Business", "Planning · Student · Content", "+ 4 More Premium Systems"],
     },
 ]
 
@@ -95,29 +81,162 @@ REG_FONTS = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
 ]
+EMOJI_FONTS = [
+    "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+    "/usr/share/fonts/noto/NotoColorEmoji.ttf",
+]
 
 
-def font(paths, size):
+def _font(paths, size):
     for p in paths:
         if Path(p).exists():
             return ImageFont.truetype(p, size)
     return ImageFont.load_default()
 
 
-def wrap(text, f, max_w, draw):
+def fb(size): return _font(BOLD_FONTS, size)
+def fr(size): return _font(REG_FONTS, size)
+
+
+def darken(c, f=0.80):
+    return tuple(max(0, int(x * f)) for x in c)
+
+
+def lighten(c, f=1.18):
+    return tuple(min(255, int(x * f)) for x in c)
+
+
+def centered_text(draw, text, font, cx, y, fill):
+    bb = draw.textbbox((0, 0), text, font=font)
+    w = bb[2] - bb[0]
+    draw.text((cx - w // 2, y), text, font=font, fill=fill)
+    return bb[3] - bb[1]
+
+
+def wrap(text, font, max_w, draw):
     words = text.split()
     lines, cur = [], ""
     for w in words:
         test = (cur + " " + w).strip()
-        if draw.textlength(test, font=f) <= max_w:
+        bb = draw.textbbox((0, 0), test, font=font)
+        if bb[2] - bb[0] <= max_w:
             cur = test
         else:
-            if cur:
-                lines.append(cur)
+            if cur: lines.append(cur)
             cur = w
-    if cur:
-        lines.append(cur)
+    if cur: lines.append(cur)
     return lines
+
+
+def rounded_rect(draw, xy, radius, fill):
+    x0, y0, x1, y1 = xy
+    r = min(radius, (x1-x0)//2, (y1-y0)//2)
+    draw.rectangle([x0+r, y0, x1-r, y1], fill=fill)
+    draw.rectangle([x0, y0+r, x1, y1-r], fill=fill)
+    draw.ellipse([x0, y0, x0+2*r, y0+2*r], fill=fill)
+    draw.ellipse([x1-2*r, y0, x1, y0+2*r], fill=fill)
+    draw.ellipse([x0, y1-2*r, x0+2*r, y1], fill=fill)
+    draw.ellipse([x1-2*r, y1-2*r, x1, y1], fill=fill)
+
+
+def draw_emoji(img, emoji_char, cx, cy, size):
+    for p in EMOJI_FONTS:
+        if not Path(p).exists():
+            continue
+        try:
+            ef = ImageFont.truetype(p, size)
+            tmp = Image.new("RGBA", (size*2, size*2), (0, 0, 0, 0))
+            td = ImageDraw.Draw(tmp)
+            td.text((0, 0), emoji_char, font=ef, embedded_color=True)
+            bb = tmp.getbbox()
+            if bb:
+                tmp = tmp.crop(bb).resize((size, size), Image.LANCZOS)
+            img.paste(tmp, (cx - size//2, cy - size//2), tmp)
+            return
+        except Exception:
+            continue
+
+
+def generate(b):
+    W, H = 2000, 2000
+    color = b["color"]
+    light = b["light"]
+
+    img  = Image.new("RGB", (W, H), color)
+    draw = ImageDraw.Draw(img)
+
+    cx = W // 2
+    cy = H // 2
+
+    # ── Large background circle (slightly lighter) ────────────────────
+    cr = 820
+    draw.ellipse([cx-cr, cy-cr, cx+cr, cy+cr], fill=lighten(color, 1.15))
+
+    # ── Inner circle ring accent ──────────────────────────────────────
+    cr2 = 760
+    draw.ellipse([cx-cr2, cy-cr2, cx+cr2, cy+cr2], fill=lighten(color, 1.10))
+
+    # ── Brand top-left ────────────────────────────────────────────────
+    draw.text((60, 58), "NasriTools", font=fr(44), fill=light)
+
+    # ── "BUNDLE" badge top-right ──────────────────────────────────────
+    badge_f = fb(38)
+    badge_txt = b["badge_top"]
+    bb = draw.textbbox((0, 0), badge_txt, font=badge_f)
+    bw = bb[2] - bb[0]
+    pad = 36
+    bx0 = W - bw - pad*2 - 60
+    bx1 = W - 60
+    by0 = 42
+    by1 = by0 + 72
+    rounded_rect(draw, (bx0, by0, bx1, by1), 20, light)
+    draw.text((bx0 + pad, by0 + 16), badge_txt, font=badge_f, fill=color)
+
+    # ── Emoji centered in upper part of circle ────────────────────────
+    emoji_y = cy - 340
+    draw_emoji(img, b["emoji"], cx, emoji_y, 140)
+
+    # ── Main headline (2 large lines) ────────────────────────────────
+    f_head = fb(86)
+    line_h = 100
+    text_y = cy - 220
+
+    for line in [b["line1"], b["line2"]]:
+        centered_text(draw, line, f_head, cx, text_y, (255, 255, 255))
+        text_y += line_h
+
+    # ── What's included — 3 items ─────────────────────────────────────
+    f_items = fr(38)
+    item_y = text_y + 30
+    for item in b["items"]:
+        centered_text(draw, "•  " + item, f_items, cx, item_y, light)
+        item_y += 56
+
+    # ── Price / save badge (pill) ─────────────────────────────────────
+    f_price = fb(44)
+    price_txt = b["badge_bot"]
+    pbb = draw.textbbox((0, 0), price_txt, font=f_price)
+    pw = pbb[2] - pbb[0]
+    pp = 50
+    pill_w = pw + pp*2
+    pill_h = 80
+    pill_x0 = cx - pill_w//2
+    pill_y0 = item_y + 40
+    rounded_rect(draw, (pill_x0, pill_y0, pill_x0+pill_w, pill_y0+pill_h), 40, (255, 255, 255))
+    draw.text((pill_x0 + pp, pill_y0 + 16), price_txt, font=f_price, fill=color)
+
+    # ── Bottom feature strip ──────────────────────────────────────────
+    strip_y = H - 150
+    draw.rectangle([0, strip_y, W, H], fill=darken(color, 0.75))
+
+    f_strip = fr(34)
+    footer = "Instant Download  ·  Google Sheets & Excel  ·  Lifetime Access  ·  No Subscription"
+    centered_text(draw, footer, f_strip, cx, strip_y + 56, (255, 255, 255))
+
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=95)
+    buf.seek(0)
+    return buf
 
 
 def get_token():
@@ -139,110 +258,6 @@ def auth_headers(token):
             "x-api-key": CLIENT_ID + ":" + SECRET}
 
 
-def generate(b):
-    W, H = 2000, 2000
-    img  = Image.new("RGB", (W, H), b["bg"])
-    draw = ImageDraw.Draw(img)
-    acc  = b["accent"]
-    mid  = b["mid"]
-    is_u = b.get("is_ultimate", False)
-
-    # ── Background: subtle diagonal gradient bands ────────────────
-    for i in range(H):
-        t = i / H
-        r = int(b["bg"][0] * (1 - t) + mid[0] * t)
-        g = int(b["bg"][1] * (1 - t) + mid[1] * t)
-        bv= int(b["bg"][2] * (1 - t) + mid[2] * t)
-        draw.line([(0, i), (W, i)], fill=(r, g, bv))
-
-    # ── Accent top bar ────────────────────────────────────────────
-    for i in range(12):
-        alpha = 1 - i / 12
-        c = tuple(int(acc[j] * alpha) for j in range(3))
-        draw.line([(0, i), (W, i)], fill=c)
-
-    # ── NASRITOOLS brand ──────────────────────────────────────────
-    fb40 = font(BOLD_FONTS, 40)
-    draw.text((80, 48), "NASRITOOLS", font=fb40, fill=(255, 255, 255, 120))
-
-    # ── Badge (top right) ─────────────────────────────────────────
-    fb42 = font(BOLD_FONTS, 42)
-    badge_txt = b["badge"]
-    bw = int(draw.textlength(badge_txt, font=fb42)) + 60
-    bx = W - bw - 60
-    draw.rounded_rectangle([bx, 32, W - 60, 102], radius=18, fill=b["tag_c"])
-    draw.text((bx + 30, 42), badge_txt, font=fb42, fill=(20, 20, 20))
-
-    # ── Accent horizontal divider under brand ─────────────────────
-    draw.rectangle([(80, 118), (W - 80, 122)], fill=acc)
-
-    # ── Main headline ─────────────────────────────────────────────
-    fb100 = font(BOLD_FONTS, 108 if not is_u else 96)
-    fb90  = font(BOLD_FONTS, 90 if not is_u else 82)
-
-    draw.text((80, 145), b["headline1"], font=fb100, fill=(255, 255, 255))
-    draw.text((82, 270 if not is_u else 258), b["headline2"], font=fb90, fill=acc)
-
-    # ── Result statement ──────────────────────────────────────────
-    fr50 = font(REG_FONTS, 52)
-    y_res = 420 if not is_u else 390
-    result_lines = wrap(b["result"], fr50, W - 160, draw)
-    for line in result_lines[:3]:
-        draw.text((80, y_res), line, font=fr50, fill=(200, 215, 235))
-        y_res += 68
-
-    # ── Price pill ────────────────────────────────────────────────
-    y_price = y_res + 30
-    fb50 = font(BOLD_FONTS, 52)
-    pw = int(draw.textlength(b["price"], font=fb50)) + 80
-    draw.rounded_rectangle([80, y_price, 80 + pw, y_price + 80], radius=16, fill=acc)
-    draw.text((114, y_price + 13), b["price"], font=fb50, fill=(255, 255, 255))
-
-    # ── What's included section ───────────────────────────────────
-    y_inc = y_price + 130
-    draw.rectangle([(80, y_inc), (W - 80, y_inc + 3)], fill=(255, 255, 255, 40))
-
-    fb46 = font(BOLD_FONTS, 48)
-    fr44 = font(REG_FONTS, 44)
-
-    draw.text((80, y_inc + 18), "WHAT'S INCLUDED:", font=fb46, fill=(255, 255, 255, 160))
-    y_inc += 90
-
-    for item in b["items"]:
-        # Bullet dot
-        draw.ellipse([(80, y_inc + 14), (104, y_inc + 38)], fill=acc)
-        draw.text((124, y_inc), item, font=fr44, fill=(230, 240, 255))
-        y_inc += 70
-
-    # ── Bottom feature strip ──────────────────────────────────────
-    strip_y = H - 200
-    draw.rectangle([(0, strip_y), (W, H)], fill=acc)
-
-    feats = [
-        "⚡ Instant Download",
-        "✅ Google Sheets (FREE) & Excel",
-        "♾️ Lifetime Access — Buy Once",
-        "🔒 No Subscription Ever",
-    ]
-    fb38 = font(BOLD_FONTS, 38)
-    x, y_f = 80, strip_y + 28
-    for feat in feats[:2]:
-        draw.text((x, y_f), feat, font=fb38, fill=(255, 255, 255))
-        x += W // 2 - 40
-    x, y_f = 80, strip_y + 106
-    for feat in feats[2:]:
-        draw.text((x, y_f), feat, font=fb38, fill=(255, 255, 255, 210))
-        x += W // 2 - 40
-
-    draw.text((W - 380, strip_y + 150), "nasritools.etsy.com",
-              font=font(REG_FONTS, 30), fill=(255, 255, 255, 140))
-
-    buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=95)
-    buf.seek(0)
-    return buf
-
-
 def upload_image(token, lid, buf):
     r = requests.post(
         f"https://api.etsy.com/v3/application/shops/{SHOP_ID}/listings/{lid}/images",
@@ -257,13 +272,13 @@ def upload_image(token, lid, buf):
 def main():
     token = get_token()
     print(f"\n{'='*65}")
-    print(f"  NasriTools - Bundle Covers v2 (result-focused)")
+    print(f"  NasriTools - Bundle Covers v3 (circle-style, brand-consistent)")
     print(f"{'='*65}\n")
 
     ok = 0
     for i, b in enumerate(BUNDLES, 1):
         lid = b["listing_id"]
-        print(f"[{i}/5] {b['headline1']} {b['headline2']}")
+        print(f"[{i}/5] {b['line1']} {b['line2']}")
         print(f"  Generating…", end=" ", flush=True)
         try:
             buf = generate(b)
