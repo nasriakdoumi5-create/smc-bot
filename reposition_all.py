@@ -17,7 +17,7 @@ DONE_FILE  = Path(os.path.expanduser("~")) / "etsy_reposition_done.json"
 
 PRODUCTS = [
     {
-        "search_kw": ["budget", "tracker"],
+        "search_kw": ["budget", "expense"],
         "title": "Monthly Budget & Expense System | Track Every Euro Automatically | Google Sheets | Instant Download",
         "tags": [
             "budget tracker", "expense tracker", "google sheets budget",
@@ -104,7 +104,7 @@ A: Message us on Etsy — we reply within 24 hours.
 nasritools.etsy.com | Systems That Run Your Life""",
     },
     {
-        "search_kw": ["habit", "tracker"],
+        "search_kw": ["habit", "building"],
         "title": "30-Day Habit Building System | Track 30 Habits with Auto Streaks | Google Sheets | Instant Download",
         "tags": [
             "habit tracker", "30 day challenge", "google sheets habit",
@@ -183,7 +183,7 @@ Questions? Message us on Etsy — we reply within 24 hours. ♥
 nasritools.etsy.com | Systems That Run Your Life""",
     },
     {
-        "search_kw": ["meal", "planner"],
+        "search_kw": ["meal", "planning"],
         "title": "Weekly Meal Planning System | Plan 7 Days of Meals in 15 Min | Grocery List | Google Sheets | Instant Download",
         "tags": [
             "meal planner", "weekly meal plan", "google sheets meal",
@@ -295,7 +295,7 @@ Questions? Message us on Etsy — we reply within 24 hours. ♥
 nasritools.etsy.com | Systems That Run Your Life""",
     },
     {
-        "search_kw": ["workout", "tracker"],
+        "search_kw": ["workout", "tracking"],
         "title": "Gym & Workout Tracking System | Log Sessions Track PRs See Progress | Google Sheets | Instant Download",
         "tags": [
             "workout tracker", "gym tracker", "google sheets workout",
@@ -413,7 +413,7 @@ Questions? Message us on Etsy — we reply within 24 hours. ♥
 nasritools.etsy.com | Systems That Run Your Life""",
     },
     {
-        "search_kw": ["invoice", "tracker"],
+        "search_kw": ["invoice", "client"],
         "title": "Freelancer Invoice & Client System | Get Paid on Time Every Time | Google Sheets | Instant Download",
         "tags": [
             "freelancer invoice tracker", "client management system", "invoice google sheets",
@@ -472,7 +472,7 @@ Questions? Message us on Etsy — we reply within 24 hours. ♥
 nasritools.etsy.com | Systems That Run Your Life""",
     },
     {
-        "search_kw": ["student", "planner"],
+        "search_kw": ["student", "academic"],
         "title": "Student Academic Success System | Grades GPA Assignments Study Schedule | Google Sheets | Instant Download",
         "tags": [
             "student planner", "gpa calculator google sheets", "grade tracker",
@@ -590,7 +590,7 @@ Questions? Message us on Etsy — we reply within 24 hours. ♥
 nasritools.etsy.com | Systems That Run Your Life""",
     },
     {
-        "search_kw": ["weekly", "planner"],
+        "search_kw": ["weekly", "productivity"],
         "title": "Weekly Productivity System | Time Blocking Priorities Energy Management | Google Sheets | Instant Download",
         "tags": [
             "weekly planner", "time blocking google sheets", "productivity system",
@@ -654,7 +654,7 @@ nasritools.etsy.com | Systems That Run Your Life""",
 
 BUNDLES = [
     {
-        "search_kw": ["finance", "bundle"],
+        "search_kw": ["finance", "control"],
         "title": "Complete Finance Control System | Budget + Invoices + Goals | 3 Google Sheets | Instant Download",
         "tags": [
             "finance bundle", "budget invoice goals bundle", "google sheets finance",
@@ -705,7 +705,7 @@ Questions? Message us on Etsy — we reply within 24 hours. ♥
 nasritools.etsy.com | Systems That Run Your Life""",
     },
     {
-        "search_kw": ["health", "bundle"],
+        "search_kw": ["health", "transformation"],
         "title": "Complete Health Transformation System | Workout + Meals + Habits | 3 Google Sheets | Instant Download",
         "tags": [
             "health bundle", "fitness bundle google sheets", "workout meal habit bundle",
@@ -748,7 +748,7 @@ Questions? Message us on Etsy — we reply within 24 hours. ♥
 nasritools.etsy.com | Systems That Run Your Life""",
     },
     {
-        "search_kw": ["planner", "bundle"],
+        "search_kw": ["planning", "productivity"],
         "title": "Complete Planning & Productivity System | Weekly + Student + Goals | 3 Google Sheets | Instant Download",
         "tags": [
             "planner bundle", "productivity bundle google sheets", "weekly student goals bundle",
@@ -784,7 +784,7 @@ Questions? Message us on Etsy — we reply within 24 hours. ♥
 nasritools.etsy.com | Systems That Run Your Life""",
     },
     {
-        "search_kw": ["business", "bundle"],
+        "search_kw": ["creator", "business"],
         "title": "Complete Creator Business System | Content + Invoices + Budget | 3 Google Sheets | Instant Download",
         "tags": [
             "business bundle", "creator business kit", "content invoice budget bundle",
@@ -820,7 +820,7 @@ Questions? Message us on Etsy — we reply within 24 hours. ♥
 nasritools.etsy.com | Systems That Run Your Life""",
     },
     {
-        "search_kw": ["ultimate", "bundle"],
+        "search_kw": ["complete", "life"],
         "title": "The Complete Life System | All 10 Google Sheets | Finance Health Business Planning | Save 50% | Instant Download",
         "tags": [
             "ultimate bundle", "complete life system", "all google sheets bundle",
