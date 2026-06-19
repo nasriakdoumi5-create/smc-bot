@@ -242,7 +242,7 @@ Questions? Message us on Etsy — we reply within 24 hours. ♥
 nasritools.etsy.com | Systems That Run Your Life""",
     },
     {
-        "search_kw": ["wedding", "planner"],
+        "search_kw": ["wedding", "planning"],
         "title": "Complete Wedding Planning System | Budget Guests Vendors Timeline | Google Sheets | Instant Download",
         "tags": [
             "wedding planner", "wedding budget tracker", "google sheets wedding",
