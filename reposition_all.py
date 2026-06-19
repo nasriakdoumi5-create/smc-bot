@@ -531,7 +531,7 @@ Questions? Message us on Etsy — we reply within 24 hours. ♥
 nasritools.etsy.com | Systems That Run Your Life""",
     },
     {
-        "search_kw": ["goals", "planner"],
+        "search_kw": ["annual", "goal"],
         "title": "Annual Goals & 90-Day Action System | Break Big Goals Into Weekly Steps | Google Sheets | Instant Download",
         "tags": [
             "goals planner", "90 day plan google sheets", "annual goal tracker",
