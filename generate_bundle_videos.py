@@ -119,7 +119,7 @@ def get_token():
 
 def auth_headers(token):
     return {"Authorization": "Bearer " + token["access_token"],
-            "x-api-key": CLIENT_ID}
+            "x-api-key": CLIENT_ID + ":" + SECRET}
 
 
 def load_font(size):

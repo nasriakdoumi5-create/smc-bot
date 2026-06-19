@@ -65,7 +65,49 @@ def get_token():
 
 def auth_headers(token):
     return {"Authorization": "Bearer " + token["access_token"],
-            "x-api-key": CLIENT_ID}
+            "x-api-key": CLIENT_ID + ":" + SECRET}
+
+
+def fetch_all_listings(token):
+    listings, offset = [], 0
+    while True:
+        r = requests.get(
+            f"https://api.etsy.com/v3/application/shops/{SHOP_ID}/listings/active",
+            headers=auth_headers(token),
+            params={"limit": 100, "offset": offset},
+            timeout=30,
+        )
+        if not r.ok:
+            break
+        batch = r.json().get("results", [])
+        listings.extend(batch)
+        if len(batch) < 100:
+            break
+        offset += 100
+        time.sleep(0.3)
+    return listings
+
+
+def find_listing_id(active_listings, keywords):
+    for lst in active_listings:
+        title = (lst.get("title") or "").lower()
+        if all(kw.lower() in title for kw in keywords):
+            return lst["listing_id"]
+    return None
+
+
+SEARCH_KEYWORDS = [
+    ["budget", "tracker"],
+    ["habit", "tracker"],
+    ["meal", "planner"],
+    ["wedding", "planner"],
+    ["workout", "tracker"],
+    ["content", "creator"],
+    ["invoice", "tracker"],
+    ["student", "planner"],
+    ["goals", "planner"],
+    ["weekly", "planner"],
+]
 
 
 def load_font(size):
@@ -221,6 +263,18 @@ def main():
     print(f"\n{'='*60}")
     print(f"  NasriTools - How To Use Images (rank 5)")
     print(f"{'='*60}\n")
+
+    print("  Discovering listing IDs…")
+    active = fetch_all_listings(token)
+    token = get_token()
+
+    for idx, p in enumerate(PRODUCTS):
+        kws = SEARCH_KEYWORDS[idx]
+        real_id = find_listing_id(active, kws)
+        if real_id:
+            p["listing"] = real_id
+        else:
+            print(f"  [{p['name']}] NOT FOUND (keywords={kws})")
 
     ok = 0
     for p in PRODUCTS:
