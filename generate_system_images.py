@@ -60,7 +60,7 @@ PRODUCTS = [
         "benefit": "Save €80+ on groceries every week",
     },
     {
-        "name": "Wedding Planner", "search_kw": ["wedding", "planner"],
+        "name": "Wedding Planner", "search_kw": ["wedding", "planning"],
         "color": (210, 82, 162), "light": (252, 228, 243), "emoji": "💍",
         "result_line1": "Plan your perfect wedding.",
         "result_line2": "Budget. Guests. Vendors. Timeline.",
@@ -115,7 +115,7 @@ PRODUCTS = [
         "benefit": "Improve your GPA by 0.5+ points",
     },
     {
-        "name": "Goals Planner", "search_kw": ["goals", "planner"],
+        "name": "Goals Planner", "search_kw": ["annual", "goals"],
         "color": (30, 100, 180), "light": (220, 235, 252), "emoji": "🎯",
         "result_line1": "Stop setting goals.",
         "result_line2": "Start achieving them.",
