@@ -14,18 +14,18 @@ TOKEN_FILE = Path(os.path.expanduser("~")) / "etsy_token.json"
 
 # ── Mountain silhouettes (normalized x,y coords — shared across bundles) ─────
 PEAKS_BACK = [
-    (0, 1), (0.05, 0.56), (0.14, 0.62), (0.22, 0.54), (0.31, 0.60),
-    (0.42, 0.51), (0.52, 0.57), (0.62, 0.52), (0.71, 0.58),
-    (0.82, 0.53), (0.91, 0.60), (1, 1),
+    (0, 1), (0.05, 0.74), (0.14, 0.80), (0.22, 0.73), (0.31, 0.78),
+    (0.42, 0.71), (0.52, 0.76), (0.62, 0.72), (0.71, 0.77),
+    (0.82, 0.73), (0.91, 0.79), (1, 1),
 ]
 PEAKS_MID = [
-    (0, 1), (0.06, 0.65), (0.17, 0.71), (0.27, 0.63), (0.37, 0.69),
-    (0.48, 0.62), (0.59, 0.67), (0.69, 0.63), (0.79, 0.68),
-    (0.90, 0.65), (1, 1),
+    (0, 1), (0.06, 0.80), (0.17, 0.86), (0.27, 0.79), (0.37, 0.84),
+    (0.48, 0.78), (0.59, 0.83), (0.69, 0.79), (0.79, 0.84),
+    (0.90, 0.80), (1, 1),
 ]
 PEAKS_FRONT = [
-    (0, 1), (0.10, 0.74), (0.22, 0.80), (0.34, 0.72), (0.45, 0.78),
-    (0.56, 0.71), (0.67, 0.76), (0.78, 0.71), (0.89, 0.77),
+    (0, 1), (0.10, 0.87), (0.22, 0.92), (0.34, 0.86), (0.45, 0.91),
+    (0.56, 0.85), (0.67, 0.90), (0.78, 0.85), (0.89, 0.90),
     (1, 1),
 ]
 
@@ -189,12 +189,11 @@ def generate(b):
         col = mix(sky_mid, mix(sky_mid, (255, 255, 255), 0.12), t)
         draw.ellipse([gx-r, gy-r, gx+r, gy+r], fill=col)
 
-    # 2b. Dark scrim over top text area — deepens sky so white text pops
-    for y in range(0, 900):
-        t   = max(0, 1 - y / 900)         # 1 at top → 0 at y=900
-        alpha = 0.30 * t
+    # 2b. Dark scrim over top text area
+    for y in range(0, 1500):
+        t     = max(0, 1 - y / 1500)
         sky_c = mix(b["sky_top"], b["sky_bot"], y / (H - 1))
-        draw.line([(0, y), (W, y)], fill=mix(sky_c, (0, 0, 0), alpha))
+        draw.line([(0, y), (W, y)], fill=mix(sky_c, (0, 0, 0), 0.32 * t))
 
     # 3. Mountain silhouette layers
     for peaks_norm, color in [
@@ -212,64 +211,62 @@ def generate(b):
 
     # ── TEXT ──────────────────────────────────────────────────────────────────
 
-    # Brand (top-left)
-    txt(draw, 72, 54, "NASRITOOLS", fb(42), (255, 255, 255))
-
-    # Bundle badge pill (top-right)
+    # Brand + badge (top bar)
+    txt(draw, 80, 60, "NASRITOOLS", fb(48), (255, 255, 255))
     btxt = b["badge"]
-    bf   = fb(36)
+    bf   = fb(42)
     bw_  = tw(draw, btxt, bf)
     bx0  = W - bw_ - 128
-    pill(draw, bx0, 40, W - 64, 104, (255, 255, 255), 22)
-    draw.text((bx0 + 32, 52), btxt, font=bf, fill=b["sky_bot"])
+    pill(draw, bx0, 46, W - 64, 118, (255, 255, 255), 24)
+    draw.text((bx0 + 36, 58), btxt, font=bf, fill=b["sky_bot"])
 
-    # Thin accent divider under brand
-    draw.rectangle([72, 118, W - 72, 122], fill=mix(b["sky_top"], (255, 255, 255), 0.55))
+    # Divider
+    draw.rectangle([80, 134, W - 80, 139], fill=mix(b["sky_top"], (255, 255, 255), 0.55))
 
-    # Headline 1 — large white (bigger shadow for max readability)
-    h1f = fb(108)
-    draw.text((76, 146), b["line1"], font=h1f, fill=(0, 0, 0))   # shadow
-    draw.text((72, 142), b["line1"], font=h1f, fill=(255, 255, 255))
+    # Headline 1 — very large white
+    h1f = fb(130)
+    draw.text((84, 158), b["line1"], font=h1f, fill=(0, 0, 0))
+    draw.text((80, 154), b["line1"], font=h1f, fill=(255, 255, 255))
 
-    # Headline 2 — accent color
-    h2f = fb(90)
-    draw.text((78, 284), b["line2"], font=h2f, fill=(0, 0, 0))   # shadow
-    draw.text((74, 280), b["line2"], font=h2f, fill=b["accent"])
+    # Headline 2 — accent, large
+    h2f = fb(108)
+    draw.text((84, 318), b["line2"], font=h2f, fill=(0, 0, 0))
+    draw.text((80, 314), b["line2"], font=h2f, fill=b["accent"])
 
     # Result statement
-    rf     = fr(44)
-    rlines = wrap(draw, b["result"], rf, W - 144)
-    ry     = 428
+    rf     = fr(52)
+    rlines = wrap(draw, b["result"], rf, W - 160)
+    ry     = 480
     for line in rlines[:2]:
-        txt(draw, 72, ry, line, rf, (255, 255, 255))
-        ry += 60
+        txt(draw, 80, ry, line, rf, (255, 255, 255))
+        ry += 66
 
-    # Price pill (white)
-    pf   = fb(54)
+    # Price pill
+    pf   = fb(64)
     ptxt = b["price"]
     pw_  = tw(draw, ptxt, pf)
-    wf   = fr(38)
+    wf   = fr(44)
     wtxt = "  ·  " + b["worth"]
     ww_  = tw(draw, wtxt, wf)
-    pill(draw, 72, ry + 22, 72 + pw_ + ww_ + 88, ry + 112, (255, 255, 255), 30)
-    draw.text((112, ry + 34), ptxt, font=pf, fill=b["sky_bot"])
-    draw.text((112 + pw_, ry + 48), wtxt, font=wf, fill=mix(b["sky_bot"], (80, 80, 80), 0.35))
-    ry += 132
+    pill(draw, 80, ry + 28, 80 + pw_ + ww_ + 96, ry + 132, (255, 255, 255), 34)
+    draw.text((122, ry + 42), ptxt, font=pf, fill=b["sky_bot"])
+    draw.text((122 + pw_, ry + 56), wtxt, font=wf, fill=mix(b["sky_bot"], (60, 60, 60), 0.3))
+    ry += 160
 
-    # Included items
-    fi = fr(42)
+    # Included items (larger)
+    fi = fr(50)
     for item in b["items"]:
-        draw.ellipse([72, ry + 12, 100, ry + 40], fill=(255, 255, 255))
-        txt(draw, 118, ry, item, fi, (255, 255, 255))
-        ry += 68
+        draw.ellipse([80, ry + 12, 112, ry + 44], fill=(255, 255, 255))
+        txt(draw, 130, ry, item, fi, (255, 255, 255))
+        ry += 76
 
-    # Footer features
-    ft = "Instant Download  ·  Google Sheets & Excel  ·  Lifetime Access  ·  No Subscription"
-    txt(draw, 72, H - 108, ft, fr(30), (255, 255, 255), shadow=False)
+    # Footer
+    ft = "Instant Download  ·  Google Sheets & Excel  ·  Lifetime Access"
+    txt(draw, 80, H - 110, ft, fr(34), (255, 255, 255), shadow=False)
     url = "nasritools.etsy.com"
-    uf  = fr(28)
-    draw.text((W - tw(draw, url, uf) - 72, H - 64), url, font=uf,
-              fill=mix((255, 255, 255), b["mtn_front"], 0.30))
+    uf  = fr(32)
+    draw.text((W - tw(draw, url, uf) - 80, H - 66), url, font=uf,
+              fill=mix((255, 255, 255), b["mtn_front"], 0.28))
 
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=95)
