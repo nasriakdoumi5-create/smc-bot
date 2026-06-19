@@ -38,7 +38,7 @@ PRODUCTS = [
         "benefit": "Users save €200+ extra per month",
     },
     {
-        "name": "Habit Tracker", "search_kw": ["habit", "tracker"],
+        "name": "Habit Tracker", "search_kw": ["habit", "building"],
         "color": (192, 57, 43), "light": (253, 228, 224), "emoji": "✅",
         "result_line1": "Never break the chain.",
         "result_line2": "30 habits. Automatic streaks.",
@@ -49,7 +49,7 @@ PRODUCTS = [
         "benefit": "Build life-changing routines in 30 days",
     },
     {
-        "name": "Meal Planner", "search_kw": ["meal", "planner"],
+        "name": "Meal Planner", "search_kw": ["meal", "planning"],
         "color": (39, 174, 141), "light": (209, 250, 229), "emoji": "🥗",
         "result_line1": "Plan 7 days of meals",
         "result_line2": "in 15 minutes flat.",
@@ -71,7 +71,7 @@ PRODUCTS = [
         "benefit": "Plan your dream wedding stress-free",
     },
     {
-        "name": "Workout Tracker", "search_kw": ["workout", "tracker"],
+        "name": "Workout Tracker", "search_kw": ["workout", "tracking"],
         "color": (192, 57, 43), "light": (253, 228, 224), "emoji": "💪",
         "result_line1": "See your strength grow",
         "result_line2": "every single session.",
@@ -93,7 +93,7 @@ PRODUCTS = [
         "benefit": "Grow your audience 3x faster",
     },
     {
-        "name": "Invoice Tracker", "search_kw": ["invoice", "tracker"],
+        "name": "Invoice Tracker", "search_kw": ["invoice", "client"],
         "color": (52, 152, 219), "light": (214, 234, 248), "emoji": "📄",
         "result_line1": "Stop chasing invoices.",
         "result_line2": "Get paid on time. Every time.",
@@ -104,7 +104,7 @@ PRODUCTS = [
         "benefit": "Never lose money to disorganization again",
     },
     {
-        "name": "Student Planner", "search_kw": ["student", "planner"],
+        "name": "Student Planner", "search_kw": ["student", "academic"],
         "color": (108, 52, 131), "light": (237, 228, 252), "emoji": "🎓",
         "result_line1": "Ace your semester.",
         "result_line2": "GPA tracked. Deadlines met.",
@@ -126,7 +126,7 @@ PRODUCTS = [
         "benefit": "Achieve more in 90 days than most do in a year",
     },
     {
-        "name": "Weekly Planner", "search_kw": ["weekly", "planner"],
+        "name": "Weekly Planner", "search_kw": ["weekly", "productivity"],
         "color": (108, 52, 131), "light": (237, 228, 252), "emoji": "📅",
         "result_line1": "Plan your perfect week",
         "result_line2": "in 15 minutes every Sunday.",
