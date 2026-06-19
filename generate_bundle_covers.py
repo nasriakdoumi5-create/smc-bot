@@ -164,6 +164,12 @@ def pill(draw, x0, y0, x1, y1, fill, radius=None):
     for cx, cy in [(x0,y0), (x1-2*r,y0), (x0,y1-2*r), (x1-2*r,y1-2*r)]:
         draw.ellipse([cx, cy, cx+2*r, cy+2*r], fill=fill)
 
+def txt(draw, x, y, text, font, fill, shadow=True):
+    """Draw text with optional drop shadow for readability."""
+    if shadow:
+        draw.text((x+3, y+3), text, font=font, fill=(0, 0, 0))
+    draw.text((x, y), text, font=font, fill=fill)
+
 # ── Generator ─────────────────────────────────────────────────────────────────
 def generate(b):
     W, H = 2000, 2000
@@ -174,14 +180,21 @@ def generate(b):
     for y in range(H):
         draw.line([(0, y), (W, y)], fill=mix(b["sky_top"], b["sky_bot"], y/(H-1)))
 
-    # 2. Soft glow / sun behind headline (subtle depth)
-    gx, gy = W // 2, 460
+    # 2. Soft glow / sun (very subtle — just atmosphere, not bright)
+    gx, gy = W // 2, 500
     sky_mid = mix(b["sky_top"], b["sky_bot"], gy / H)
-    for step in range(12, 0, -1):
-        r   = int(450 * step / 12)
-        t   = (12 - step) / 11   # 0 at edge → 1 at center
-        col = mix(sky_mid, mix(sky_mid, (255, 255, 255), 0.28), t)
+    for step in range(10, 0, -1):
+        r   = int(420 * step / 10)
+        t   = (10 - step) / 9
+        col = mix(sky_mid, mix(sky_mid, (255, 255, 255), 0.12), t)
         draw.ellipse([gx-r, gy-r, gx+r, gy+r], fill=col)
+
+    # 2b. Dark scrim over top text area — deepens sky so white text pops
+    for y in range(0, 900):
+        t   = max(0, 1 - y / 900)         # 1 at top → 0 at y=900
+        alpha = 0.30 * t
+        sky_c = mix(b["sky_top"], b["sky_bot"], y / (H - 1))
+        draw.line([(0, y), (W, y)], fill=mix(sky_c, (0, 0, 0), alpha))
 
     # 3. Mountain silhouette layers
     for peaks_norm, color in [
@@ -200,7 +213,7 @@ def generate(b):
     # ── TEXT ──────────────────────────────────────────────────────────────────
 
     # Brand (top-left)
-    draw.text((72, 54), "NASRITOOLS", font=fb(42), fill=(255, 255, 255))
+    txt(draw, 72, 54, "NASRITOOLS", fb(42), (255, 255, 255))
 
     # Bundle badge pill (top-right)
     btxt = b["badge"]
@@ -211,21 +224,25 @@ def generate(b):
     draw.text((bx0 + 32, 52), btxt, font=bf, fill=b["sky_bot"])
 
     # Thin accent divider under brand
-    draw.rectangle([72, 118, W - 72, 122], fill=mix(b["sky_top"], (255, 255, 255), 0.45))
+    draw.rectangle([72, 118, W - 72, 122], fill=mix(b["sky_top"], (255, 255, 255), 0.55))
 
-    # Headline 1 — large white
-    draw.text((72, 142), b["line1"], font=fb(108), fill=(255, 255, 255))
+    # Headline 1 — large white (bigger shadow for max readability)
+    h1f = fb(108)
+    draw.text((76, 146), b["line1"], font=h1f, fill=(0, 0, 0))   # shadow
+    draw.text((72, 142), b["line1"], font=h1f, fill=(255, 255, 255))
 
     # Headline 2 — accent color
-    draw.text((74, 280), b["line2"], font=fb(90), fill=b["accent"])
+    h2f = fb(90)
+    draw.text((78, 284), b["line2"], font=h2f, fill=(0, 0, 0))   # shadow
+    draw.text((74, 280), b["line2"], font=h2f, fill=b["accent"])
 
     # Result statement
-    rf     = fr(42)
+    rf     = fr(44)
     rlines = wrap(draw, b["result"], rf, W - 144)
-    ry     = 424
+    ry     = 428
     for line in rlines[:2]:
-        draw.text((72, ry), line, font=rf, fill=(255, 255, 255))
-        ry += 58
+        txt(draw, 72, ry, line, rf, (255, 255, 255))
+        ry += 60
 
     # Price pill (white)
     pf   = fb(54)
@@ -240,19 +257,19 @@ def generate(b):
     ry += 132
 
     # Included items
-    fi = fr(40)
+    fi = fr(42)
     for item in b["items"]:
-        draw.ellipse([72, ry + 13, 96, ry + 37], fill=(255, 255, 255))
-        draw.text((116, ry), item, font=fi, fill=(255, 255, 255))
-        ry += 64
+        draw.ellipse([72, ry + 12, 100, ry + 40], fill=(255, 255, 255))
+        txt(draw, 118, ry, item, fi, (255, 255, 255))
+        ry += 68
 
-    # Footer features (on front mountain — dark enough for white text)
+    # Footer features
     ft = "Instant Download  ·  Google Sheets & Excel  ·  Lifetime Access  ·  No Subscription"
-    draw.text((72, H - 108), ft, font=fr(30), fill=mix((255,255,255), b["mtn_front"], 0.20))
-    url  = "nasritools.etsy.com"
-    uf   = fr(28)
+    txt(draw, 72, H - 108, ft, fr(30), (255, 255, 255), shadow=False)
+    url = "nasritools.etsy.com"
+    uf  = fr(28)
     draw.text((W - tw(draw, url, uf) - 72, H - 64), url, font=uf,
-              fill=mix((255, 255, 255), b["mtn_front"], 0.38))
+              fill=mix((255, 255, 255), b["mtn_front"], 0.30))
 
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=95)
