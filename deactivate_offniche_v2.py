@@ -11,28 +11,10 @@ SECRET     = "hc89hlqkd6"
 SHOP_ID    = 66526082
 TOKEN_FILE = Path(os.path.expanduser("~")) / "etsy_token.json"
 
-# Listings that MUST stay active — never deactivate these
-CORE_KEEP_KEYWORDS = [
-    ["budget", "tracker"],
-    ["habit", "tracker"],
-    ["meal", "planner"],
-    ["wedding", "planner"],
-    ["workout", "tracker"],
-    ["content", "creator"],
-    ["invoice", "tracker"],
-    ["student", "planner"],
-    ["goals", "planner"],
-    ["weekly", "planner"],
-    ["finance", "bundle"],
-    ["health", "bundle"],
-    ["planner", "bundle"],
-    ["business", "bundle"],
-    ["ultimate", "bundle"],
-    ["free", "budget"],    # Free lead magnet
-]
-
 # Keywords that signal an off-niche listing to deactivate
+# Checked FIRST — overrides core protection
 OFFNICHE_KEYWORDS = [
+    # Original list
     "restaurant",
     "nonprofit",
     "non-profit",
@@ -40,7 +22,7 @@ OFFNICHE_KEYWORDS = [
     "kpi dashboard",
     "content repurposing",
     "social media posting calendar",
-    "social media calendar",  # standalone (not content creator planner)
+    "social media calendar",
     "church",
     "real estate",
     "construction",
@@ -55,6 +37,54 @@ OFFNICHE_KEYWORDS = [
     "hr tracker",
     "employee",
     "payroll",
+    # Newly added from store audit
+    "affiliate",
+    "podcast",
+    "dividend",
+    "homeschool",
+    "side hustle",
+    "crm",
+    "tax prep",
+    "marketing roi",
+    "school supply",
+    "blog content tracker",
+    "holiday gift",
+    "christmas budget",
+    "coaching business",
+    "general template",   # catches mass-created generic off-niche templates
+]
+
+# Listings that MUST stay active — only applies when NOT off-niche
+CORE_KEEP_KEYWORDS = [
+    ["budget", "expense"],       # Monthly Budget & Expense System
+    ["habit", "building"],       # 30-Day Habit Building System
+    ["habit", "tracker"],        # old title fallback
+    ["meal", "planning"],        # Weekly Meal Planning System
+    ["meal", "planner"],         # old title fallback
+    ["wedding", "planning"],     # Complete Wedding Planning System
+    ["wedding", "planner"],      # old title fallback
+    ["workout", "tracking"],     # Gym & Workout Tracking System
+    ["workout", "tracker"],      # old title fallback
+    ["content", "creator"],      # Content Creator Business System
+    ["invoice", "client"],       # Freelancer Invoice & Client System
+    ["invoice", "tracker"],      # old title fallback
+    ["student", "academic"],     # Student Academic Success System
+    ["student", "planner"],      # old title fallback
+    ["annual", "goal"],          # Annual Goals & 90-Day Action System
+    ["goals", "planner"],        # old title fallback
+    ["weekly", "productivity"],  # Weekly Productivity System
+    ["weekly", "planner"],       # old title fallback
+    ["finance", "control"],      # Complete Finance Control System (bundle)
+    ["health", "transformation"],# Complete Health Transformation System (bundle)
+    ["planning", "productivity"],# Complete Planning & Productivity System (bundle)
+    ["creator", "business"],     # Complete Creator Business System (bundle)
+    ["complete", "life"],        # The Complete Life System (ultimate bundle)
+    ["finance", "bundle"],       # old bundle title fallback
+    ["health", "bundle"],        # old bundle title fallback
+    ["planner", "bundle"],       # old bundle title fallback
+    ["business", "bundle"],      # old bundle title fallback
+    ["ultimate", "bundle"],      # old bundle title fallback
+    ["free", "budget"],          # Free lead magnet
 ]
 
 
@@ -96,22 +126,21 @@ def fetch_all_listings(token):
     return listings
 
 
-def is_core(title_lower):
-    for kw_set in CORE_KEEP_KEYWORDS:
-        if all(kw in title_lower for kw in kw_set):
+def is_offniche(title_lower):
+    for kw in OFFNICHE_KEYWORDS:
+        if kw in title_lower:
+            # "social media calendar/posting calendar" is off-niche
+            # UNLESS it's our Content Creator product
+            if kw in ("social media posting calendar", "social media calendar"):
+                if "content creator" in title_lower:
+                    continue
             return True
     return False
 
 
-def is_offniche(title_lower):
-    for kw in OFFNICHE_KEYWORDS:
-        if kw in title_lower:
-            # Extra check: "social media calendar" is off-niche
-            # but "content creator" + "social media" is fine (it's our product)
-            if kw == "social media posting calendar" and "content creator" in title_lower:
-                continue
-            if kw == "social media calendar" and "content creator" in title_lower:
-                continue
+def is_core(title_lower):
+    for kw_set in CORE_KEEP_KEYWORDS:
+        if all(kw in title_lower for kw in kw_set):
             return True
     return False
 
@@ -147,10 +176,11 @@ def main():
         title = (lst.get("title") or "")
         tl    = title.lower()
 
-        if is_core(tl):
-            keep.append((lid, title))
-        elif is_offniche(tl):
+        # OFFNICHE is checked FIRST — it overrides core protection
+        if is_offniche(tl):
             to_deactivate.append((lid, title))
+        elif is_core(tl):
+            keep.append((lid, title))
         else:
             uncertain.append((lid, title))
 
@@ -158,10 +188,16 @@ def main():
     print(f"  Off-niche (to deactivate):  {len(to_deactivate)}")
     print(f"  Uncertain (keeping active): {len(uncertain)}\n")
 
+    if keep:
+        print("  ── Core (protected) ──")
+        for lid, t in keep:
+            print(f"    ✓ [{lid}] {t[:65]}")
+        print()
+
     if uncertain:
         print("  ── Uncertain (keeping, review manually) ──")
         for lid, t in uncertain:
-            print(f"    [{lid}] {t[:65]}")
+            print(f"    ? [{lid}] {t[:65]}")
         print()
 
     if not to_deactivate:
