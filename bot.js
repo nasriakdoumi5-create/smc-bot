@@ -7,6 +7,7 @@
 
 import { get5mBars, get1hBars }                    from './data.js';
 import { analyze }                                  from './smc.js';
+import { analyzeSimple }                            from './strategy_simple.js';
 import { getUpcomingHigh, isNewsTime, todaySummary } from './calendar.js';
 
 // ══ إعدادات ══════════════════════════════════
@@ -61,13 +62,26 @@ async function check() {
       get1hBars(SYMBOL)
     ]);
 
+    // ── استراتيجية EMA21 Bounce (بسيطة) ──────────
+    const simple = analyzeSimple(bars1h);
+    const t = new Date().toLocaleTimeString('ar-DZ');
+
+    if (!simple.error) {
+      const d = simple.debug;
+      console.log(`[${t}] EMA21 @ ${simple.price} | ${simple.htfTrend} RSI:${simple.rsi} HTF:${d.htfBull||d.htfBear?'✅':'❌'} Touch:${d.touchedBull||d.touchedBear?'✅':'❌'} Bounce:${d.bouncedBull||d.bouncedBear?'✅':'❌'} RSIok:${d.rsiLong||d.rsiShort?'✅':'❌'} Body:${d.strongCandle?'✅':'❌'} ${simple.signal?'→ SIGNAL!':'(no signal)'}`);
+    }
+
+    // ── استراتيجية SMC (متقدمة) ───────────────────
     const result = analyze(bars5m, bars1h);
     if (result.error) { console.log('[SMC]', result.error); return; }
 
-    const { price, signal, htfTrend, session, scoreLong, scoreShort, rsi } = result;
-    const t = new Date().toLocaleTimeString('ar-DZ');
+    const { price, signal: smcSignal, htfTrend, session, scoreLong, scoreShort, rsi } = result;
     const sessIcon = session ? '✅' : '❌';
-    console.log(`[${t}] ${SYMBOL} @ ${price} | Trend:${htfTrend} Session:${sessIcon} L:${scoreLong}/9 S:${scoreShort}/9 RSI:${rsi} ${signal ? '→ SIGNAL!' : '(no signal)'}`);
+    console.log(`[${t}] SMC  @ ${price} | Trend:${htfTrend} Session:${sessIcon} L:${scoreLong}/9 S:${scoreShort}/9 RSI:${rsi} ${smcSignal ? '→ SIGNAL!' : '(no signal)'}`);
+
+    // استخدم إشارة EMA21 إن وجدت، وإلا SMC
+    const signal = simple.signal || smcSignal;
+    const isSimple = !!simple.signal;
 
     if (!signal) return;
 
@@ -90,13 +104,15 @@ async function check() {
     const rrActual = risk > 0 ? (Math.abs(signal.tp1 - signal.price) / risk).toFixed(1) : '?';
 
     // الشروط المتحققة
-    const cond = signal.conditions;
+    const cond = signal.conditions || {};
     const condList = Object.entries(cond)
       .map(([k, v]) => `${v ? '✅' : '❌'} ${condLabel(k)}`)
       .join('\n');
 
+    const stratLabel = isSimple ? '📐 EMA21 Bounce (1H)' : '🧠 SMC Elite';
     await tg(
 `${isBull ? '📈' : '📉'} <b>إشارة ${signal.type} — NQ Futures</b>
+<i>${stratLabel}</i>
 
 💰 السعر:  <b>${signal.price}</b>
 🛑 SL:     <b>${signal.sl}</b>  (${risk.toFixed(0)} نقطة)
@@ -104,8 +120,7 @@ async function check() {
 🎯 TP2:    <b>${signal.tp2}</b>
 ⚖️  R:R:   <b>${rrActual}:1</b>
 
-⭐ الجودة: <b>${signal.score}/9</b>  ${scoreBar}
-📊 RSI:    ${signal.rsi}  |  ATR: ${signal.atr}
+${isSimple ? `📊 RSI: ${signal.rsi}  |  EMA21: ${signal.e21}  |  ATR: ${signal.atr}` : `⭐ الجودة: <b>${signal.score}/9</b>  ${scoreBar}\n📊 RSI:    ${signal.rsi}  |  ATR: ${signal.atr}`}
 
 ${condList}
 
@@ -131,6 +146,9 @@ function condLabel(key) {
     recentBullFVG: 'Fair Value Gap صاعد', recentBearFVG: 'Fair Value Gap هابط',
     fibOTE_bull: 'Fibonacci OTE (61-78%)', fibOTE_bear: 'Fibonacci OTE (61-78%)',
     rsiOversold: 'RSI مبالغ هبوط', rsiOverbought: 'RSI مبالغ صعود',
+    touchedEma21: 'لمس خط EMA21',
+    bouncedUp: 'ارتداد صاعد من EMA21', bouncedDown: 'ارتداد هابط من EMA21',
+    rsiOk: 'RSI مناسب', strongBody: 'شمعة قوية',
   };
   return labels[key] || key;
 }
