@@ -1,25 +1,16 @@
 """
-NasriTools - Activate Bundle Drafts
-Activates the 4 bundle listings that were created as drafts.
-Run: python activate_bundles.py
+activate_bundles.py
+Finds all draft listings and activates them (state: draft → active).
+Run after create_premium_bundles.py and upload_thumbnails.py.
 """
-import json, os, time, requests
+import json, os, time, requests, urllib.parse
 from pathlib import Path
 
 CLIENT_ID  = "pluc0garrgcjzhim0hawxf0k"
 SECRET     = "hc89hlqkd6"
 SHOP_ID    = 66526082
 TOKEN_FILE = Path(os.path.expanduser("~")) / "etsy_token.json"
-DONE_FILE  = Path(os.path.expanduser("~")) / "etsy_missing_bundles.json"
-
-# Fallback IDs if done file not found
-FALLBACK_IDS = {
-    "health_bundle":   4524724720,
-    "planner_bundle":  4524724758,
-    "business_bundle": 4524724798,
-    "ultimate_bundle": 4524724846,
-}
-
+API        = "https://api.etsy.com/v3/application"
 
 def get_token():
     t = json.loads(TOKEN_FILE.read_text())
@@ -34,63 +25,66 @@ def get_token():
         TOKEN_FILE.write_text(json.dumps(t, indent=2))
     return t
 
-
 def auth_headers(token):
     return {"Authorization": "Bearer " + token["access_token"],
             "x-api-key": CLIENT_ID + ":" + SECRET}
 
+def get_draft_listings(token):
+    listings, offset = [], 0
+    while True:
+        r = requests.get(
+            f"{API}/shops/{SHOP_ID}/listings",
+            headers=auth_headers(token),
+            params={"limit": 100, "offset": offset, "state": "draft"},
+        )
+        if not r.ok:
+            print(f"  [WARN] Draft fetch: HTTP {r.status_code}")
+            break
+        results = r.json().get("results", [])
+        listings.extend(results)
+        if len(results) < 100: break
+        offset += 100
+    return listings
+
+def activate_listing(token, lid):
+    r = requests.patch(
+        f"{API}/shops/{SHOP_ID}/listings/{lid}",
+        headers={**auth_headers(token), "Content-Type": "application/x-www-form-urlencoded"},
+        data="state=active",
+        timeout=30,
+    )
+    return r.ok, r.status_code
 
 def main():
-    done  = json.loads(DONE_FILE.read_text()) if DONE_FILE.exists() else FALLBACK_IDS
+    print("=" * 65)
+    print("  NasriTools — Activate All Draft Listings")
+    print("=" * 65)
     token = get_token()
+    drafts = get_draft_listings(token)
+    print(f"[*] Found {len(drafts)} draft listings\n")
 
-    bundle_ids = {k: v for k, v in done.items() if k in FALLBACK_IDS}
-    if not bundle_ids:
-        bundle_ids = FALLBACK_IDS
+    if not drafts:
+        print("  No drafts found — all listings already active.")
+        return
 
-    print(f"\n{'='*60}")
-    print(f"  NasriTools - Activate Bundle Drafts")
-    print(f"{'='*60}\n")
-
-    ok = 0
-    for key, lid in bundle_ids.items():
-        print(f"  Activating [{lid}] {key}…", end=" ")
+    ok = fail = 0
+    for l in drafts:
+        lid   = l["listing_id"]
+        title = l["title"]
+        print(f"  [ACT]  {title[:55]}...", end=" ", flush=True)
         token = get_token()
-
-        # First check current state
-        check = requests.get(
-            f"https://api.etsy.com/v3/application/listings/{lid}",
-            headers=auth_headers(token), timeout=15,
-        )
-        if check.ok:
-            state = check.json().get("state", "unknown")
-            if state == "active":
-                print(f"already active ✓")
-                ok += 1
-                continue
-            print(f"(state={state})", end=" ")
-
-        r = requests.patch(
-            f"https://api.etsy.com/v3/application/shops/{SHOP_ID}/listings/{lid}",
-            headers={**auth_headers(token), "Content-Type": "application/json"},
-            json={"state": "active"},
-            timeout=30,
-        )
-
-        if r.ok:
-            print("✓")
+        r_ok, code = activate_listing(token, lid)
+        if r_ok:
+            print("OK")
             ok += 1
         else:
-            print(f"✗  {r.status_code}: {r.text[:200]}")
-
+            print(f"FAIL ({code})")
+            fail += 1
         time.sleep(1)
 
-    print(f"\n  Activated: {ok}/{len(bundle_ids)}")
-    print(f"\n  Bundle URLs:")
-    for key, lid in bundle_ids.items():
-        print(f"    https://www.etsy.com/listing/{lid}  ({key})")
-    print(f"\n{'='*60}\n")
-
+    print(f"\n{'='*65}")
+    print(f"  Activated: {ok} | Failed: {fail}")
+    print(f"{'='*65}")
 
 if __name__ == "__main__":
     main()
