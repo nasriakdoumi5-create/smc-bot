@@ -183,7 +183,7 @@ TITLE_REWRITES = [
         "new_title": "Budget Tracker Spreadsheet Bundle | Google Sheets Finance System | Invoice + Cash Flow + Debt Payoff Tracker",
     },
     {
-        "keywords": ["complete health os", "health os"],
+        "keywords": ["complete health os", "health os", "workout + meal planner", "health planner system"],
         "new_title": "Workout Tracker Bundle Google Sheets | Health Planner System | Meal Plan + Habit + Sleep + Weight Loss",
     },
     {
@@ -191,11 +191,11 @@ TITLE_REWRITES = [
         "new_title": "KPI Dashboard Bundle Google Sheets | Business Starter Kit | Sales + Marketing + Cash Flow + Profit Tracker",
     },
     {
-        "keywords": ["productivity os"],
+        "keywords": ["productivity os", "weekly planner bundle", "productivity system", "weekly planner + goals"],
         "new_title": "Weekly Planner Bundle Google Sheets | Productivity System | Goals + Student + Project + Time Tracker",
     },
     {
-        "keywords": ["freelancer os", "invoice + time tracking"],
+        "keywords": ["freelancer os", "invoice + time tracking", "invoice tracker bundle", "freelancer system"],
         "new_title": "Invoice Tracker Bundle Google Sheets | Freelancer System | Time Tracking + Content Planner + Social Media",
     },
 ]
@@ -276,116 +276,140 @@ def fix_titles(token, listings):
     return ok
 
 # ─────────────────────────────────────────────────────────────────────────────
-# STEP 3 — Tag diversity
+# STEP 3 — Tag diversity (direct assignment, 3 variants per category)
+# Same mechanism as fix_tags.py — proven to work. Each listing gets a
+# variant chosen by listing_id % 3, so similar listings get different tags.
+# All tags ≤ 20 chars (Etsy hard limit).
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Extra long-tail tags per category — used as replacements when a tag is overused
-# IMPORTANT: Etsy max tag length = 20 characters
-EXTRA_TAGS = {
-    "finance": [
-        "finance planner",   "monthly budget",     "income tracker",
-        "savings tracker",   "bill tracker",        "money planner",
-        "expense log",       "budget sheet",        "finance sheet",
-        "debt tracker",
-    ],
-    "business": [
-        "sales tracker",     "revenue tracker",    "business planner",
-        "work tracker",      "team tracker",        "client tracker",
-        "profit tracker",    "business sheet",      "metrics tracker",
-        "reporting sheet",
-    ],
-    "health": [
-        "fitness tracker",   "exercise tracker",   "nutrition log",
-        "workout log",       "body tracker",        "calorie tracker",
-        "health log",        "wellness tracker",    "diet tracker",
-        "gym planner",
-    ],
-    "productivity": [
-        "daily planner",     "task tracker",       "goal tracker",
-        "habit tracker",     "time tracker",        "study planner",
-        "project tracker",   "to do list",          "life planner",
-        "work planner",
-    ],
-    "bundle": [
-        "template bundle",   "planner bundle",     "sheets bundle",
-        "digital bundle",    "organizer bundle",    "life planner",
-        "planner templates", "productivity bundle", "instant download",
-        "digital planner",
-    ],
-    "default": [
-        "planner template",  "tracker template",   "editable template",
-        "organizer template","digital download",    "printable sheet",
-        "productivity sheet","business template",   "google sheets",
-        "spreadsheet tool",
-    ],
+DIVERSE_TAGS = {
+    # finance: budget-focused variants
+    "finance_0": ["google sheets","budget planner","expense tracker",
+                  "monthly budget","budget spreadsheet","personal finance",
+                  "money tracker","savings tracker","budget template",
+                  "finance planner","income tracker","expense sheet","finance sheet"],
+    "finance_1": ["budget tracker","expense planner","finance tracker",
+                  "monthly expenses","money manager","savings planner",
+                  "budget log","personal budget","income planner",
+                  "bill tracker","cash tracker","finance log","budget guide"],
+    "finance_2": ["spending tracker","monthly planner","money log",
+                  "household budget","expense manager","income log",
+                  "budget system","finance system","cost tracker",
+                  "budget journal","money journal","finance journal","pay tracker"],
+
+    # business: kpi/dashboard/sales variants
+    "business_0": ["kpi dashboard","business tracker","metrics tracker",
+                   "performance tracker","sales dashboard","analytics sheet",
+                   "goal tracker","team tracker","work tracker",
+                   "sales tracker","data tracker","reporting sheet","business metrics"],
+    "business_1": ["business planner","revenue tracker","sales planner",
+                   "client tracker","profit tracker","business sheet",
+                   "sales report","team planner","lead tracker",
+                   "campaign tracker","work planner","biz tracker","growth tracker"],
+    "business_2": ["sales metrics","roi tracker","business log",
+                   "performance sheet","revenue planner","sales log",
+                   "business report","team metrics","project planner",
+                   "marketing sheet","ops tracker","pipeline tracker","deal tracker"],
+
+    # health: fitness/meal/habit variants
+    "health_0": ["workout tracker","fitness tracker","gym planner",
+                 "exercise log","gym spreadsheet","workout log",
+                 "fitness planner","progress tracker","workout schedule",
+                 "exercise tracker","gym template","fitness sheet","health tracker"],
+    "health_1": ["meal planner","meal prep","grocery list",
+                 "weekly meal plan","grocery tracker","food planner",
+                 "meal schedule","nutrition tracker","diet planner",
+                 "weekly menu","food log","meal log","diet sheet"],
+    "health_2": ["habit tracker","daily planner","wellness planner",
+                 "sleep tracker","weight tracker","calorie tracker",
+                 "body tracker","health log","wellness tracker",
+                 "routine tracker","health sheet","body log","wellness log"],
+
+    # productivity: planner/goals/student variants
+    "productivity_0": ["weekly planner","productivity planner","time management",
+                       "weekly schedule","time blocking","task planner",
+                       "daily planner","work planner","priority planner",
+                       "monday planner","weekly organizer","schedule sheet","planner sheet"],
+    "productivity_1": ["goal planner","goal tracker","action planner",
+                       "90 day planner","vision planner","life planner",
+                       "task tracker","habit planner","monthly planner",
+                       "goal setting","project planner","milestone tracker","focus planner"],
+    "productivity_2": ["student planner","study planner","grade tracker",
+                       "assignment tracker","semester planner","course tracker",
+                       "homework tracker","school planner","academic planner",
+                       "exam tracker","college planner","study schedule","gpa tracker"],
+
+    # bundle: OS/complete system variants
+    "bundle_0": ["template bundle","google sheets bundle","digital download",
+                 "spreadsheet bundle","planner bundle","template set",
+                 "life planner","organizer bundle","planner templates",
+                 "productivity bundle","digital planner","instant download","sheets bundle"],
+    "bundle_1": ["planner set","sheets pack","digital bundle",
+                 "tracker bundle","tool bundle","system bundle",
+                 "all in one sheet","complete planner","budget bundle",
+                 "life bundle","work bundle","home bundle","goal bundle"],
+    "bundle_2": ["bundle pack","mega bundle","super bundle",
+                 "full bundle","pro bundle","master bundle",
+                 "sheets system","life system","planner pack",
+                 "tracker pack","tool pack","finance bundle","health bundle"],
+
+    # default: generic catch-all variants
+    "default_0": ["google sheets","spreadsheet template","digital download",
+                  "planner template","tracker template","instant download",
+                  "productivity sheet","organizer template","editable template",
+                  "business template","google sheets tool","digital planner","printable sheet"],
+    "default_1": ["google sheet","spreadsheet tool","digital template",
+                  "planner sheet","tracker sheet","editable sheet",
+                  "printable planner","organizer sheet","customizable sheet",
+                  "work template","daily template","life template","goal template"],
+    "default_2": ["sheets template","planner tool","tracker tool",
+                  "download template","instant template","easy template",
+                  "simple tracker","simple planner","simple sheet",
+                  "basic template","starter template","quick template","free template"],
 }
 
-MAX_TAG_USES = 5  # cap each tag at this many listings
+# Maps category → base key in DIVERSE_TAGS
+CAT_BASE = {
+    "finance": "finance", "business": "business", "health": "health",
+    "productivity": "productivity", "bundle": "bundle", "default": "default",
+}
 
 def fix_tag_diversity(token, listings):
-    print("\n── STEP 3: Tag Diversity Fix ────────────────────────────────────")
+    print("\n── STEP 3: Tag Diversity (3 variants per category, direct assign) ─")
+    ok = skip = fail = 0
 
-    # Count current tag frequency
-    tag_freq = Counter()
+    # Count current tags to show before/after
+    before = Counter()
     for l in listings:
         for t in (l.get("tags") or []):
-            tag_freq[t.lower()] += 1
-
-    overused = {tag for tag, cnt in tag_freq.items() if cnt > MAX_TAG_USES}
-    print(f"  Overused tags (>{MAX_TAG_USES}x): {len(overused)}")
-    for t,c in sorted(tag_freq.items(), key=lambda x:-x[1])[:10]:
-        mark = " ← OVERUSED" if t in overused else ""
-        print(f"    [{c:3}x] {t}{mark}")
-
-    ok = skip = fail = 0
-    # Track how many times we've used each replacement tag
-    replacement_used = Counter()
+            before[t.lower()] += 1
+    top_before = [f"{t}({c})" for t,c in before.most_common(5)]
+    print(f"  Before — top tags: {', '.join(top_before)}")
 
     for l in listings:
-        tags = list(l.get("tags") or [])
-        if not tags:
-            skip += 1
-            continue
+        lid = l["listing_id"]
+        cat = get_category(l["title"])
+        base = CAT_BASE.get(cat, "default")
+        variant = lid % 3  # 0, 1, or 2
+        tag_key = f"{base}_{variant}"
+        new_tags = DIVERSE_TAGS.get(tag_key, DIVERSE_TAGS["default_0"])
 
-        cat      = get_category(l["title"])
-        extras   = EXTRA_TAGS.get(cat, EXTRA_TAGS["default"])
-        changed  = False
-        new_tags = []
-
-        for t in tags:
-            tl = t.lower()
-            if tl in overused and tag_freq[tl] > MAX_TAG_USES:
-                # Find a replacement not already in this listing's tags and not too overused
-                existing_lower = {x.lower() for x in tags}
-                replacement = None
-                for ex in extras:
-                    if ex not in existing_lower and replacement_used[ex] < MAX_TAG_USES:
-                        replacement = ex
-                        break
-                if replacement:
-                    new_tags.append(replacement)
-                    replacement_used[replacement] += 1
-                    tag_freq[tl] -= 1
-                    changed = True
-                else:
-                    new_tags.append(t)
-            else:
-                new_tags.append(t)
-
-        if not changed:
-            skip += 1
-            continue
-
-        # Build tags param — must use safe='' and tags[] format (same as fix_tags.py)
-        tags_str = "&".join(f"tags[]={urllib.parse.quote(tg, safe='')}" for tg in new_tags[:13])
+        # Use exact same format as fix_tags.py
+        tag_str = "&".join(f"tags[]={urllib.parse.quote(t, safe='')}" for t in new_tags[:13])
         token = get_token()
-        r_ok, code = patch_listing(token, l["listing_id"], tags_str)
-        if r_ok:
+        r = requests.patch(
+            f"{API}/shops/{SHOP_ID}/listings/{lid}",
+            headers={**auth_headers(token), "Content-Type": "application/x-www-form-urlencoded"},
+            data=tag_str, timeout=30,
+        )
+        if r.ok:
             ok += 1
         else:
-            print(f"  [FAIL tag] {l['title'][:40]} ({code})")
+            print(f"  [FAIL] {l['title'][:40]} ({r.status_code}) {r.text[:80]}")
             fail += 1
-        time.sleep(0.4)
+        time.sleep(0.8)
+
+    print(f"  Tags reassigned: {ok} | Failed: {fail}")
 
     print(f"  Tags diversified: {ok} | No change needed: {skip} | Failed: {fail}")
     return ok
