@@ -63,7 +63,7 @@ async function check() {
     ]);
 
     // ── استراتيجية EMA21 Bounce (بسيطة) ──────────
-    const simple = analyzeSimple(bars1h);
+    const simple = analyzeSimple(bars5m, bars1h);
     const t = new Date().toLocaleTimeString('ar-DZ');
 
     if (!simple.error) {
