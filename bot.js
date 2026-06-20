@@ -9,6 +9,7 @@
 import { get5mBars, get15mBars, get1hBars }          from './data.js';
 import { analyzeSimple, currentSession }              from './strategy_simple.js';
 import { getUpcomingHigh, isNewsTime, todaySummary }  from './calendar.js';
+import { validateSignal }                             from './gemini.js';
 import { createServer }                               from 'http';
 
 // ══ إعدادات ══════════════════════════════════════
@@ -125,6 +126,17 @@ async function checkSymbol(symbol, t) {
     return;
   }
 
+  // ══ Gemini فلتر للإشارات الضعيفة (3/5) ═════
+  const name = SYMBOL_NAMES[symbol] || symbol;
+  if (sig.score <= 3) {
+    const ai = await validateSignal(sig, name).catch(() => ({ confirm: true, reason: '' }));
+    if (!ai.confirm) {
+      console.log(`[${t}] ${symbol} 🤖 Gemini رفض الإشارة: ${ai.reason}`);
+      return;
+    }
+    sig._aiReason = ai.reason; // نحفظه لعرضه في الرسالة
+  }
+
   sym.lastSignalKey  = sigKey;
   sym.lastSignalTime = now;
   stats.total++;
@@ -144,6 +156,7 @@ async function checkSymbol(symbol, t) {
   const e21Line = sig.e21_15m
     ? `📉 EMA21 → 5M: ${sig.e21_5m}  |  15M: ${sig.e21_15m}`
     : `📉 EMA21 (5M): ${sig.e21_5m}`;
+  const aiLine  = sig._aiReason ? `\n🤖 <i>Gemini: ${sig._aiReason}</i>` : '';
 
   await tg(
 `${isBull ? '📈' : '📉'} <b>${sig.type} — ${name}</b>   ${q.stars} ${q.label}
@@ -159,7 +172,7 @@ ${pdhLine}
 🕐 ${session}   |   ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}
 
 ${conds}
-
+${aiLine}
 <i>⚠️ إدارة المخاطر: لا تخاطر بأكثر من 1-2% من رأس المال</i>`
   );
 
