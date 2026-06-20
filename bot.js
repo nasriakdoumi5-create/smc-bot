@@ -9,11 +9,7 @@
 import { get5mBars, get15mBars, get1hBars }          from './data.js';
 import { analyzeSimple, currentSession }              from './strategy_simple.js';
 import { getUpcomingHigh, isNewsTime, todaySummary }  from './calendar.js';
-import { executeSignal, tradovate }                   from './tradovate.js';
 import { createServer }                               from 'http';
-
-// هل التداول الآلي مفعّل؟
-const AUTO_TRADE = process.env.TRADOVATE_USERNAME && process.env.TRADOVATE_PASSWORD;
 
 // ══ إعدادات ══════════════════════════════════════
 const TOKEN    = process.env.TELEGRAM_TOKEN   || '8986679008:AAHmT44SZeoUzdkiaKg-OlnA3NHOonHZ2cw';
@@ -164,18 +160,6 @@ ${conds}
 
     console.log(`[${t}] ✅ إشارة #${stats.total} — ${sig.type} @ ${sig.price} | ${q.label} (${sig.score}/5)`);
 
-    // ══ تنفيذ تلقائي على Tradovate ══════════════
-    if (AUTO_TRADE) {
-      try {
-        const order = await executeSignal(sig);
-        await tg(`🤖 <b>تم تنفيذ الأمر تلقائياً على Tradovate</b>\n✅ ${sig.type} × ${process.env.TRADE_QTY || 1} عقد\nالمرجع: ${order.orderId || 'تم'}`);
-        console.log(`[${t}] 🤖 Tradovate: أمر ${sig.type} نُفِّذ`);
-      } catch (err) {
-        console.error(`[${t}] ❌ Tradovate error:`, err.message);
-        await tg(`⚠️ فشل التنفيذ التلقائي: ${err.message}`);
-      }
-    }
-
   } catch (err) {
     console.error(`[${t}] ❌ Error:`, err.message);
   } finally {
@@ -230,19 +214,6 @@ console.log(`  ⏸️  Cooldown: 30 minutes between signals`);
 console.log(`  📐 Strategy: 1H Bias + 15M + 5M Entry`);
 console.log(`  📱 Chat ID : ${CHAT_ID}`);
 console.log('═'.repeat(52));
-
-// تهيئة Tradovate عند البدء
-if (AUTO_TRADE) {
-  tradovate.login()
-    .then(() => tradovate.getAccount())
-    .then(acc => {
-      console.log(`  🔗 Tradovate: ${acc.name} (${(process.env.TRADOVATE_ENV||'demo').toUpperCase()})`);
-      tg(`🔗 <b>Tradovate متصل</b>\n📋 الحساب: ${acc.name}\n🌐 البيئة: ${(process.env.TRADOVATE_ENV||'demo').toUpperCase()}\n⚡ التداول الآلي: مفعّل`).catch(()=>{});
-    })
-    .catch(err => console.error('  ❌ Tradovate login failed:', err.message));
-} else {
-  console.log('  ⚠️  Tradovate: غير مفعّل (أضف TRADOVATE_USERNAME + PASSWORD في Railway)');
-}
 
 tg(`🚀 <b>NQ Bot يعمل الآن</b>
 
