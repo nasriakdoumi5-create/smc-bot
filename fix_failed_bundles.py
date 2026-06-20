@@ -76,6 +76,37 @@ def upload_file(token, lid, filename, content_bytes):
     )
     return r.ok, r.status_code, r.text[:200]
 
+def get_active_listing_meta(token):
+    """Grab return_policy_id and shipping_profile_id from an existing active listing."""
+    r = requests.get(
+        f"{API}/shops/{SHOP_ID}/listings/active",
+        headers=auth_headers(token),
+        params={"limit": 1},
+    )
+    if r.ok:
+        results = r.json().get("results", [])
+        if results:
+            l = results[0]
+            return l.get("return_policy_id"), l.get("shipping_profile_id")
+    return None, None
+
+def patch_listing_meta(token, lid, return_policy_id, shipping_profile_id):
+    """Apply return policy and shipping profile to a draft listing."""
+    parts = []
+    if return_policy_id:
+        parts.append(f"return_policy_id={return_policy_id}")
+    if shipping_profile_id:
+        parts.append(f"shipping_profile_id={shipping_profile_id}")
+    if not parts:
+        return True, 200
+    r = requests.patch(
+        f"{API}/shops/{SHOP_ID}/listings/{lid}",
+        headers={**auth_headers(token), "Content-Type": "application/x-www-form-urlencoded"},
+        data="&".join(parts),
+        timeout=30,
+    )
+    return r.ok, r.status_code
+
 def activate_listing(token, lid):
     r = requests.patch(
         f"{API}/shops/{SHOP_ID}/listings/{lid}",
@@ -83,13 +114,20 @@ def activate_listing(token, lid):
         data="state=active",
         timeout=30,
     )
-    return r.ok, r.status_code
+    return r.ok, r.status_code, r.text[:300]
 
 def main():
     print("=" * 65)
     print("  NasriTools — Fix Failed Bundles (Attach File + Activate)")
     print("=" * 65)
     token = get_token()
+
+    # Get policy/shipping from existing listing
+    print("[*] Fetching return_policy_id from active listings...")
+    return_policy_id, shipping_profile_id = get_active_listing_meta(token)
+    print(f"    return_policy_id   = {return_policy_id}")
+    print(f"    shipping_profile_id = {shipping_profile_id}\n")
+
     drafts = get_draft_listings(token)
     print(f"[*] Found {len(drafts)} remaining draft listings\n")
 
@@ -118,15 +156,23 @@ def main():
             print(f"FAIL ({f_code}) — {f_text[:80]}")
         time.sleep(2)
 
-        # Step 2: Activate
+        # Step 2: Apply return policy + shipping profile
+        print(f"    → Applying return policy...", end=" ", flush=True)
+        token = get_token()
+        p_ok, p_code = patch_listing_meta(token, lid, return_policy_id, shipping_profile_id)
+        print("OK" if p_ok else f"FAIL ({p_code})")
+        time.sleep(1)
+
+        # Step 3: Activate
         print(f"    → Activating...", end=" ", flush=True)
         token = get_token()
-        a_ok, a_code = activate_listing(token, lid)
+        a_ok, a_code, a_text = activate_listing(token, lid)
         if a_ok:
             print("OK ✓ — Bundle is now LIVE")
             ok += 1
         else:
             print(f"FAIL ({a_code})")
+            print(f"       Error: {a_text[:150]}")
             fail += 1
         time.sleep(2)
         print()
