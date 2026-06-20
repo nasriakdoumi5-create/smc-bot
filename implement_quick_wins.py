@@ -280,42 +280,43 @@ def fix_titles(token, listings):
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Extra long-tail tags per category — used as replacements when a tag is overused
+# IMPORTANT: Etsy max tag length = 20 characters
 EXTRA_TAGS = {
     "finance": [
-        "financial planner spreadsheet","monthly expense log","savings tracker google sheets",
-        "household budget planner","income tracking spreadsheet","money management sheet",
-        "expense report template","personal finance google sheets","bill payment tracker",
-        "zero based budget sheet",
+        "finance planner",   "monthly budget",     "income tracker",
+        "savings tracker",   "bill tracker",        "money planner",
+        "expense log",       "budget sheet",        "finance sheet",
+        "debt tracker",
     ],
     "business": [
-        "business analytics spreadsheet","sales reporting template","revenue dashboard google sheets",
-        "client management spreadsheet","team performance tracker","operations tracker google sheets",
-        "project budget template","business management tool","work tracker spreadsheet",
-        "performance metrics google sheets",
+        "sales tracker",     "revenue tracker",    "business planner",
+        "work tracker",      "team tracker",        "client tracker",
+        "profit tracker",    "business sheet",      "metrics tracker",
+        "reporting sheet",
     ],
     "health": [
-        "fitness progress tracker","nutrition log spreadsheet","daily workout log google sheets",
-        "healthy meal plan spreadsheet","calorie deficit tracker","body measurement log",
-        "30 day fitness challenge","sleep quality tracker","wellness journal spreadsheet",
-        "exercise log google sheets",
+        "fitness tracker",   "exercise tracker",   "nutrition log",
+        "workout log",       "body tracker",        "calorie tracker",
+        "health log",        "wellness tracker",    "diet tracker",
+        "gym planner",
     ],
     "productivity": [
-        "daily schedule template","monthly goal planner","task management spreadsheet",
-        "habit building tracker","time blocking spreadsheet","study planner google sheets",
-        "project timeline tracker","to do list spreadsheet","personal organizer google sheets",
-        "semester planner google sheets",
+        "daily planner",     "task tracker",       "goal tracker",
+        "habit tracker",     "time tracker",        "study planner",
+        "project tracker",   "to do list",          "life planner",
+        "work planner",
     ],
     "bundle": [
-        "all in one google sheets","complete spreadsheet bundle","digital planner bundle",
-        "google sheets pack","spreadsheet collection","multiple tracker bundle",
-        "complete system google sheets","all tools spreadsheet","digital download bundle",
-        "google sheets toolkit",
+        "template bundle",   "planner bundle",     "sheets bundle",
+        "digital bundle",    "organizer bundle",    "life planner",
+        "planner templates", "productivity bundle", "instant download",
+        "digital planner",
     ],
     "default": [
-        "google sheets tracker","digital spreadsheet download","instant download spreadsheet",
-        "easy to use google sheets","printable spreadsheet template","customizable google sheet",
-        "beginner friendly spreadsheet","simple tracking spreadsheet","google sheets system",
-        "professional spreadsheet tool",
+        "planner template",  "tracker template",   "editable template",
+        "organizer template","digital download",    "printable sheet",
+        "productivity sheet","business template",   "google sheets",
+        "spreadsheet tool",
     ],
 }
 
@@ -375,8 +376,8 @@ def fix_tag_diversity(token, listings):
             skip += 1
             continue
 
-        # Build tags param (Etsy API: tags[]=tag1&tags[]=tag2...)
-        tags_str = "&".join(f"tags[]={urllib.parse.quote(tg)}" for tg in new_tags[:13])
+        # Build tags param — must use safe='' and tags[] format (same as fix_tags.py)
+        tags_str = "&".join(f"tags[]={urllib.parse.quote(tg, safe='')}" for tg in new_tags[:13])
         token = get_token()
         r_ok, code = patch_listing(token, l["listing_id"], tags_str)
         if r_ok:
