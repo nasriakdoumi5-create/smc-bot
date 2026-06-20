@@ -13,10 +13,12 @@ const URLS = {
 
 class TradovateClient {
   constructor() {
-    this.env      = process.env.TRADOVATE_ENV || 'demo';
-    this.base     = URLS[this.env];
-    this.token    = null;
-    this.expiry   = 0;
+    this.env         = process.env.TRADOVATE_ENV || 'demo';
+    this.base        = URLS[this.env];
+    this.token       = null;
+    this.expiry      = 0;
+    this.failedAt    = 0;         // وقت آخر فشل لتسجيل الدخول
+    this.loginRetryAfter = 0;    // لا تحاول قبل هذا الوقت
     this.accountId   = null;
     this.accountName = null;
   }
@@ -54,7 +56,14 @@ class TradovateClient {
       appVersion: '1.0', cid, sec: appSecret,
     });
 
-    if (!data.accessToken) throw new Error('فشل تسجيل الدخول: ' + JSON.stringify(data));
+    if (!data.accessToken) {
+      // Rate limit — انتظر 35 دقيقة قبل المحاولة مجدداً
+      const pTime = data['p-time'];
+      const waitMs = pTime ? (pTime + 5) * 60 * 1000 : 35 * 60 * 1000;
+      this.loginRetryAfter = Date.now() + waitMs;
+      console.error(`[Tradovate] ⛔ Rate limit — سيُعاد المحاولة بعد ${Math.ceil(waitMs/60000)} دقيقة`);
+      throw new Error('فشل تسجيل الدخول: ' + JSON.stringify(data));
+    }
 
     this.token  = data.accessToken;
     this.expiry = data.expirationTime
@@ -67,6 +76,11 @@ class TradovateClient {
 
   // ── تجديد Token تلقائياً ──────────────────────
   async ensureToken() {
+    // إذا كنا في فترة انتظار Rate Limit — لا تحاول
+    if (Date.now() < this.loginRetryAfter) {
+      const waitMin = Math.ceil((this.loginRetryAfter - Date.now()) / 60000);
+      throw new Error(`Rate limit — انتظر ${waitMin} دقيقة قبل المحاولة`);
+    }
     if (!this.token || Date.now() > this.expiry - 5 * 60 * 1000) {
       await this.login();
     }
