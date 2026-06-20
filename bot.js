@@ -127,6 +127,7 @@ async function checkSymbol(symbol, t) {
   }
 
   // ══ Gemini فلتر للإشارات الضعيفة (3/5) ═════
+  const sig  = r.signal;
   const name = SYMBOL_NAMES[symbol] || symbol;
   if (sig.score <= 3) {
     const ai = await validateSignal(sig, name).catch(() => ({ confirm: true, reason: '' }));
@@ -134,23 +135,21 @@ async function checkSymbol(symbol, t) {
       console.log(`[${t}] ${symbol} 🤖 Gemini رفض الإشارة: ${ai.reason}`);
       return;
     }
-    sig._aiReason = ai.reason; // نحفظه لعرضه في الرسالة
+    sig._aiReason = ai.reason;
   }
 
   sym.lastSignalKey  = sigKey;
   sym.lastSignalTime = now;
   stats.total++;
-  r.signal.type === 'LONG' ? stats.long++ : stats.short++;
+  sig.type === 'LONG' ? stats.long++ : stats.short++;
   stats.bySymbol[symbol] = (stats.bySymbol[symbol] || 0) + 1;
 
   // ══ رسالة Telegram ══════════════════════════
-  const sig     = r.signal;
   const isBull  = sig.type === 'LONG';
   const q       = quality(sig.score);
   const risk    = Math.abs(sig.price - sig.sl);
   const rr      = risk > 0 ? (Math.abs(sig.tp1 - sig.price) / risk).toFixed(1) : '?';
   const conds   = Object.entries(sig.conditions).map(([k, v]) => condLine(k, v)).join('\n');
-  const name    = SYMBOL_NAMES[symbol] || symbol;
 
   const pdhLine = sig.pdh ? `📌 PDH: <b>${sig.pdh}</b>  |  PDL: <b>${sig.pdl}</b>` : '';
   const e21Line = sig.e21_15m
