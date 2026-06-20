@@ -4,7 +4,7 @@ Attaches a placeholder digital file to draft listings that failed to activate (H
 then retries activation.
 Etsy requires at least one digital file before a digital listing can go active.
 """
-import json, os, time, requests, urllib.parse, io
+import json, os, re, time, requests, urllib.parse, io
 from pathlib import Path
 
 CLIENT_ID  = "pluc0garrgcjzhim0hawxf0k"
@@ -101,7 +101,9 @@ def main():
     for l in drafts:
         lid   = l["listing_id"]
         title = l["title"]
-        safe_name = title[:40].replace(" ", "_").replace("|", "").replace("/", "") + ".txt"
+        safe_name = re.sub(r'[^a-zA-Z0-9_-]', '', title.replace(' ', '_'))[:55] + ".txt"
+        if len(safe_name) < 7:
+            safe_name = f"bundle_{lid}.txt"
 
         print(f"  [{lid}] {title[:50]}")
 
