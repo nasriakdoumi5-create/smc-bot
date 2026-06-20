@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SMCoin — معاينة GMGN</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0b0d;--card:#111318;--border:#1e2430;
+  --green:#00d97e;--red:#ff4b6e;--text:#e8ecf0;
+  --muted:#5a6578;--accent:#9945ff;--yellow:#fbbf24;
+  --blue:#3b82f6;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:13px;min-height:100vh}
+
+/* ── Top Bar ── */
+.topbar{background:#0d1117;border-bottom:1px solid var(--border);padding:8px 20px;display:flex;align-items:center;justify-content:space-between;font-size:.75rem;color:var(--muted)}
+.topbar .logo{color:var(--accent);font-weight:800;font-size:.95rem;letter-spacing:1px}
+.topbar-nav{display:flex;gap:20px}
+.topbar-nav a{color:var(--muted);text-decoration:none}
+.topbar-nav a:hover{color:var(--text)}
+.wallet-btn{background:var(--accent);color:#fff;border:none;padding:5px 14px;border-radius:6px;font-size:.75rem;font-weight:600;cursor:pointer}
+
+/* ── Header Token ── */
+.token-header{padding:16px 20px 0;display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.token-icon{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#9945ff,#14f195);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0;border:2px solid var(--border)}
+.token-name{font-size:1.15rem;font-weight:700;display:flex;align-items:center;gap:8px}
+.token-symbol{background:#1e2430;color:var(--muted);padding:2px 8px;border-radius:4px;font-size:.75rem}
+.token-address{font-family:monospace;font-size:.72rem;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:6px}
+.copy-btn{background:#1e2430;border:none;color:var(--muted);padding:2px 7px;border-radius:4px;cursor:pointer;font-size:.68rem}
+.badges{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.badge{padding:3px 9px;border-radius:20px;font-size:.7rem;font-weight:600;border:1px solid}
+.badge-sol{background:#1a1040;color:var(--accent);border-color:var(--accent)}
+.badge-new{background:#0d2a1a;color:var(--green);border-color:var(--green)}
+.badge-pump{background:#1a1040;color:#c084fc;border-color:#c084fc}
+.badge-safe{background:#0d2020;color:#22d3ee;border-color:#22d3ee}
+
+/* ── Price Section ── */
+.price-section{padding:12px 20px;display:flex;gap:24px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.price-main{font-size:1.7rem;font-weight:800;color:var(--green)}
+.price-change{background:#0d2a1a;color:var(--green);padding:4px 10px;border-radius:6px;font-size:.85rem;font-weight:600}
+.price-change.down{background:#2a0d15;color:var(--red)}
+.stats-row{display:flex;gap:20px;flex-wrap:wrap}
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat-l{font-size:.68rem;color:var(--muted)}
+.stat-v{font-size:.85rem;font-weight:600}
+.stat-v.g{color:var(--green)} .stat-v.r{color:var(--red)}
+
+/* ── Layout ── */
+.main-layout{display:grid;grid-template-columns:1fr 320px;gap:1px;background:var(--border);padding-top:1px}
+.left-col{display:flex;flex-direction:column;gap:1px;background:var(--border)}
+.right-col{display:flex;flex-direction:column;gap:1px;background:var(--border)}
+.panel{background:var(--card);padding:14px 16px}
+
+/* ── Chart ── */
+.chart-panel{background:var(--card);padding:0}
+.chart-toolbar{display:flex;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);align-items:center}
+.tf-btn{background:transparent;border:none;color:var(--muted);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:.75rem}
+.tf-btn.act{background:#1e2430;color:var(--text);font-weight:600}
+svg.chart{display:block;width:100%}
+
+/* ── Trades Table ── */
+.table-head{display:grid;padding:6px 14px;font-size:.68rem;color:var(--muted);border-bottom:1px solid var(--border)}
+.trade-row{display:grid;padding:5px 14px;font-size:.76rem;border-bottom:1px solid #0f1318;align-items:center}
+.trade-row:hover{background:#0f1318}
+.trades-head{grid-template-columns:80px 70px 70px 80px 80px 1fr}
+.trades-row-grid{grid-template-columns:80px 70px 70px 80px 80px 1fr}
+.buy-badge{color:var(--green)} .sell-badge{color:var(--red)}
+
+/* ── Holders ── */
+.holder-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #0f1318;font-size:.78rem}
+.holder-addr{font-family:monospace;color:var(--blue)}
+.holder-bar-wrap{width:80px;height:5px;background:#1e2430;border-radius:3px;overflow:hidden;display:inline-block;margin:0 8px;vertical-align:middle}
+.holder-bar{height:100%;border-radius:3px;background:var(--accent)}
+.holder-pct{color:var(--muted);font-size:.72rem;min-width:35px;text-align:right}
+.dev-badge{background:#1a1040;color:var(--accent);padding:1px 5px;border-radius:3px;font-size:.65rem;margin-right:4px}
+
+/* ── Buy Panel ── */
+.buy-panel{background:var(--card);padding:16px}
+.buy-tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:14px}
+.buy-tab{flex:1;padding:8px;text-align:center;font-weight:700;font-size:.85rem;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted)}
+.buy-tab.buy.act{color:var(--green);border-color:var(--green)}
+.buy-tab.sell.act{color:var(--red);border-color:var(--red)}
+.quick-btns{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.qbtn{background:#1e2430;border:none;color:var(--text);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:.75rem;font-weight:500}
+.qbtn:hover{background:#2a3240}
+.qbtn.act{background:var(--green);color:#000}
+.sol-input{width:100%;background:#0a0b0d;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:8px;font-size:.9rem;margin-bottom:8px}
+.sol-input:focus{border-color:var(--accent);outline:none}
+.est-receive{display:flex;justify-content:space-between;font-size:.75rem;color:var(--muted);margin-bottom:12px}
+.btn-buy-sol{width:100%;padding:12px;background:var(--green);border:none;border-radius:8px;color:#000;font-weight:800;font-size:.95rem;cursor:pointer}
+.btn-buy-sol:hover{filter:brightness(1.1)}
+.slippage-row{display:flex;justify-content:space-between;align-items:center;font-size:.72rem;color:var(--muted);margin-top:8px}
+
+/* ── Info Box ── */
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.info-item{display:flex;flex-direction:column;gap:3px}
+.info-label{font-size:.68rem;color:var(--muted)}
+.info-value{font-size:.82rem;font-weight:600}
+.progress-wrap{margin-top:10px}
+.progress-label{display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted);margin-bottom:5px}
+.progress-bar{height:6px;background:#1e2430;border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--green))}
+
+/* ── Social Links ── */
+.social-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.social-btn{display:flex;align-items:center;gap:5px;background:#1e2430;border:none;color:var(--text);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.75rem;text-decoration:none}
+.social-btn:hover{background:#2a3240}
+
+/* ── Security ── */
+.sec-item{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #0f1318;font-size:.78rem}
+.sec-ok{color:var(--green);font-size:.72rem}
+.sec-warn{color:var(--yellow);font-size:.72rem}
+.sec-bad{color:var(--red);font-size:.72rem}
+.check-icon{margin-left:4px}
+
+/* ── Panel Title ── */
+.ptitle{font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+
+/* ── Watermark ── */
+.watermark{position:fixed;bottom:12px;right:12px;background:var(--card);border:1px solid var(--border);padding:6px 12px;border-radius:6px;font-size:.72rem;color:var(--muted);z-index:10}
+
+/* ── Alert ── */
+.alert{background:#1a1010;border:1px solid var(--red);border-radius:8px;padding:10px 14px;font-size:.78rem;color:var(--red);margin-bottom:12px;display:flex;gap:8px;align-items:flex-start}
+
+/* ── Top nav ── */
+.section-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 20px}
+.stab{padding:10px 16px;cursor:pointer;font-size:.82rem;color:var(--muted);border-bottom:2px solid transparent}
+.stab.act{color:var(--text);border-color:var(--accent)}
+
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:var(--border)}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="logo">GMGN</div>
+  <div class="topbar-nav">
+    <a href="#">Trending</a>
+    <a href="#">New Pairs</a>
+    <a href="#">Portfolio</a>
+    <a href="#">Alerts</a>
+    <a href="#">Copy Trade</a>
+  </div>
+  <button class="wallet-btn">Connect Wallet</button>
+</div>
+
+<!-- Token Header -->
+<div class="token-header">
+  <div class="token-icon">💰</div>
+  <div>
+    <div class="token-name">
+      SMCoin
+      <span class="token-symbol">SMC</span>
+    </div>
+    <div class="token-address">
+      <span>7xKX...mP3q</span>
+      <button class="copy-btn" onclick="this.textContent='✓ نُسخ'">📋 نسخ</button>
+      <a href="#" style="color:var(--blue);font-size:.7rem;text-decoration:none">Solscan ↗</a>
+    </div>
+    <div class="badges">
+      <span class="badge badge-sol">⬦ Solana</span>
+      <span class="badge badge-pump">🚀 Pump.fun</span>
+      <span class="badge badge-new">🆕 New</span>
+      <span class="badge badge-safe">🔒 Mint Revoked</span>
+    </div>
+  </div>
+</div>
+
+<!-- Price Section -->
+<div class="price-section">
+  <div>
+    <div class="price-main" id="live-price">$0.000001247</div>
+    <div style="font-size:.72rem;color:var(--muted);margin-top:2px">≈ 0.0000000073 SOL</div>
+  </div>
+  <span class="price-change" id="price-chg">▲ +184.3%</span>
+  <div class="stats-row">
+    <div class="stat"><span class="stat-l">5M</span><span class="stat-v g" id="s5m">+28.4%</span></div>
+    <div class="stat"><span class="stat-l">1H</span><span class="stat-v g" id="s1h">+73.1%</span></div>
+    <div class="stat"><span class="stat-l">6H</span><span class="stat-v g">+184.3%</span></div>
+    <div class="stat"><span class="stat-l">24H</span><span class="stat-v g">+184.3%</span></div>
+    <div class="stat"><span class="stat-l">حجم 24H</span><span class="stat-v" id="svol">$42,817</span></div>
+    <div class="stat"><span class="stat-l">Mkt Cap</span><span class="stat-v" id="smcap">$124,700</span></div>
+    <div class="stat"><span class="stat-l">Holders</span><span class="stat-v" id="sholders">347</span></div>
+    <div class="stat"><span class="stat-l">Txns 24H</span><span class="stat-v">1,284</span></div>
+    <div class="stat"><span class="stat-l">Liquidity</span><span class="stat-v" id="sliq">$18,240</span></div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="section-tabs">
+  <div class="stab act">📊 التداول</div>
+  <div class="stab">👥 الحاملون</div>
+  <div class="stab">📈 الإحصائيات</div>
+  <div class="stab">💬 تعليقات</div>
+</div>
+
+<!-- Main Layout -->
+<div class="main-layout">
+  <div class="left-col">
+
+    <!-- Chart -->
+    <div class="chart-panel">
+      <div class="chart-toolbar">
+        <span style="font-size:.78rem;font-weight:600;color:var(--text)">SMC / USD</span>
+        <div style="display:flex;gap:4px;margin-right:8px">
+          <button class="tf-btn">1S</button>
+          <button class="tf-btn">5S</button>
+          <button class="tf-btn act">1M</button>
+          <button class="tf-btn">5M</button>
+          <button class="tf-btn">1H</button>
+        </div>
+        <span style="color:var(--green);font-size:.78rem;font-weight:700" id="chart-price-label">$0.000001247</span>
+      </div>
+      <svg class="chart" id="main-chart" viewBox="0 0 900 280" preserveAspectRatio="none" style="height:260px"></svg>
+    </div>
+
+    <!-- Recent Trades -->
+    <div class="panel" style="padding:0">
+      <div class="ptitle" style="padding:10px 14px 6px">آخر الصفقات</div>
+      <div class="table-head trades-head">
+        <span>الوقت</span><span>النوع</span><span>السعر USD</span><span>SMC</span><span>SOL</span><span>المحفظة</span>
+      </div>
+      <div id="trades-body"></div>
+    </div>
+
+  </div>
+
+  <div class="right-col">
+
+    <!-- Buy/Sell Panel -->
+    <div class="buy-panel">
+      <div class="buy-tabs">
+        <div class="buy-tab buy act" onclick="this.classList.add('act');document.querySelector('.buy-tab.sell').classList.remove('act')">شراء</div>
+        <div class="buy-tab sell" onclick="this.classList.add('act');document.querySelector('.buy-tab.buy').classList.remove('act')">بيع</div>
+      </div>
+      <div class="quick-btns">
+        <button class="qbtn" onclick="setAmt('0.1')">0.1 SOL</button>
+        <button class="qbtn act" onclick="setAmt('0.5')">0.5 SOL</button>
+        <button class="qbtn" onclick="setAmt('1')">1 SOL</button>
+        <button class="qbtn" onclick="setAmt('5')">5 SOL</button>
+      </div>
+      <input class="sol-input" type="number" id="sol-amt" value="0.5" placeholder="0.0" oninput="calcSmc()">
+      <div class="est-receive">
+        <span>ستحصل على تقريباً</span>
+        <span id="est-smc" style="color:var(--green);font-weight:600">~400,962 SMC</span>
+      </div>
+      <button class="btn-buy-sol" onclick="showBuyConfirm()">شراء SMC</button>
+      <div class="slippage-row">
+        <span>Slippage: <b style="color:var(--text)">10%</b></span>
+        <span>Gas: ~0.000005 SOL</span>
+      </div>
+    </div>
+
+    <!-- Token Info -->
+    <div class="panel">
+      <div class="ptitle">معلومات التوكن</div>
+      <div class="info-grid">
+        <div class="info-item"><span class="info-label">الشبكة</span><span class="info-value">◎ Solana</span></div>
+        <div class="info-item"><span class="info-label">المنصة</span><span class="info-value">🚀 Pump.fun</span></div>
+        <div class="info-item"><span class="info-label">إجمالي العرض</span><span class="info-value">1,000,000,000</span></div>
+        <div class="info-item"><span class="info-label">المتداول</span><span class="info-value">100%</span></div>
+        <div class="info-item"><span class="info-label">تاريخ الإنشاء</span><span class="info-value">اليوم</span></div>
+        <div class="info-item"><span class="info-label">المطور</span><span class="info-value" style="color:var(--accent)">Nasri...k5</span></div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-label">
+          <span>تقدم Pump.fun</span>
+          <span style="color:var(--green)">12.4% → Raydium</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="pump-bar" style="width:12.4%"></div></div>
+        <div style="font-size:.68rem;color:var(--muted);margin-top:4px">عند 100% تُدرج تلقائياً على Raydium DEX</div>
+      </div>
+      <div class="social-links">
+        <a href="#" class="social-btn">🐦 Twitter</a>
+        <a href="#" class="social-btn">💬 Telegram</a>
+        <a href="#" class="social-btn">🌐 Website</a>
+        <a href="#" class="social-btn">📋 Pump.fun</a>
+      </div>
+    </div>
+
+    <!-- Security Check -->
+    <div class="panel">
+      <div class="ptitle">فحص الأمان <span style="color:var(--green);font-size:.7rem">✅ آمن</span></div>
+      <div class="sec-item"><span>Mint Authority ملغاة</span><span class="sec-ok">✅ آمن</span></div>
+      <div class="sec-item"><span>Freeze Authority ملغاة</span><span class="sec-ok">✅ آمن</span></div>
+      <div class="sec-item"><span>المطور يملك</span><span class="sec-ok">0.0% ✅</span></div>
+      <div class="sec-item"><span>Top 10 Holders</span><span class="sec-warn">⚠️ 34.2%</span></div>
+      <div class="sec-item"><span>Rug Check</span><span class="sec-ok">✅ لا مشاكل</span></div>
+      <div class="sec-item"><span>LP محروقة</span><span class="sec-ok">✅ 100%</span></div>
+    </div>
+
+    <!-- Top Holders -->
+    <div class="panel">
+      <div class="ptitle">أكبر الحاملين</div>
+      <div id="holders-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="watermark">🖼️ معاينة — هكذا ستبدو SMCoin على GMGN</div>
+
+<script>
+// ── Live Chart ──────────────────────────────────────
+let priceHistory = [];
+let basePrice = 0.000001247;
+
+function genHistory() {
+  let p = 0.0000000031;
+  for (let i = 0; i < 120; i++) {
+    p *= (1 + (Math.random() - 0.42) * 0.08);
+    p = Math.max(0.0000000010, p);
+    priceHistory.push(p);
+  }
+}
+genHistory();
+
+function drawChart() {
+  const svg = document.getElementById('main-chart');
+  const W=900, H=280, PAD=12;
+  const prices = priceHistory;
+  const lo = Math.min(...prices) * 0.98;
+  const hi = Math.max(...prices) * 1.02;
+  const range = hi - lo || 1e-12;
+  const px = i => PAD + (i / (prices.length-1)) * (W - PAD*2);
+  const py = p => H - PAD - ((p - lo) / range) * (H - PAD*2);
+  const pts = prices.map((p,i) => px(i)+','+py(p)).join(' ');
+  const lastX = px(prices.length-1), lastY = py(prices[prices.length-1]);
+  const fill = 'M'+px(0)+' '+H+' L'+prices.map((p,i)=>px(i)+' '+py(p)).join(' L')+' L'+lastX+' '+H+' Z';
+  const color = '#00d97e';
+  svg.innerHTML =
+    '<defs>'
+    +'<linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">'
+    +'<stop offset="0%" stop-color="'+color+'" stop-opacity="0.3"/>'
+    +'<stop offset="80%" stop-color="'+color+'" stop-opacity="0"/>'
+    +'</linearGradient>'
+    +'<filter id="glow"><feGaussianBlur stdDeviation="2" result="coloredBlur"/>'
+    +'<feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+    +'</defs>'
+    +'<path d="'+fill+'" fill="url(#cg)"/>'
+    +'<polyline points="'+pts+'" fill="none" stroke="'+color+'" stroke-width="1.8" filter="url(#glow)"/>'
+    +'<circle cx="'+lastX+'" cy="'+lastY+'" r="4" fill="'+color+'" filter="url(#glow)"/>'
+    // Grid lines
+    +'<line x1="'+PAD+'" y1="'+py(lo+(hi-lo)*0.25)+'" x2="'+(W-PAD)+'" y2="'+py(lo+(hi-lo)*0.25)+'" stroke="#1e2430" stroke-width="0.5" stroke-dasharray="4"/>'
+    +'<line x1="'+PAD+'" y1="'+py(lo+(hi-lo)*0.5)+'" x2="'+(W-PAD)+'" y2="'+py(lo+(hi-lo)*0.5)+'" stroke="#1e2430" stroke-width="0.5" stroke-dasharray="4"/>'
+    +'<line x1="'+PAD+'" y1="'+py(lo+(hi-lo)*0.75)+'" x2="'+(W-PAD)+'" y2="'+py(lo+(hi-lo)*0.75)+'" stroke="#1e2430" stroke-width="0.5" stroke-dasharray="4"/>'
+    +'<text x="'+(W-PAD-2)+'" y="'+(PAD+8)+'" fill="#5a6578" font-size="9" text-anchor="end">'+fmtP(hi)+'</text>'
+    +'<text x="'+(W-PAD-2)+'" y="'+(H-PAD-2)+'" fill="#5a6578" font-size="9" text-anchor="end">'+fmtP(lo)+'</text>';
+}
+drawChart();
+
+function fmtP(p) {
+  if (p < 0.000001) return '$'+p.toExponential(3);
+  return '$'+p.toFixed(8);
+}
+
+// ── Live price update ──────────────────────────────
+function updateLive() {
+  const last = priceHistory[priceHistory.length-1];
+  const newP = last * (1 + (Math.random()-0.45)*0.04);
+  priceHistory.push(newP);
+  if (priceHistory.length > 150) priceHistory.shift();
+  basePrice = newP;
+
+  document.getElementById('live-price').textContent = fmtP(newP);
+  document.getElementById('chart-price-label').textContent = fmtP(newP);
+
+  const pctChange = ((newP - priceHistory[0]) / priceHistory[0] * 100);
+  const chgEl = document.getElementById('price-chg');
+  chgEl.textContent = (pctChange>=0?'▲ +':'▼ ')+pctChange.toFixed(1)+'%';
+  chgEl.className = 'price-change'+(pctChange<0?' down':'');
+
+  const mcap = (newP * 1e9).toFixed(0);
+  document.getElementById('smcap').textContent = '$'+Number(mcap).toLocaleString();
+  calcSmc();
+  drawChart();
+  addTrade();
+}
+setInterval(updateLive, 1800);
+
+// ── Trades ────────────────────────────────────────
+const wallets = ['Gx2k...7Rp','8mNQ...k4Z','dF9s...2Wx','vK3p...8Tn','xA7m...9Zq','bR4n...5Yw'];
+let tradeCount = 0;
+
+function addTrade() {
+  const isBuy = Math.random() > 0.4;
+  const sol = (Math.random()*2+0.05).toFixed(3);
+  const smcAmt = (sol / basePrice / 170).toFixed(0);
+  const usdAmt = (sol * 170).toFixed(2);
+  const t = new Date();
+  const ts = t.getHours().toString().padStart(2,'0')+':'+t.getMinutes().toString().padStart(2,'0')+':'+t.getSeconds().toString().padStart(2,'0');
+  const wallet = wallets[Math.floor(Math.random()*wallets.length)];
+  const color = isBuy ? 'var(--green)' : 'var(--red)';
+  const type = isBuy ? 'شراء' : 'بيع';
+
+  const tbody = document.getElementById('trades-body');
+  const row = document.createElement('div');
+  row.className = 'trade-row trades-row-grid';
+  row.innerHTML =
+    '<span style="color:var(--muted)">'+ts+'</span>'
+    +'<span style="color:'+color+';font-weight:600">'+type+'</span>'
+    +'<span style="color:'+color+'">'+fmtP(basePrice)+'</span>'
+    +'<span>'+Number(smcAmt).toLocaleString()+'</span>'
+    +'<span style="color:var(--muted)">'+sol+'</span>'
+    +'<span style="color:var(--blue);font-family:monospace">'+wallet+'</span>';
+  tbody.insertBefore(row, tbody.firstChild);
+  if (tbody.children.length > 30) tbody.removeChild(tbody.lastChild);
+  tradeCount++;
+}
+
+// Initial trades
+for(let i=0;i<15;i++) addTrade();
+
+// ── Holders ───────────────────────────────────────
+const holders = [
+  { addr:'Pump.fun Bonding Curve', pct:87.6, dev:true },
+  { addr:'9Kx3...mP7n', pct:3.2, dev:false },
+  { addr:'7rQs...vN4k', pct:2.1, dev:false },
+  { addr:'3bWt...xA8p', pct:1.8, dev:false },
+  { addr:'5mFg...cK2z', pct:1.4, dev:false },
+  { addr:'kD8n...yR5j', pct:0.9, dev:false },
+  { addr:'2pXs...tM6w', pct:0.8, dev:false },
+  { addr:'نسري (المطور)', pct:0.0, dev:true },
+];
+document.getElementById('holders-list').innerHTML = holders.map(h =>
+  '<div class="holder-row">'
+  +(h.dev?'<span class="dev-badge">DEV</span>':'')
+  +'<span class="holder-addr">'+h.addr+'</span>'
+  +'<div class="holder-bar-wrap"><div class="holder-bar" style="width:'+Math.min(h.pct,100)+'%"></div></div>'
+  +'<span class="holder-pct">'+h.pct+'%</span>'
+  +'</div>'
+).join('');
+
+// ── Buy Calc ──────────────────────────────────────
+function setAmt(v) {
+  document.getElementById('sol-amt').value = v;
+  document.querySelectorAll('.qbtn').forEach(b=>b.classList.remove('act'));
+  event.target.classList.add('act');
+  calcSmc();
+}
+function calcSmc() {
+  const sol = parseFloat(document.getElementById('sol-amt').value)||0;
+  const smc = (sol * 170 / basePrice).toFixed(0);
+  document.getElementById('est-smc').textContent = '~'+Number(smc).toLocaleString()+' SMC';
+}
+
+function showBuyConfirm() {
+  const sol = document.getElementById('sol-amt').value;
+  const el = document.querySelector('.btn-buy-sol');
+  el.textContent = '✅ تم إرسال المعاملة!';
+  el.style.background = '#1e2430';
+  el.style.color = 'var(--green)';
+  setTimeout(()=>{ el.textContent='شراء SMC'; el.style.background='var(--green)'; el.style.color='#000'; },2000);
+}
+
+// ── Pump bar animation ────────────────────────────
+let pumpPct = 12.4;
+setInterval(()=>{
+  pumpPct = Math.min(100, pumpPct + Math.random()*0.3);
+  document.getElementById('pump-bar').style.width = pumpPct.toFixed(1)+'%';
+  document.querySelector('.progress-label span:last-child').textContent = pumpPct.toFixed(1)+'% → Raydium';
+}, 3000);
+
+// ── Holders counter ───────────────────────────────
+let holderCount = 347;
+setInterval(()=>{
+  if(Math.random()>0.6) { holderCount++; document.getElementById('sholders').textContent = holderCount.toLocaleString(); }
+},4000);
+</script>
+</body>
+</html>
