@@ -12,52 +12,77 @@ OUT_DIR.mkdir(exist_ok=True)
 
 SIZE = 2000
 
-# Font discovery — Windows + Linux paths
-FONT_CANDIDATES_BOLD = [
-    # Windows
-    "C:/Windows/Fonts/arialbd.ttf",
-    "C:/Windows/Fonts/calibrib.ttf",
-    "C:/Windows/Fonts/verdanab.ttf",
-    "C:/Windows/Fonts/trebucbd.ttf",
-    "C:/Windows/Fonts/impact.ttf",
-    "C:/Windows/Fonts/georgiab.ttf",
-    # Linux
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-    "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
-    "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-    "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
-]
+import glob, platform
 
-FONT_CANDIDATES_REGULAR = [
-    # Windows
-    "C:/Windows/Fonts/arial.ttf",
-    "C:/Windows/Fonts/calibri.ttf",
-    "C:/Windows/Fonts/verdana.ttf",
-    # Linux
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-]
+def _find_font(names):
+    """Try font names as bare filenames (PIL searches Windows Fonts dir),
+    then full paths, then any .ttf on the system."""
+    for name in names:
+        # 1. Bare filename — works on Windows where PIL searches C:\Windows\Fonts
+        try:
+            return ImageFont.truetype(name, 10)  # size 10 just to test; caller passes real size
+        except Exception:
+            pass
+    return None  # will retry with size below
 
 def load_font(size):
-    for path in FONT_CANDIDATES_BOLD:
+    bold_names = [
+        "arialbd.ttf", "Arial Bold.ttf",
+        "calibrib.ttf", "Calibri Bold.ttf",
+        "verdanab.ttf", "Verdana Bold.ttf",
+        "trebucbd.ttf", "impact.ttf",
+    ]
+    full_paths_bold = [
+        "C:/Windows/Fonts/arialbd.ttf",
+        "C:/Windows/Fonts/calibrib.ttf",
+        "C:/Windows/Fonts/verdanab.ttf",
+        "C:/Windows/Fonts/trebucbd.ttf",
+        "C:/Windows/Fonts/impact.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
+    ]
+    # Try bare names first (Windows PIL auto-resolves from Fonts dir)
+    for name in bold_names:
+        try:
+            return ImageFont.truetype(name, size)
+        except Exception:
+            continue
+    # Try full paths
+    for path in full_paths_bold:
         if os.path.exists(path):
             try:
                 return ImageFont.truetype(path, size)
             except Exception:
                 continue
-    # Last resort: try any .ttf in system
-    import glob
+    # Last resort: scan for any .ttf
     for pattern in ["C:/Windows/Fonts/*.ttf", "/usr/share/fonts/**/*.ttf"]:
         for f in glob.glob(pattern, recursive=True):
             try:
                 return ImageFont.truetype(f, size)
             except Exception:
                 continue
-    return ImageFont.load_default(size=size) if hasattr(ImageFont, 'load_default') else ImageFont.load_default()
+    # Absolute fallback — PIL built-in (small but at least shows text)
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
 
 def load_font_regular(size):
-    for path in FONT_CANDIDATES_REGULAR:
+    regular_names = ["arial.ttf", "calibri.ttf", "verdana.ttf"]
+    regular_paths  = [
+        "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/calibri.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+    for name in regular_names:
+        try:
+            return ImageFont.truetype(name, size)
+        except Exception:
+            continue
+    for path in regular_paths:
         if os.path.exists(path):
             try:
                 return ImageFont.truetype(path, size)

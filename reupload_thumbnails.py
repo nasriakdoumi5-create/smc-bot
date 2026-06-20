@@ -27,7 +27,7 @@ UPLOAD_MAP = [
     # Finance Bundle (existing)
     ("hero_finance_bundle.png",   None, ["finance bundle google sheets"]),
     # New Premium Bundles (by ID)
-    ("bundle_freelancer_kit.png",    4525136862, None),
+    ("bundle_freelancer_kit.png",    None, ["freelancer os", "invoice + time tracking", "invoice + time"]),
     ("bundle_health_os.png",         4525136928, None),
     ("bundle_business_starter.png",  4525136952, None),
     ("bundle_productivity_os.png",   4525136964, None),
