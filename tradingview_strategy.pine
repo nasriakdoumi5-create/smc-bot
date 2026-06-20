@@ -1,0 +1,66 @@
+//@version=5
+strategy("EMA21 Bounce — 3TF Signal", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=1)
+
+// ══ المدخلات ══════════════════════════════════════
+webhook_url = input.string("", "Webhook URL", tooltip="رابط Railway الخاص بك + /webhook")
+
+// ══ المؤشرات ══════════════════════════════════════
+ema21  = ta.ema(close, 21)
+ema50  = ta.ema(close, 50)
+ema200 = ta.ema(close, 200)
+rsi14  = ta.rsi(close, 14)
+atr14  = ta.atr(14)
+
+// ══ الشروط ════════════════════════════════════════
+htfBull = ema50 > ema200
+htfBear = ema50 < ema200
+
+// لمس EMA21 (الشمعة السابقة تلمس أو تخترق)
+touchedUp   = low[1] <= ema21[1] and close > ema21
+touchedDown = high[1] >= ema21[1] and close < ema21
+
+// RSI
+rsiLong  = rsi14 >= 40 and rsi14 <= 65
+rsiShort = rsi14 >= 35 and rsi14 <= 60
+
+// SL و TP
+slLong  = ema21 - atr14 * 1.5
+tp1Long = close + atr14 * 3.0
+tp2Long = close + atr14 * 5.0
+
+slShort  = ema21 + atr14 * 1.5
+tp1Short = close - atr14 * 3.0
+tp2Short = close - atr14 * 5.0
+
+// ══ إشارات الدخول ═════════════════════════════════
+longCond  = htfBull and touchedUp   and rsiLong
+shortCond = htfBear and touchedDown and rsiShort
+
+// ══ رسم على الشارت ════════════════════════════════
+plot(ema21,  "EMA21",  color=color.blue,   linewidth=2)
+plot(ema50,  "EMA50",  color=color.orange, linewidth=1)
+plot(ema200, "EMA200", color=color.red,    linewidth=1)
+
+plotshape(longCond,  "LONG",  shape.labelup,   location.belowbar, color.green, text="▲ LONG",  textcolor=color.white, size=size.small)
+plotshape(shortCond, "SHORT", shape.labeldown, location.abovebar, color.red,   text="▼ SHORT", textcolor=color.white, size=size.small)
+
+// ══ تنفيذ الاستراتيجية (Backtesting) ══════════════
+if longCond
+    strategy.entry("LONG", strategy.long)
+    strategy.exit("EXIT_LONG", "LONG", stop=slLong, limit=tp1Long)
+
+if shortCond
+    strategy.entry("SHORT", strategy.short)
+    strategy.exit("EXIT_SHORT", "SHORT", stop=slShort, limit=tp1Short)
+
+// ══ Webhook Alert Messages ════════════════════════
+// انسخ هذا في حقل "Message" عند إنشاء التنبيه في TradingView:
+//
+// LONG:
+// {"symbol":"MNQ","type":"LONG","price":{{close}},"sl":{{plot("EMA21")}},"tp1":0,"tp2":0,"rsi":{{plot("RSI")}},"atr":{{plot("ATR")}}}
+//
+// SHORT:
+// {"symbol":"MNQ","type":"SHORT","price":{{close}},"sl":{{plot("EMA21")}},"tp1":0,"tp2":0,"rsi":{{plot("RSI")}},"atr":{{plot("ATR")}}}
+
+alertcondition(longCond,  "LONG Signal",  "EMA21 Bounce — LONG")
+alertcondition(shortCond, "SHORT Signal", "EMA21 Bounce — SHORT")

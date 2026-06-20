@@ -266,8 +266,71 @@ scheduleDailySummary();
 check();
 setInterval(check, CHECK_MS);
 
-// ══ Health check server (Railway) ════════════════
-createServer((req, res) => {
+// ══ TradingView Webhook Handler ══════════════════
+async function handleTVWebhook(data) {
+  console.log('[TV Webhook]', JSON.stringify(data));
+
+  const { symbol, type, price, sl, tp1, tp2, rsi, atr } = data;
+  if (!symbol || !type || !price) {
+    console.log('[TV Webhook] ⚠️ بيانات ناقصة');
+    return;
+  }
+
+  const name    = SYMBOL_NAMES[symbol] || symbol;
+  const isBull  = type === 'LONG';
+  const risk    = sl ? Math.abs(price - sl) : 0;
+  const rr      = (risk > 0 && tp1) ? (Math.abs(tp1 - price) / risk).toFixed(1) : '?';
+  const session = currentSession();
+
+  await tg(
+`${isBull ? '📈' : '📉'} <b>${type} — ${name}</b>   📡 TradingView
+
+💰 الدخول:  <b>${price}</b>
+${sl  ? `🛑 SL:      <b>${sl}</b>   (−${risk.toFixed(0)} نقطة)` : ''}
+${tp1 ? `🎯 TP1:     <b>${tp1}</b>   (R:R ${rr}:1)` : ''}
+${tp2 ? `🎯 TP2:     <b>${tp2}</b>` : ''}
+${rsi ? `📊 RSI: ${rsi}${atr ? `   |   ATR: ${atr}` : ''}` : ''}
+🕐 ${session}   |   ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}
+
+<i>⚠️ إدارة المخاطر: لا تخاطر بأكثر من 1-2% من رأس المال</i>`
+  );
+
+  stats.total++;
+  type === 'LONG' ? stats.long++ : stats.short++;
+  stats.bySymbol[symbol] = (stats.bySymbol[symbol] || 0) + 1;
+  console.log(`[TV Webhook] ✅ إشارة أُرسلت — ${symbol} ${type} @ ${price}`);
+}
+
+// ══ HTTP Server (Health check + Webhook) ═════════
+createServer(async (req, res) => {
+  const url = new URL(req.url, `http://localhost`);
+
+  // ── TradingView Webhook ──
+  if (req.method === 'POST' && url.pathname === '/webhook') {
+    const token = req.headers['x-webhook-token'] || url.searchParams.get('token');
+    if (process.env.WEBHOOK_TOKEN && token !== process.env.WEBHOOK_TOKEN) {
+      res.writeHead(401);
+      return res.end('Unauthorized');
+    }
+
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const data = JSON.parse(body);
+        await handleTVWebhook(data);
+        res.writeHead(200);
+        res.end('OK');
+      } catch (e) {
+        console.error('[TV Webhook] ❌', e.message);
+        res.writeHead(400);
+        res.end('Bad Request');
+      }
+    });
+    return;
+  }
+
+  // ── Health check ──
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({
     status:   'running',
@@ -278,5 +341,5 @@ createServer((req, res) => {
     time:     new Date().toISOString(),
   }));
 }).listen(process.env.PORT || 3000, () => {
-  console.log(`  🌐 Health check: port ${process.env.PORT || 3000}`);
+  console.log(`  🌐 Health check + Webhook: port ${process.env.PORT || 3000}`);
 });
