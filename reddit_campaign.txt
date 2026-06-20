@@ -1,0 +1,287 @@
+
+════════════════════════════════════════════════════════════
+   NASRITOOLS — Reddit Campaign (Copy-Paste Ready)
+════════════════════════════════════════════════════════════
+
+REDDIT RULES:
+  - Never say "buy" or "shop" directly in the post
+  - Always lead with VALUE, mention product at the end
+  - Respond to every comment — Reddit rewards engagement
+  - Post title is EVERYTHING — make it a question or a statement
+  - Use "I made this" tone, not "I'm selling this"
+  - Don't post same link in multiple subs same day
+  - Wait 24h between posts across different subs
+
+
+────────────────────────────────────────────────────────────
+1. r/personalfinance  (17M members)
+   BEST TIME: Tuesday-Thursday, 8-10am EST
+────────────────────────────────────────────────────────────
+
+TITLE:
+I made a free Google Sheets budget tracker — tracks expenses
+automatically, no formulas needed. Here it is.
+
+POST:
+Been struggling with budgeting apps that are either too
+complicated or want a monthly subscription.
+
+So I built my own in Google Sheets. It:
+- Logs daily expenses across 50+ categories
+- Calculates monthly budget vs actual automatically
+- Tracks savings goals
+- Shows 12-month overview
+
+No app to download. No subscription. Works on any device
+(phone, tablet, laptop) through the free Google Sheets app.
+
+I'm giving it away free this week to get some honest feedback.
+Code FRIENDS100 → [nasritools.etsy.com]
+
+Happy to answer questions about how I built it.
+
+
+────────────────────────────────────────────────────────────
+2. r/productivity  (2.5M members)
+   BEST TIME: Monday, 7-9am EST
+────────────────────────────────────────────────────────────
+
+TITLE:
+I replaced 4 different apps with one Google Sheets file —
+here's what it does
+
+POST:
+I was using Notion, Todoist, Google Calendar, and a habit
+app simultaneously. It was chaos.
+
+Built everything into one Google Sheets system instead:
+- Time-blocked weekly grid (Mon-Sun)
+- Top 3 priorities system
+- Task tracker with % completion score
+- Energy level planner
+- Rolling to-do list
+- Weekly review sheet
+
+Zero subscriptions. Works offline. Opens in 2 seconds.
+
+Made 10 templates total (budget, workout, meal plan, goals,
+student planner, etc.) — giving them free this week for
+honest feedback. Code FRIENDS100 → nasritools.etsy.com
+
+What system do you use for weekly planning?
+
+
+────────────────────────────────────────────────────────────
+3. r/weddingplanning  (900K members)
+   BEST TIME: Weekend mornings
+────────────────────────────────────────────────────────────
+
+TITLE:
+Made a complete wedding planner in Google Sheets —
+budget, guests, vendors, timeline, seating chart. Free this week.
+
+POST:
+After seeing so many posts about wedding stress and going
+over budget, I built this.
+
+It covers everything in one file:
+✅ Full budget tracker (20+ categories, auto-totals)
+✅ Guest list & RSVP manager
+✅ Vendor contacts & status tracker
+✅ Day-of timeline builder
+✅ Seating chart organizer
+✅ Wedding countdown dashboard
+
+No app. No subscription. Just Google Sheets — free on
+any device.
+
+Giving it free to anyone who wants to try it and leave
+honest feedback. Code FRIENDS100 → nasritools.etsy.com
+
+Hope it helps someone stressed about planning! 💍
+
+
+────────────────────────────────────────────────────────────
+4. r/mealprep  (2M members)
+   BEST TIME: Sunday, 9-11am EST
+────────────────────────────────────────────────────────────
+
+TITLE:
+Built a meal planner in Google Sheets that auto-generates
+your grocery list — free this week
+
+POST:
+Tired of spending 2 hours planning meals and still
+forgetting things at the store.
+
+Built a Google Sheets meal planner that:
+- Plans 7 days of meals (breakfast, lunch, dinner)
+- Automatically generates your grocery list
+- Tracks daily calories
+- Stays within your weekly food budget
+- Has a pantry tracker
+
+No app. No subscription. Works on phone via Google Sheets
+(free).
+
+Giving it away free for honest feedback.
+Code FRIENDS100 → nasritools.etsy.com
+
+What's your current meal planning system?
+
+
+────────────────────────────────────────────────────────────
+5. r/freelance  (500K members)
+   BEST TIME: Monday-Wednesday, 9am EST
+────────────────────────────────────────────────────────────
+
+TITLE:
+I was tired of chasing unpaid invoices, so I built
+a tracker in Google Sheets — here it is for free
+
+POST:
+Had 3 clients with overdue invoices and no quick way
+to see the full picture.
+
+Built an invoice & client tracker in Google Sheets:
+- Shows all invoices: paid / pending / overdue at a glance
+- Client database & CRM
+- Monthly & annual revenue summary
+- Tax prep sheet (auto-calculated)
+- Business expense tracker
+
+No monthly subscription. No app needed. Works everywhere.
+
+Free this week for honest feedback.
+Code FRIENDS100 → nasritools.etsy.com
+
+How do you currently manage invoices?
+
+
+────────────────────────────────────────────────────────────
+6. r/loseit OR r/fitness  (4M+ members)
+   BEST TIME: Monday, 6-8am EST
+────────────────────────────────────────────────────────────
+
+TITLE:
+Built a workout tracker in Google Sheets that logs PRs
+automatically — free this week
+
+POST:
+Was writing workouts in notes app and losing track of
+progress. Built this instead.
+
+Google Sheets workout tracker:
+- Logs every session (unlimited)
+- Tracks personal records automatically
+- Weekly volume calculator
+- Auto-generated progress charts
+- Exercise library (50+ exercises)
+- Body measurements log
+
+No app. No subscription. Free on any device.
+
+Also made a habit tracker (30-day grid, auto streak counter)
+and a meal planner if anyone needs those too.
+
+Free for honest feedback → code FRIENDS100 at nasritools.etsy.com
+
+What do you use to track your workouts?
+
+
+────────────────────────────────────────────────────────────
+7. r/college OR r/studytips  (1M+ members)
+   BEST TIME: Sunday evening / Monday morning
+────────────────────────────────────────────────────────────
+
+TITLE:
+Made a student planner in Google Sheets with a live GPA
+calculator — free this week
+
+POST:
+Built this after missing two deadlines in one semester.
+
+Google Sheets student planner:
+- Assignment & deadline tracker
+- Live GPA calculator (updates automatically)
+- Study schedule builder
+- Exam countdown dashboard
+- Grade tracker per subject
+- Semester overview
+
+Free on any device. No app. No subscription.
+
+Giving it free for honest feedback.
+Code FRIENDS100 → nasritools.etsy.com
+
+Good luck with exams everyone 📚
+
+
+────────────────────────────────────────────────────────────
+8. r/digitalnomad  (500K members)
+   BEST TIME: Wednesday-Friday, 10am EST
+────────────────────────────────────────────────────────────
+
+TITLE:
+Made 10 Google Sheets templates to manage finances, work,
+health, and life while traveling — free this week
+
+POST:
+Managing money, clients, and habits while traveling is chaos
+without a system.
+
+Built 10 templates in Google Sheets:
+💰 Budget & expense tracker
+🧾 Invoice & client manager
+💪 Workout tracker
+🥗 Meal planner
+✅ Habit tracker (30-day)
+📅 Weekly planner
+🎯 Goals & 90-day planner
+📚 Student planner
+📱 Content creator calendar
+💍 Wedding planner
+
+All work offline. Free on any device. No subscription.
+
+Giving them all free this week for feedback.
+Code FRIENDS100 → nasritools.etsy.com
+
+What tools do you use to stay organized while nomading?
+
+
+════════════════════════════════════════════════════════════
+   REPLY TEMPLATES (when people comment)
+════════════════════════════════════════════════════════════
+
+When someone says "thanks, this looks great!":
+→ "Thanks! Let me know what you think after you try it 🙏"
+
+When someone asks "how long did this take to build?":
+→ "Few weeks on and off! Happy to answer any questions about
+   how specific formulas work."
+
+When someone asks "is it really free?":
+→ "Yes, 100% free with code FRIENDS100. Just looking for
+   honest feedback since I just launched."
+
+When someone says "I don't use Etsy":
+→ "You don't need an account to checkout — just guest
+   checkout works fine!"
+
+
+════════════════════════════════════════════════════════════
+   POSTING SCHEDULE
+════════════════════════════════════════════════════════════
+
+Day 1 (Saturday):  r/weddingplanning
+Day 2 (Sunday):    r/mealprep
+Day 3 (Monday):    r/personalfinance
+Day 4 (Tuesday):   r/productivity
+Day 5 (Wednesday): r/freelance
+Day 6 (Thursday):  r/loseit
+Day 7 (Friday):    r/digitalnomad
+
+→ One subreddit per day
+→ Reply to ALL comments within 2 hours
+→ After 10 reviews: keep posting but remove the coupon code
