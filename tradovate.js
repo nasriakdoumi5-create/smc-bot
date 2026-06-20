@@ -101,6 +101,38 @@ class TradovateClient {
     return r;
   }
 
+  // ══ بيانات السوق التاريخية (MD API) ══════════
+  async getChartData(contractSymbol, minuteSize, count = 500) {
+    await this.ensureToken();
+    const res = await fetch('https://md.tradovateapi.com/v1/chart/getchartdata', {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${this.token}`,
+      },
+      body: JSON.stringify({
+        symbol: contractSymbol,
+        chartDescription: {
+          underlyingType:   'Bars',
+          elementSize:      minuteSize,
+          elementSizeUnit:  'Minute',
+          withHistogram:    false,
+        },
+        timeRange: { asMuchAsElements: count },
+      }),
+    });
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch { throw new Error(`MD parse: ${text.slice(0, 200)}`); }
+    if (data.errorText || data.error)
+      throw new Error(`MD: ${data.errorText || JSON.stringify(data)}`);
+    // Tradovate يُعيد {bars:[]} أو مصفوفة مباشرة
+    const bars = Array.isArray(data) ? data : (data.bars || data.d || []);
+    console.log(`[MD] ${contractSymbol} ${minuteSize}M → ${bars.length} شمعة`);
+    return bars;
+  }
+
   // ── رصيد الحساب ───────────────────────────────
   async getBalance() {
     await this.ensureToken();

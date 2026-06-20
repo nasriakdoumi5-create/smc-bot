@@ -1,85 +1,63 @@
 /**
- * Market Data — Yahoo Finance (مجاني بدون API key)
- * رموز: NQ=F (Nasdaq Futures), GC=F (Gold), ES=F (S&P)
+ * Market Data — Tradovate MD API
+ * يجلب بيانات OHLC من Tradovate بدلاً من Yahoo Finance
  */
 
-const SYMBOLS = {
-  MNQ: 'NQ=F',   // Micro Nasdaq
-  MGC: 'GC=F',   // Micro Gold
-  MCL: 'CL=F',   // Micro Crude Oil
-  MES: 'ES=F',   // S&P 500
-};
+import { tradovate } from './tradovate.js';
 
-const INTERVALS = {
-  '5m':  '5m',
-  '15m': '15m',
-  '1h':  '60m',
-  '4h':  '1h',   // Yahoo لا يدعم 4h مباشرة — نحسبه من 1h
-  '1d':  '1d',
-};
-
-async function fetchYahoo(symbol, interval, range) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=${interval}&range=${range}&includePrePost=true`;
-  const res = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0' }
-  });
-  if (!res.ok) throw new Error(`Yahoo Finance error: ${res.status}`);
-  const json = await res.json();
-
-  const result = json.chart?.result?.[0];
-  if (!result) throw new Error('No data from Yahoo Finance');
-
-  const timestamps = result.timestamp;
-  const q = result.indicators.quote[0];
-
-  const bars = timestamps.map((t, i) => ({
-    time:   t,
-    open:   q.open[i],
-    high:   q.high[i],
-    low:    q.low[i],
-    close:  q.close[i],
-    volume: q.volume[i],
-  })).filter(b => b.close != null);
-
-  return bars;
+// ── تحويل شمعة Tradovate → تنسيقنا ────────────
+function parseBars(rawBars) {
+  return rawBars
+    .map(b => ({
+      time:   Math.floor(new Date(b.timestamp).getTime() / 1000),
+      open:   b.open,
+      high:   b.high,
+      low:    b.low,
+      close:  b.close,
+      volume: (b.upVolume || 0) + (b.downVolume || 0),
+    }))
+    .filter(b => b.close != null && !isNaN(b.close) && b.close > 0);
 }
 
-/**
- * جلب 15m bars لآخر 5 أيام (للـ MTF structure)
- */
-export async function get15mBars(symbol = 'MNQ') {
-  const ticker = SYMBOLS[symbol] || symbol;
-  return fetchYahoo(ticker, '15m', '5d');
+// ── كاش العقود (يُجدَّد كل 6 ساعات) ─────────────
+const contractCache = {};
+const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 ساعات
+
+async function getContractName(symbol) {
+  const cached = contractCache[symbol];
+  if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.name;
+
+  const contract = await tradovate.findContract(symbol);
+  const name = contract.name;
+  contractCache[symbol] = { name, ts: Date.now() };
+  console.log(`[Data] ${symbol} → عقد: ${name}`);
+  return name;
 }
 
-/**
- * جلب 1m bars لآخر يومين (للدخول الدقيق)
- */
-export async function get1mBars(symbol = 'MNQ') {
-  const ticker = SYMBOLS[symbol] || symbol;
-  return fetchYahoo(ticker, '1m', '2d');
-}
+// ══ دوال الجلب ═══════════════════════════════════
 
-/**
- * جلب 5m bars لآخر 5 أيام
- */
 export async function get5mBars(symbol = 'MNQ') {
-  const ticker = SYMBOLS[symbol] || symbol;
-  return fetchYahoo(ticker, '5m', '5d');
+  const name = await getContractName(symbol);
+  return parseBars(await tradovate.getChartData(name, 5, 500));
 }
 
-/**
- * جلب 1h bars لآخر 60 يوم (للـ HTF trend)
- */
+export async function get15mBars(symbol = 'MNQ') {
+  const name = await getContractName(symbol);
+  return parseBars(await tradovate.getChartData(name, 15, 250));
+}
+
 export async function get1hBars(symbol = 'MNQ') {
-  const ticker = SYMBOLS[symbol] || symbol;
-  return fetchYahoo(ticker, '60m', '60d');
+  const name = await getContractName(symbol);
+  return parseBars(await tradovate.getChartData(name, 60, 350));
 }
 
-/**
- * جلب آخر سعر
- */
 export async function getLastPrice(symbol = 'MNQ') {
   const bars = await get5mBars(symbol);
   return bars[bars.length - 1];
+}
+
+// ── للتوافق مع ملفات أخرى ──────────────────────
+export async function get1mBars(symbol = 'MNQ') {
+  const name = await getContractName(symbol);
+  return parseBars(await tradovate.getChartData(name, 1, 500));
 }
