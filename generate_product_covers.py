@@ -288,106 +288,191 @@ def generate(p):
     color = p["color"]
     light = p["light"]
 
-    img  = Image.new("RGB", (W, H), (245, 247, 250))
+    # ── Dark background with subtle product color tint ────────────────────────
+    bg = tuple(max(0, int(c * 0.07) + 8) for c in color)
+    img  = Image.new("RGB", (W, H), bg)
     draw = ImageDraw.Draw(img)
 
-    # ── HEADER (0-310) ────────────────────────────────────────────────────────
-    draw.rectangle([0, 0, W, 310], fill=color)
-    dark = tuple(max(0, int(c*0.72)) for c in color)
-    draw.polygon([(W-500, 0), (W, 0), (W, 310)], fill=dark)
+    for y in range(H):
+        t = y / H
+        rc = tuple(int(bg[i] * (1 - t * 0.45)) for i in range(3))
+        draw.line([(0, y), (W, y)], fill=rc)
 
-    # product label (top-left)
-    draw.text((80, 18), p["label"], font=fb(48), fill=(255, 255, 255))
+    # Ambient glow top-left (product color, subtle)
+    for r in range(380, 0, -12):
+        t  = (380 - r) / 380
+        gc = tuple(int(c * 0.20 * (1 - t)) for c in color)
+        draw.ellipse([-r, -r, r, r], fill=gc)
 
-    # INSTANT DOWNLOAD pill (top-right)
+    # ── HEADER (y=0 to y=270) ────────────────────────────────────────────────
+    # Product label pill
+    lf = fb(42)
+    lw = tw(draw, p["label"], lf)
+    pill(draw, 80, 44, 80+lw+50, 108, color, 22)
+    draw.text((106, 57), p["label"], font=lf, fill=(255, 255, 255))
+
+    # INSTANT DOWNLOAD badge (top right)
     it  = "INSTANT DOWNLOAD"
-    if_ = fb(36)
+    if_ = fb(34)
     iw  = tw(draw, it, if_)
-    pill(draw, W-iw-128, 14, W-60, 84, (255, 255, 255), 24)
-    draw.text((W-iw-108, 26), it, font=if_, fill=color)
+    pill(draw, W-iw-128, 40, W-66, 110, (255, 255, 255), 26)
+    draw.text((W-iw-108, 54), it, font=if_,
+              fill=tuple(max(0, int(c * 0.75)) for c in color))
 
-    # Headline (2 lines, large)
+    # Title (large white, 2 lines)
     lines = p["headline"].split("\n")
-    draw.text((80, 96), lines[0], font=fb(104), fill=(255, 255, 255))
+    draw.text((80, 128), lines[0], font=fb(114), fill=(255, 255, 255))
     if len(lines) > 1:
-        draw.text((80, 210), lines[1], font=fb(82), fill=(255, 255, 255))
+        lc = tuple(min(255, int(c * 1.3 + 80)) for c in color)
+        draw.text((80, 252), lines[1], font=fb(92), fill=lc)
 
-    # ── SPREADSHEET MOCKUP (330-1710) ────────────────────────────────────────
-    SL, SR = 68, W - 68
-    ST, SB = 330, 1710
-    SW     = SR - SL           # 1864 px
+    # ── MACBOOK FRAME (y=300 to y=1640) ──────────────────────────────────────
+    LX0, LY0 = 55,  300
+    LX1, LY1 = 1945, 1640
+    R = 30
 
-    # shadow + white background
-    draw.rectangle([SL+8, ST+8, SR+8, SB+8], fill=(190, 198, 212))
-    draw.rectangle([SL, ST, SR, SB], fill=(255, 255, 255))
+    MAC_BODY = (36, 38, 45)
+    # Rounded body
+    draw.rectangle([LX0+R, LY0, LX1-R, LY1], fill=MAC_BODY)
+    draw.rectangle([LX0, LY0+R, LX1, LY1-R], fill=MAC_BODY)
+    for cx, cy in [(LX0,LY0),(LX1-2*R,LY0),(LX0,LY1-2*R),(LX1-2*R,LY1-2*R)]:
+        draw.ellipse([cx, cy, cx+2*R, cy+2*R], fill=MAC_BODY)
+    # Top edge highlight
+    draw.rectangle([LX0+R, LY0, LX1-R, LY0+4], fill=(62, 65, 75))
 
-    # browser chrome (60 px)
-    CH = 60
-    draw.rectangle([SL, ST, SR, ST+CH], fill=(241, 243, 245))
-    for i, dc in enumerate([(232,72,72), (252,185,60), (36,168,90)]):
-        ox = SL + 22 + i*34
-        draw.ellipse([ox, ST+14, ox+26, ST+40], fill=dc)
-    pill(draw, SL+122, ST+12, SR-110, ST+48, (255, 255, 255), 8)
-    draw.text((SL+142, ST+16),
+    # Camera
+    cam_x, cam_y = W//2, LY0+26
+    draw.ellipse([cam_x-8, cam_y-8, cam_x+8, cam_y+8], fill=(55, 58, 68))
+
+    # Screen area
+    SX0, SY0 = LX0+44, LY0+52
+    SX1, SY1 = LX1-44, LY1-42
+    SW_S = SX1 - SX0   # ~1857
+    SH_S = SY1 - SY0   # ~1246
+    draw.rectangle([SX0, SY0, SX1, SY1], fill=(7, 9, 18))
+
+    # ── Mini spreadsheet inside screen ───────────────────────────────────────
+    COL_TOTAL = sum(cw for _, cw in p["cols"])
+    scale     = SW_S / COL_TOTAL
+
+    # Browser chrome (38px)
+    BCH = 38
+    draw.rectangle([SX0, SY0, SX1, SY0+BCH], fill=(24, 26, 36))
+    for i, dc in enumerate([(175,60,58),(178,148,45),(52,155,75)]):
+        ox = SX0 + 14 + i*20
+        draw.ellipse([ox, SY0+11, ox+14, SY0+25], fill=dc)
+    draw.rectangle([SX0+82, SY0+8, SX1-72, SY0+30], fill=(36, 38, 50))
+    draw.text((SX0+96, SY0+12),
               "docs.google.com  —  " + p["sheet_title"],
-              font=fr(22), fill=(100, 105, 118))
+              font=fr(16), fill=(105, 112, 135))
 
-    # sheet title bar (80 px)
-    TT = ST + CH
-    draw.rectangle([SL, TT, SR, TT+80], fill=color)
-    draw.text((SL+28, TT+18), p["sheet_title"], font=fb(46), fill=(255, 255, 255))
+    # Sheet title bar (product color, 64px)
+    TBH = 64
+    TT  = SY0 + BCH
+    draw.rectangle([SX0, TT, SX1, TT+TBH], fill=color)
+    draw.text((SX0+18, TT+16), p["sheet_title"], font=fb(36), fill=(255, 255, 255))
 
-    # column headers (84 px)
-    CT    = TT + 80
-    COL_H = 84
-    draw.rectangle([SL, CT, SR, CT+COL_H], fill=light)
-
-    cols   = p["cols"]
-    col_xs = []
-    x      = SL
-    for i, (cname, cw) in enumerate(cols):
-        col_xs.append(x)
+    # Column headers (50px)
+    CHH = 50
+    CT  = TT + TBH
+    draw.rectangle([SX0, CT, SX1, CT+CHH], fill=light)
+    x   = SX0
+    col_xs_s, col_ws_s = [], []
+    for i, (cname, cw) in enumerate(p["cols"]):
+        cw_s = int(cw * scale)
+        col_xs_s.append(x)
+        col_ws_s.append(cw_s)
         if i > 0:
-            draw.line([(x, CT), (x, SB)], fill=(210, 218, 230), width=2)
-        draw.text((x+18, CT+(COL_H-42)//2), cname,
-                  font=fb(42),
-                  fill=tuple(max(0, int(c*0.68)) for c in color))
-        x += cw
+            draw.line([(x, CT), (x, SY1)], fill=(190, 202, 218), width=1)
+        draw.text((x+10, CT+(CHH-24)//2), cname[:14], font=fb(24),
+                  fill=tuple(max(0, int(c*0.62)) for c in color))
+        x += cw_s
 
-    # data rows
-    RT    = CT + COL_H
-    nrows = len(p["rows"])
-    ROW_H = (SB - RT) // nrows
+    # Data rows (show first 4)
+    ROWS_T  = CT + CHH
+    nrows   = min(4, len(p["rows"]))
+    ROW_H_S = (SY1 - ROWS_T) // nrows
+    PC_S = {"g":(34,164,85),"y":(210,140,18),"bad":(214,62,45),"n":(140,148,162)}
 
-    for ri, row in enumerate(p["rows"]):
-        ry      = RT + ri * ROW_H
+    for ri in range(nrows):
+        ry    = ROWS_T + ri * ROW_H_S
+        bg_r  = (15, 17, 28) if ri % 2 == 0 else (11, 13, 22)
         is_last = ri == nrows - 1
-        bg      = light if is_last else ((251,252,254) if ri%2==0 else (255,255,255))
-        draw.rectangle([SL, ry, SR, ry+ROW_H], fill=bg)
-        draw.line([(SL, ry+ROW_H), (SR, ry+ROW_H)],
-                  fill=tuple(int(c*0.90) for c in light) if is_last else (220, 226, 235),
-                  width=1)
-        for ci, (ct, ctype) in enumerate(row):
-            if ci < len(col_xs):
-                draw_cell(draw, col_xs[ci], cols[ci][1], ry, ROW_H, ct, ctype, color)
+        if is_last:
+            bg_r = tuple(int(c * 0.18) for c in color)
+        draw.rectangle([SX0, ry, SX1, ry+ROW_H_S], fill=bg_r)
+        draw.line([(SX0, ry+ROW_H_S),(SX1, ry+ROW_H_S)],
+                  fill=(26, 30, 46), width=1)
 
-    draw.rectangle([SL, ST, SR, SB], outline=(195, 202, 215), width=2)
+        if ri >= len(p["rows"]):
+            continue
+        for ci, (ct_text, ctype) in enumerate(p["rows"][ri]):
+            if ci >= len(col_xs_s) or not ct_text or not ctype:
+                continue
+            cx_s = col_xs_s[ci]
+            cw_s = col_ws_s[ci]
+            cy_s = ry + ROW_H_S // 2
 
-    # ── BENEFITS STRIP (1728-2000) ────────────────────────────────────────────
-    BY = 1728
-    draw.rectangle([0, BY, W, H], fill=color)
+            if ctype in ("g", "y", "bad", "n"):
+                pc = PC_S.get(ctype, (100,100,100))
+                pf = fr(20)
+                pw = min(tw(draw, ct_text, pf)+22, cw_s-14)
+                pill(draw, cx_s+8, cy_s-15, cx_s+8+pw, cy_s+15, pc)
+                draw.text((cx_s+18, cy_s-11), ct_text, font=pf, fill=(255,255,255))
 
-    rf = fr(46)
+            elif ctype == "p":
+                try:   pct = int(ct_text.replace("%",""))/100
+                except: pct = 0.5
+                bw = cw_s - 38
+                pill(draw, cx_s+8, cy_s-8, cx_s+8+bw, cy_s+8, (38,42,58))
+                pill(draw, cx_s+8, cy_s-8, cx_s+8+max(8,int(bw*pct)), cy_s+8, color)
+
+            elif ctype == "r":
+                draw.text((cx_s+10, cy_s-13), ct_text, font=fb(24), fill=(210,85,75))
+
+            elif ctype in ("a", "ab"):
+                draw.text((cx_s+10, cy_s-13), ct_text,
+                          font=fb(26 if ctype=="ab" else 24), fill=(205,215,235))
+
+            elif ctype == "b":
+                draw.text((cx_s+10, cy_s-13), ct_text, font=fb(26), fill=(225,230,248))
+
+            elif ctype == "c":
+                f   = fr(24)
+                cx2 = cx_s + (cw_s - tw(draw, ct_text, f)) // 2
+                draw.text((cx2, cy_s-13), ct_text, font=f, fill=(155,168,200))
+
+            else:
+                draw.text((cx_s+10, cy_s-13), ct_text, font=fr(26), fill=(165,178,215))
+
+    # Screen reflection (subtle)
+    for y in range(SY0, SY0+70):
+        t  = (y - SY0) / 70
+        rc = tuple(int(255 * 0.05 * (1 - t)) for _ in range(3))
+        draw.line([(SX0, y), (SX1, y)], fill=rc)
+
+    # ── KEYBOARD BASE ─────────────────────────────────────────────────────────
+    KB_X0, KB_X1 = LX0-28, LX1+28
+    KB_Y0, KB_Y1 = LY1, LY1+88
+    draw.rectangle([KB_X0, KB_Y0, KB_X1, KB_Y1], fill=(27, 29, 35))
+    draw.rectangle([LX0, LY1-3, LX1, LY1+3], fill=(20, 22, 28))
+    TP_W, TP_H = 310, 56
+    TP_X = W//2 - TP_W//2
+    draw.rectangle([TP_X, KB_Y0+16, TP_X+TP_W, KB_Y0+16+TP_H], fill=(38, 40, 48))
+
+    # ── BENEFITS (y≈1750 to y=2000) ───────────────────────────────────────────
+    BY = KB_Y1 + 20
+    rf = fr(44)
     bx = 80
     for i, ben in enumerate(p["benefits"]):
-        draw.ellipse([bx, BY+26+i*86, bx+58, BY+84+i*86], fill=(255, 255, 255))
-        draw.text((bx+16, BY+36+i*86), "✓", font=fb(32), fill=color)
-        draw.text((bx+78, BY+30+i*86), ben, font=rf, fill=(255, 255, 255))
+        draw.ellipse([bx, BY+18+i*76, bx+50, BY+68+i*76], fill=color)
+        draw.text((bx+13, BY+28+i*76), "✓", font=fb(28), fill=(255, 255, 255))
+        draw.text((bx+70, BY+22+i*76), ben, font=rf, fill=(175, 192, 228))
 
     url = "nasritools.etsy.com"
     uf  = fr(30)
-    draw.text((W - tw(draw, url, uf) - 80, BY+260), url, font=uf,
-              fill=tuple(min(255, int(c*1.45)) for c in color))
+    draw.text((W - tw(draw, url, uf) - 80, BY+244), url, font=uf,
+              fill=tuple(min(255, int(c * 0.8)) for c in color))
 
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=95)
