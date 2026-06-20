@@ -1,113 +1,104 @@
 //@version=5
-indicator("EMA21 Bounce — 3TF Signal", overlay=true, max_bars_back=500)
+indicator("EMA21 Bounce — 3TF", overlay=true, max_bars_back=500)
 
-// ══ إعدادات ══════════════════════════════════════
-cooldownBars = input.int(6,   "Cooldown (عدد الشمعات بين إشارتين)", minval=1)
-rsiLow       = input.int(35,  "RSI Min", minval=10, maxval=50)
-rsiHigh      = input.int(65,  "RSI Max", minval=50, maxval=80)
+// ── Settings ──────────────────────────────────
+cooldown = input.int(12, "Cooldown (bars بين إشارتين)", minval=6)
+rsiMinL  = input.int(40, "RSI Min (Long)")
+rsiMaxS  = input.int(60, "RSI Max (Short)")
 
-// ══ بيانات HTF — 1H Bias ═══════════════════════
-ema50_1h  = request.security(syminfo.tickerid, "60", ta.ema(close, 50),  lookahead=barmerge.lookahead_off)
-ema200_1h = request.security(syminfo.tickerid, "60", ta.ema(close, 200), lookahead=barmerge.lookahead_off)
-htfBull   = ema50_1h > ema200_1h
-htfBear   = ema50_1h < ema200_1h
+// ── 1H Bias ───────────────────────────────────
+ema50h  = request.security(syminfo.tickerid, "60", ta.ema(close, 50),  lookahead=barmerge.lookahead_off)
+ema200h = request.security(syminfo.tickerid, "60", ta.ema(close, 200), lookahead=barmerge.lookahead_off)
+bull1h  = ema50h > ema200h
+bear1h  = ema50h < ema200h
 
-// ══ بيانات MTF — 15M Structure ══════════════════
-ema21_15m = request.security(syminfo.tickerid, "15", ta.ema(close, 21), lookahead=barmerge.lookahead_off)
-close_15m = request.security(syminfo.tickerid, "15", close,             lookahead=barmerge.lookahead_off)
-atr_15m   = request.security(syminfo.tickerid, "15", ta.atr(14),        lookahead=barmerge.lookahead_off)
+// ── 5M Indicators ─────────────────────────────
+e21 = ta.ema(close, 21)
+rsi = ta.rsi(close, 14)
+atr = ta.atr(14)
 
-// السعر قريب من EMA21 على 15M
-mtfNear = math.abs(close_15m - ema21_15m) <= atr_15m * 0.6
+// ── كم شمعة كانت فوق/تحت EMA21 في الـ 8 السابقة ──
+// هذا يضمن أن السعر كان في اتجاه ثم سحب للخط (pullback حقيقي)
+aboveC = (close[1] > e21[1] ? 1 : 0) + (close[2] > e21[2] ? 1 : 0) +
+         (close[3] > e21[3] ? 1 : 0) + (close[4] > e21[4] ? 1 : 0) +
+         (close[5] > e21[5] ? 1 : 0) + (close[6] > e21[6] ? 1 : 0) +
+         (close[7] > e21[7] ? 1 : 0) + (close[8] > e21[8] ? 1 : 0)
 
-// ══ مؤشرات الـ 5M ════════════════════════════════
-ema21 = ta.ema(close, 21)
-rsi   = ta.rsi(close, 14)
-atr   = ta.atr(14)
+belowC = (close[1] < e21[1] ? 1 : 0) + (close[2] < e21[2] ? 1 : 0) +
+         (close[3] < e21[3] ? 1 : 0) + (close[4] < e21[4] ? 1 : 0) +
+         (close[5] < e21[5] ? 1 : 0) + (close[6] < e21[6] ? 1 : 0) +
+         (close[7] < e21[7] ? 1 : 0) + (close[8] < e21[8] ? 1 : 0)
 
-// ══ شروط الارتداد الصارمة ════════════════════════
-// LONG: الشمعة الحالية تلمس EMA21 وتغلق فوقه بجسم واضح
-bodyBull  = (close - open) >= atr * 0.15          // جسم الشمعة ذو حجم كافٍ
-wickBull  = low < ema21                            // الذيل السفلي اخترق EMA21
-closeBull = close > ema21 and close > open         // إغلاق فوق EMA21 وصاعد
-prevBull  = close[1] <= ema21[1] * 1.002          // الشمعة السابقة كانت قرب/تحت EMA21
+// السعر كان فوق EMA21 (5 من 8 شمعات) ثم رجع إليه
+priorAbove = aboveC >= 5
+priorBelow = belowC >= 5
 
-bouncedUp = wickBull and closeBull and bodyBull and prevBull
+// ── شمعة الارتداد ─────────────────────────────
+cRange = high - low
 
-// SHORT: العكس
-bodySell  = (open - close) >= atr * 0.15
-wickSell  = high > ema21
-closeSell = close < ema21 and close < open
-prevSell  = close[1] >= ema21[1] * 0.998
+// LONG: ذيل اخترق EMA21 + إغلاق فوقه + شمعة صاعدة + ذيل واضح
+bUp = low  < e21 and close > e21 and close > open
+    and (close - open) > atr * 0.1          // جسم كافٍ
+    and (e21  - low)   > cRange * 0.25      // ذيل تحت EMA21 لا يقل عن 25% من الشمعة
 
-bouncedDown = wickSell and closeSell and bodySell and prevSell
+// SHORT: ذيل اخترق EMA21 + إغلاق تحته + شمعة هابطة + ذيل واضح
+bDn = high > e21 and close < e21 and close < open
+    and (open - close) > atr * 0.1
+    and (high - e21)   > cRange * 0.25
 
-// RSI
-rsiOkLong  = rsi >= rsiLow and rsi <= rsiHigh
-rsiOkShort = rsi >= rsiLow and rsi <= rsiHigh
+// ── RSI ───────────────────────────────────────
+rsiL = rsi >= rsiMinL and rsi <= 65
+rsiS = rsi <= rsiMaxS and rsi >= 35
 
-// ══ Cooldown — يمنع تكرار الإشارات ══════════════
-var int lastLong  = -100
-var int lastShort = -100
+// ── Cooldown ──────────────────────────────────
+var int lL = -100
+var int lS = -100
 
-longReady  = (bar_index - lastLong)  >= cooldownBars
-shortReady = (bar_index - lastShort) >= cooldownBars
+lSig = bull1h and priorAbove and bUp and rsiL and (bar_index - lL) >= cooldown
+sSig = bear1h and priorBelow and bDn and rsiS and (bar_index - lS) >= cooldown
 
-// ══ الإشارة النهائية (كل الشروط) ════════════════
-longSig  = htfBull and mtfNear and bouncedUp   and rsiOkLong  and longReady
-shortSig = htfBear and mtfNear and bouncedDown and rsiOkShort and shortReady
+if lSig
+    lL := bar_index
+if sSig
+    lS := bar_index
 
-if longSig
-    lastLong := bar_index
-if shortSig
-    lastShort := bar_index
+// ── SL & TP ───────────────────────────────────
+slL  = ta.lowest(low,  5) - atr * 0.2
+slS  = ta.highest(high,5) + atr * 0.2
+tp1L = close + (close - slL) * 2
+tp1S = close - (slS - close) * 2
 
-// ══ SL و TP ═══════════════════════════════════
-slLong   = ta.lowest(low, 4) - atr * 0.2
-slShort  = ta.highest(high, 4) + atr * 0.2
-rL       = close - slLong
-rS       = slShort - close
-tp1Long  = close + rL * 2.0
-tp1Short = close - rS * 2.0
-tp2Long  = close + rL * 3.0
-tp2Short = close - rS * 3.0
+// ── رسم ───────────────────────────────────────
+plot(e21, "EMA21", color.blue, 2)
 
-// ══ رسم ══════════════════════════════════════════
-plot(ema21,     "EMA21 (5M)", color.blue, 2)
-plot(ema21_15m, "EMA21 (15M)", color.new(color.purple, 40), 1, plot.style_stepline)
+plotshape(lSig, style=shape.labelup,   location=location.belowbar,
+          color=color.green, text="▲ LONG",  textcolor=color.white, size=size.normal)
+plotshape(sSig, style=shape.labeldown, location=location.abovebar,
+          color=color.red,   text="▼ SHORT", textcolor=color.white, size=size.normal)
 
-// إشارات
-plotshape(longSig,  style=shape.labelup,   location=location.belowbar,
-          color=color.new(color.green, 0), text="▲ LONG",  textcolor=color.white, size=size.normal)
-plotshape(shortSig, style=shape.labeldown, location=location.abovebar,
-          color=color.new(color.red, 0),   text="▼ SHORT", textcolor=color.white, size=size.normal)
+// خط SL
+plot(lSig ? slL  : na, "SL Long",  color.new(color.red,   0), 1, plot.style_linebr)
+plot(sSig ? slS  : na, "SL Short", color.new(color.red,   0), 1, plot.style_linebr)
+plot(lSig ? tp1L : na, "TP Long",  color.new(color.green, 0), 1, plot.style_linebr)
+plot(sSig ? tp1S : na, "TP Short", color.new(color.green, 0), 1, plot.style_linebr)
 
-// خطوط SL و TP عند الإشارة
-plotshape(longSig,  style=shape.triangleup, location=location.absolute, color=color.new(color.green, 80), size=size.tiny)
+bgcolor(bull1h ? color.new(color.green, 96) : bear1h ? color.new(color.red, 96) : na)
 
-// خلفية الاتجاه HTF
-bgcolor(htfBull ? color.new(color.green, 97) : htfBear ? color.new(color.red, 97) : na)
-
-// ══ جدول المعلومات ════════════════════════════════
-var table info = table.new(position.top_right, 2, 5,
-  bgcolor=color.new(color.black, 60), border_width=1, border_color=color.gray)
-
+// ── جدول ──────────────────────────────────────
+var table t = table.new(position.top_right, 2, 4, bgcolor=color.new(color.black,60), border_width=1)
 if barstate.islast
-    table.cell(info, 0, 0, "1H Bias",   text_color=color.white,  text_size=size.small)
-    table.cell(info, 1, 0, htfBull ? "▲ BULL" : "▼ BEAR",
-               text_color=htfBull ? color.lime : color.red, text_size=size.small)
-    table.cell(info, 0, 1, "15M Near",  text_color=color.white,  text_size=size.small)
-    table.cell(info, 1, 1, mtfNear ? "✓ نعم" : "✗ لا",
-               text_color=mtfNear ? color.lime : color.red, text_size=size.small)
-    table.cell(info, 0, 2, "RSI",       text_color=color.white,  text_size=size.small)
-    table.cell(info, 1, 2, str.tostring(math.round(rsi, 1)),
-               text_color=(rsiOkLong or rsiOkShort) ? color.lime : color.orange, text_size=size.small)
-    table.cell(info, 0, 3, "ATR",       text_color=color.white,  text_size=size.small)
-    table.cell(info, 1, 3, str.tostring(math.round(atr, 1)), text_color=color.white, text_size=size.small)
-    table.cell(info, 0, 4, "Cooldown",  text_color=color.white,  text_size=size.small)
-    table.cell(info, 1, 4, str.tostring(cooldownBars) + " bars",
+    table.cell(t,0,0,"1H Bias",  text_color=color.white, text_size=size.small)
+    table.cell(t,1,0, bull1h ? "▲ BULL" : "▼ BEAR",
+               text_color=bull1h ? color.lime : color.red, text_size=size.small)
+    table.cell(t,0,1,"Prior",    text_color=color.white, text_size=size.small)
+    table.cell(t,1,1, str.tostring(aboveC) + "/8 above | " + str.tostring(belowC) + "/8 below",
                text_color=color.gray, text_size=size.small)
+    table.cell(t,0,2,"RSI",      text_color=color.white, text_size=size.small)
+    table.cell(t,1,2, str.tostring(math.round(rsi,1)),
+               text_color=(rsiL or rsiS) ? color.lime : color.orange, text_size=size.small)
+    table.cell(t,0,3,"ATR",      text_color=color.white, text_size=size.small)
+    table.cell(t,1,3, str.tostring(math.round(atr,0)), text_color=color.white, text_size=size.small)
 
-// ══ Alerts ════════════════════════════════════════
-alertcondition(longSig,  "LONG Signal",  "LONG")
-alertcondition(shortSig, "SHORT Signal", "SHORT")
+// ── Alerts ────────────────────────────────────
+alertcondition(lSig, "LONG",  "LONG")
+alertcondition(sSig, "SHORT", "SHORT")
