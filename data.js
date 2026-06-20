@@ -45,6 +45,14 @@ async function fetchYahoo(symbol, interval, range) {
 }
 
 /**
+ * جلب 15m bars لآخر 5 أيام (للـ MTF structure)
+ */
+export async function get15mBars(symbol = 'MNQ') {
+  const ticker = SYMBOLS[symbol] || symbol;
+  return fetchYahoo(ticker, '15m', '5d');
+}
+
+/**
  * جلب 1m bars لآخر يومين (للدخول الدقيق)
  */
 export async function get1mBars(symbol = 'MNQ') {
