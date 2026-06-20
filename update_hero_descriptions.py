@@ -298,15 +298,6 @@ Step 3: Start immediately
 """,
 }
 
-HERO_KEYWORDS = {
-    "budget": ["budget tracker", "budget & expense", "budget spreadsheet", "monthly budget"],
-    "invoice": ["invoice tracker", "invoice & client", "freelancer invoice", "freelance invoice"],
-    "kpi": ["kpi dashboard", "kpi spread"],
-    "complete life": ["complete life system", "all 10 templa"],
-    "finance bundle": ["finance bundle", "budget + invoice", "finance os"],
-}
-
-
 def get_token():
     t = json.loads(TOKEN_FILE.read_text())
     if time.time() >= t.get("expires_at", 0) - 60:
@@ -337,10 +328,22 @@ def get_all_listings(token):
         offset += 100
     return listings
 
-def get_hero_type(title_lower):
-    for hero_type, keywords in HERO_KEYWORDS.items():
-        if any(k in title_lower for k in keywords):
-            return hero_type
+def get_hero_type(title):
+    """Match hero type using title string — case-insensitive, flexible."""
+    t = title.lower()
+    # Finance bundle must come before budget to avoid false match
+    if "finance bundle" in t or ("finance" in t and "bundle" in t):
+        return "finance bundle"
+    if "complete life" in t:
+        return "complete life"
+    if "kpi" in t and "dashboard" in t:
+        return "kpi"
+    # Invoice before budget (both may appear in some titles)
+    if "invoice" in t and ("tracker" in t or "client" in t or "freelancer" in t):
+        return "invoice"
+    # Budget: must NOT be a bundle title
+    if "budget" in t and "bundle" not in t and "finance" not in t:
+        return "budget"
     return None
 
 def update_description(token, lid, desc):
@@ -363,20 +366,14 @@ def main():
     for l in listings:
         lid   = l["listing_id"]
         title = l["title"]
-        tl    = title.lower()
-        desc  = l.get("description", "") or ""
 
-        if MARKER in desc:
-            skip += 1
-            continue
-
-        hero_type = get_hero_type(tl)
+        hero_type = get_hero_type(title)
         if not hero_type:
             skip += 1
             continue
 
         new_desc = HERO_DESCRIPTIONS[hero_type]
-        print(f"  [HERO-{hero_type.upper()[:8]:8}] {title[:40]} ...", end=" ", flush=True)
+        print(f"  [{hero_type.upper()[:14]:14}] {title[:38]} ...", end=" ", flush=True)
         token = get_token()
         r_ok, code = update_description(token, lid, new_desc)
         if r_ok:
