@@ -12,39 +12,58 @@ OUT_DIR.mkdir(exist_ok=True)
 
 SIZE = 2000
 
-# Font discovery
-FONT_CANDIDATES = [
+# Font discovery — Windows + Linux paths
+FONT_CANDIDATES_BOLD = [
+    # Windows
+    "C:/Windows/Fonts/arialbd.ttf",
+    "C:/Windows/Fonts/calibrib.ttf",
+    "C:/Windows/Fonts/verdanab.ttf",
+    "C:/Windows/Fonts/trebucbd.ttf",
+    "C:/Windows/Fonts/impact.ttf",
+    "C:/Windows/Fonts/georgiab.ttf",
+    # Linux
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
     "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
     "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
     "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
-    "/usr/share/fonts/truetype/open-sans/OpenSans-Bold.ttf",
+]
+
+FONT_CANDIDATES_REGULAR = [
+    # Windows
+    "C:/Windows/Fonts/arial.ttf",
+    "C:/Windows/Fonts/calibri.ttf",
+    "C:/Windows/Fonts/verdana.ttf",
+    # Linux
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
 ]
 
 def load_font(size):
-    for path in FONT_CANDIDATES:
+    for path in FONT_CANDIDATES_BOLD:
         if os.path.exists(path):
             try:
                 return ImageFont.truetype(path, size)
             except Exception:
                 continue
-    return ImageFont.load_default()
+    # Last resort: try any .ttf in system
+    import glob
+    for pattern in ["C:/Windows/Fonts/*.ttf", "/usr/share/fonts/**/*.ttf"]:
+        for f in glob.glob(pattern, recursive=True):
+            try:
+                return ImageFont.truetype(f, size)
+            except Exception:
+                continue
+    return ImageFont.load_default(size=size) if hasattr(ImageFont, 'load_default') else ImageFont.load_default()
 
 def load_font_regular(size):
-    for path in FONT_CANDIDATES:
-        regular = path.replace("Bold", "").replace("-B.ttf", ".ttf").replace("Bold.ttf", "Regular.ttf")
-        if os.path.exists(regular):
-            try:
-                return ImageFont.truetype(regular, size)
-            except Exception:
-                continue
+    for path in FONT_CANDIDATES_REGULAR:
         if os.path.exists(path):
             try:
                 return ImageFont.truetype(path, size)
             except Exception:
                 continue
-    return ImageFont.load_default()
+    return load_font(size)
 
 # ── Color palettes ─────────────────────────────────────────────────────────────
 PALETTES = {
