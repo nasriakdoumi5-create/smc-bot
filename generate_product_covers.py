@@ -47,7 +47,7 @@ PRODUCTS = [
         ],
     },
     {
-        "search_kw": ["meal", "planning"],
+        "search_kw": ["meal", "planner"],
         "color": (39, 174, 141), "light": (209, 250, 229),
         "label": "MEAL PLANNER",
         "headline": "7 Days of Meals\nin 15 Minutes.",
@@ -63,7 +63,7 @@ PRODUCTS = [
         ],
     },
     {
-        "search_kw": ["wedding", "planning"],
+        "search_kw": ["wedding", "planner"],
         "color": (210, 82, 162), "light": (252, 228, 243),
         "label": "WEDDING PLANNER",
         "headline": "Plan Your Perfect\nWedding.",
@@ -79,7 +79,7 @@ PRODUCTS = [
         ],
     },
     {
-        "search_kw": ["workout", "tracking"],
+        "search_kw": ["workout", "tracker"],
         "color": (192, 57, 43), "light": (253, 228, 224),
         "label": "WORKOUT TRACKER",
         "headline": "See Your Strength\nGrow Every Session.",
