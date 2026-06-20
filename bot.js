@@ -66,7 +66,8 @@ async function check() {
 
     const { price, signal, htfTrend, session, scoreLong, scoreShort, rsi } = result;
     const t = new Date().toLocaleTimeString('ar-DZ');
-    console.log(`[${t}] ${SYMBOL} @ ${price} | Trend:${htfTrend} Session:${session} L:${scoreLong}/7 S:${scoreShort}/7 RSI:${rsi}`);
+    const sessIcon = session ? '✅' : '❌';
+    console.log(`[${t}] ${SYMBOL} @ ${price} | Trend:${htfTrend} Session:${sessIcon} L:${scoreLong}/9 S:${scoreShort}/9 RSI:${rsi} ${signal ? '→ SIGNAL!' : '(no signal)'}`);
 
     if (!signal) return;
 
@@ -84,7 +85,7 @@ async function check() {
     totalToday++;
 
     const isBull  = signal.type === 'LONG';
-    const scoreBar = '●'.repeat(signal.score) + '○'.repeat(7 - signal.score);
+    const scoreBar = '●'.repeat(signal.score) + '○'.repeat(9 - signal.score);
     const risk     = Math.abs(signal.price - signal.sl);
     const rrActual = risk > 0 ? (Math.abs(signal.tp1 - signal.price) / risk).toFixed(1) : '?';
 
@@ -103,7 +104,7 @@ async function check() {
 🎯 TP2:    <b>${signal.tp2}</b>
 ⚖️  R:R:   <b>${rrActual}:1</b>
 
-⭐ الجودة: <b>${signal.score}/7</b>  ${scoreBar}
+⭐ الجودة: <b>${signal.score}/9</b>  ${scoreBar}
 📊 RSI:    ${signal.rsi}  |  ATR: ${signal.atr}
 
 ${condList}
