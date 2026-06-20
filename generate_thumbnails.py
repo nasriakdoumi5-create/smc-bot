@@ -182,9 +182,9 @@ def draw_stat_card(draw, x, y, w, h, label, value, p, card_font_large, card_font
               font=card_font_small, fill=hex2rgb(p["text_sub"]))
 
 def draw_check_item(draw, x, y, text, p, font):
-    draw.ellipse([x, y+4, x+28, y+32], fill=hex2rgb(p["accent"]))
-    draw.text((x+7, y+4), "✓", font=font, fill=hex2rgb(p["bg"]))
-    draw.text((x+44, y), text, font=font, fill=hex2rgb(p["text_sub"]))
+    draw.ellipse([x, y+6, x+44, y+50], fill=hex2rgb(p["accent"]))
+    draw.text((x+10, y+6), "✓", font=font, fill=hex2rgb(p["bg"]))
+    draw.text((x+62, y), text, font=font, fill=hex2rgb(p["text_sub"]))
 
 def make_thumbnail(filename, palette_key, badge_text, product_name, tagline,
                    stats, features, cta="⚡ INSTANT DOWNLOAD"):
@@ -195,12 +195,12 @@ def make_thumbnail(filename, palette_key, badge_text, product_name, tagline,
     # Fonts
     f_huge   = load_font(130)
     f_large  = load_font(72)
-    f_medium = load_font(52)
-    f_small  = load_font(40)
-    f_badge  = load_font(38)
-    f_stat_v = load_font(80)
-    f_stat_l = load_font(34)
-    f_check  = load_font(34)
+    f_medium = load_font(58)
+    f_small  = load_font(44)
+    f_badge  = load_font(42)
+    f_stat_v = load_font(88)
+    f_stat_l = load_font(40)
+    f_check  = load_font(58)
 
     # ── Background accent stripe ───────────────────────────────────────────────
     if palette_key == "bundle":
@@ -215,15 +215,15 @@ def make_thumbnail(filename, palette_key, badge_text, product_name, tagline,
     # ── Stats cards ───────────────────────────────────────────────────────────
     if stats:
         card_w = (SIZE - 200 - (len(stats)-1)*40) // len(stats)
-        card_h = 220
-        card_y = 200
+        card_h = 260
+        card_y = 190
         for i, (val, lbl) in enumerate(stats):
             cx = 100 + i * (card_w + 40)
             draw_stat_card(draw, cx, card_y, card_w, card_h,
                            lbl, val, p, f_stat_v, f_stat_l)
 
     # ── Product name ──────────────────────────────────────────────────────────
-    name_y = 480 if stats else 260
+    name_y = 510 if stats else 260
     # Word wrap product name
     words = product_name.upper().split()
     lines, line = [], ""
@@ -248,16 +248,17 @@ def make_thumbnail(filename, palette_key, badge_text, product_name, tagline,
     draw.text((x, tag_y), tagline, font=f_medium, fill=hex2rgb(p["text_sub"]))
 
     # ── Accent line ───────────────────────────────────────────────────────────
-    line_y = tag_y + 90
-    draw.rectangle([100, line_y, SIZE-100, line_y+5], fill=hex2rgb(p["accent"]))
+    line_y = tag_y + 100
+    draw.rectangle([100, line_y, SIZE-100, line_y+6], fill=hex2rgb(p["accent"]))
 
     # ── Features checklist ────────────────────────────────────────────────────
-    feat_y = line_y + 50
-    for i, feat in enumerate(features[:4]):
-        draw_check_item(draw, 100, feat_y + i * 80, feat, p, f_check)
+    feat_y = line_y + 70
+    feat_spacing = 115
+    for i, feat in enumerate(features[:5]):
+        draw_check_item(draw, 100, feat_y + i * feat_spacing, feat, p, f_check)
 
     # ── CTA bar ───────────────────────────────────────────────────────────────
-    cta_y = SIZE - 180
+    cta_y = SIZE - 190
     draw_rounded_rect(draw, (80, cta_y, SIZE-80, cta_y+110), 20, hex2rgb(p["accent"]))
     bbox = f_large.getbbox(cta)
     x = (SIZE - (bbox[2] - bbox[0])) // 2
