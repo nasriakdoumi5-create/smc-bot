@@ -1,10 +1,9 @@
 //@version=5
 indicator("EMA21 Bounce — 3TF", overlay=true, max_bars_back=500)
 
-// ── Settings ──────────────────────────────────
-cooldown = input.int(12, "Cooldown (bars بين إشارتين)", minval=6)
-rsiMinL  = input.int(40, "RSI Min (Long)")
-rsiMaxS  = input.int(60, "RSI Max (Short)")
+cooldown = input.int(12, "Cooldown bars", minval=6)
+rsiMinL  = input.int(42, "RSI Min (Long)")
+rsiMaxS  = input.int(58, "RSI Max (Short)")
 
 // ── 1H Bias ───────────────────────────────────
 ema50h  = request.security(syminfo.tickerid, "60", ta.ema(close, 50),  lookahead=barmerge.lookahead_off)
@@ -12,50 +11,45 @@ ema200h = request.security(syminfo.tickerid, "60", ta.ema(close, 200), lookahead
 bull1h  = ema50h > ema200h
 bear1h  = ema50h < ema200h
 
-// ── 5M Indicators ─────────────────────────────
+// ── 5M ────────────────────────────────────────
 e21 = ta.ema(close, 21)
 rsi = ta.rsi(close, 14)
 atr = ta.atr(14)
 
-// ── كم شمعة كانت فوق/تحت EMA21 في الـ 8 السابقة ──
-// هذا يضمن أن السعر كان في اتجاه ثم سحب للخط (pullback حقيقي)
-aboveC = (close[1] > e21[1] ? 1 : 0) + (close[2] > e21[2] ? 1 : 0) +
-         (close[3] > e21[3] ? 1 : 0) + (close[4] > e21[4] ? 1 : 0) +
-         (close[5] > e21[5] ? 1 : 0) + (close[6] > e21[6] ? 1 : 0) +
-         (close[7] > e21[7] ? 1 : 0) + (close[8] > e21[8] ? 1 : 0)
+// ── الشرط الأساسي: السعر كان فوق EMA21 ثم جاء إليه ──
+// 5 من 6 شمعات سابقة كانت فوق EMA21 = pullback حقيقي
+aboveC6 = (close[1] > e21[1] ? 1 : 0) + (close[2] > e21[2] ? 1 : 0) +
+          (close[3] > e21[3] ? 1 : 0) + (close[4] > e21[4] ? 1 : 0) +
+          (close[5] > e21[5] ? 1 : 0) + (close[6] > e21[6] ? 1 : 0)
 
-belowC = (close[1] < e21[1] ? 1 : 0) + (close[2] < e21[2] ? 1 : 0) +
-         (close[3] < e21[3] ? 1 : 0) + (close[4] < e21[4] ? 1 : 0) +
-         (close[5] < e21[5] ? 1 : 0) + (close[6] < e21[6] ? 1 : 0) +
-         (close[7] < e21[7] ? 1 : 0) + (close[8] < e21[8] ? 1 : 0)
+belowC6 = (close[1] < e21[1] ? 1 : 0) + (close[2] < e21[2] ? 1 : 0) +
+          (close[3] < e21[3] ? 1 : 0) + (close[4] < e21[4] ? 1 : 0) +
+          (close[5] < e21[5] ? 1 : 0) + (close[6] < e21[6] ? 1 : 0)
 
-// السعر كان فوق EMA21 (5 من 8 شمعات) ثم رجع إليه
-priorAbove = aboveC >= 5
-priorBelow = belowC >= 5
+cRange = high - low + 0.001
 
-// ── شمعة الارتداد ─────────────────────────────
-cRange = high - low
+// ── LONG: pullback للـ EMA21 + ارتداد صاعد واضح ──
+bUp = aboveC6 >= 5          // كان فوق EMA21
+    and low  <= e21          // الذيل لمس EMA21
+    and close > e21          // أغلق فوق EMA21
+    and close > open         // شمعة صاعدة
+    and (close - open) / cRange > 0.35   // جسم لا يقل عن 35% (ليس دوجي)
+    and rsi >= rsiMinL and rsi < 68
 
-// LONG: ذيل اخترق EMA21 + إغلاق فوقه + شمعة صاعدة + ذيل واضح
-bUp = low  < e21 and close > e21 and close > open
-    and (close - open) > atr * 0.1          // جسم كافٍ
-    and (e21  - low)   > cRange * 0.25      // ذيل تحت EMA21 لا يقل عن 25% من الشمعة
-
-// SHORT: ذيل اخترق EMA21 + إغلاق تحته + شمعة هابطة + ذيل واضح
-bDn = high > e21 and close < e21 and close < open
-    and (open - close) > atr * 0.1
-    and (high - e21)   > cRange * 0.25
-
-// ── RSI ───────────────────────────────────────
-rsiL = rsi >= rsiMinL and rsi <= 65
-rsiS = rsi <= rsiMaxS and rsi >= 35
+// ── SHORT: pullback للـ EMA21 + ارتداد هابط واضح ──
+bDn = belowC6 >= 5
+    and high >= e21
+    and close < e21
+    and close < open
+    and (open - close) / cRange > 0.35
+    and rsi <= rsiMaxS and rsi > 32
 
 // ── Cooldown ──────────────────────────────────
 var int lL = -100
 var int lS = -100
 
-lSig = bull1h and priorAbove and bUp and rsiL and (bar_index - lL) >= cooldown
-sSig = bear1h and priorBelow and bDn and rsiS and (bar_index - lS) >= cooldown
+lSig = bull1h and bUp and (bar_index - lL) >= cooldown
+sSig = bear1h and bDn and (bar_index - lS) >= cooldown
 
 if lSig
     lL := bar_index
@@ -63,12 +57,14 @@ if sSig
     lS := bar_index
 
 // ── SL & TP ───────────────────────────────────
-slL  = ta.lowest(low,  5) - atr * 0.2
-slS  = ta.highest(high,5) + atr * 0.2
-tp1L = close + (close - slL) * 2
-tp1S = close - (slS - close) * 2
+slL  = ta.lowest(low,  4) - atr * 0.15
+slS  = ta.highest(high,4) + atr * 0.15
+rL   = close - slL
+rS   = slS - close
+tp1L = close + rL * 2
+tp1S = close - rS * 2
 
-// ── رسم ───────────────────────────────────────
+// ── Plot ──────────────────────────────────────
 plot(e21, "EMA21", color.blue, 2)
 
 plotshape(lSig, style=shape.labelup,   location=location.belowbar,
@@ -76,29 +72,14 @@ plotshape(lSig, style=shape.labelup,   location=location.belowbar,
 plotshape(sSig, style=shape.labeldown, location=location.abovebar,
           color=color.red,   text="▼ SHORT", textcolor=color.white, size=size.normal)
 
-// خط SL
-plot(lSig ? slL  : na, "SL Long",  color.new(color.red,   0), 1, plot.style_linebr)
-plot(sSig ? slS  : na, "SL Short", color.new(color.red,   0), 1, plot.style_linebr)
-plot(lSig ? tp1L : na, "TP Long",  color.new(color.green, 0), 1, plot.style_linebr)
-plot(sSig ? tp1S : na, "TP Short", color.new(color.green, 0), 1, plot.style_linebr)
+// SL و TP خطوط
+plot(lSig ? slL  : na, color=color.new(color.red,  20), linewidth=1, style=plot.style_linebr)
+plot(lSig ? tp1L : na, color=color.new(color.green,20), linewidth=1, style=plot.style_linebr)
+plot(sSig ? slS  : na, color=color.new(color.red,  20), linewidth=1, style=plot.style_linebr)
+plot(sSig ? tp1S : na, color=color.new(color.green,20), linewidth=1, style=plot.style_linebr)
 
 bgcolor(bull1h ? color.new(color.green, 96) : bear1h ? color.new(color.red, 96) : na)
 
-// ── جدول ──────────────────────────────────────
-var table t = table.new(position.top_right, 2, 4, bgcolor=color.new(color.black,60), border_width=1)
-if barstate.islast
-    table.cell(t,0,0,"1H Bias",  text_color=color.white, text_size=size.small)
-    table.cell(t,1,0, bull1h ? "▲ BULL" : "▼ BEAR",
-               text_color=bull1h ? color.lime : color.red, text_size=size.small)
-    table.cell(t,0,1,"Prior",    text_color=color.white, text_size=size.small)
-    table.cell(t,1,1, str.tostring(aboveC) + "/8 above | " + str.tostring(belowC) + "/8 below",
-               text_color=color.gray, text_size=size.small)
-    table.cell(t,0,2,"RSI",      text_color=color.white, text_size=size.small)
-    table.cell(t,1,2, str.tostring(math.round(rsi,1)),
-               text_color=(rsiL or rsiS) ? color.lime : color.orange, text_size=size.small)
-    table.cell(t,0,3,"ATR",      text_color=color.white, text_size=size.small)
-    table.cell(t,1,3, str.tostring(math.round(atr,0)), text_color=color.white, text_size=size.small)
-
-// ── Alerts ────────────────────────────────────
+// ── Alert ─────────────────────────────────────
 alertcondition(lSig, "LONG",  "LONG")
 alertcondition(sSig, "SHORT", "SHORT")
