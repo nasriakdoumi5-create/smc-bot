@@ -57,20 +57,10 @@ wickDn = math.min(open, close) - low
 
 // ══ دوال السويب ══════════════════════════════════
 sweptUp(lvl) =>
-    not na(lvl)
-    and high > lvl
-    and close < lvl
-    and close < open
-    and wickUp >= atr14 * minWick
-    and rsi14  >= rsiOB
+    not na(lvl) and high > lvl and close < lvl and close < open and wickUp >= atr14 * minWick and rsi14 >= rsiOB
 
 sweptDn(lvl) =>
-    not na(lvl)
-    and low < lvl
-    and close > lvl
-    and close > open
-    and wickDn >= atr14 * minWick
-    and rsi14  <= rsiOS
+    not na(lvl) and low < lvl and close > lvl and close > open and wickDn >= atr14 * minWick and rsi14 <= rsiOS
 
 // ══ النقاط (داخل KZ فقط) ═════════════════════════
 shortPts = 0
