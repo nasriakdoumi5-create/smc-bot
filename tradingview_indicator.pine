@@ -1,85 +1,104 @@
 //@version=5
-indicator("EMA21 Bounce — 3TF", overlay=true, max_bars_back=500)
+indicator("Liquidity Sweep — PDH/PDL Reversal", overlay=true, max_bars_back=1000)
 
-cooldown = input.int(12, "Cooldown bars", minval=6)
-rsiMinL  = input.int(42, "RSI Min (Long)")
-rsiMaxS  = input.int(58, "RSI Max (Short)")
+// ══ Settings ══════════════════════════════════
+cooldownBars = input.int(24,  "Cooldown bars (24 = 2h on 5M)")
+rsiOBLevel   = input.int(60,  "RSI Min للـ SHORT بعد Sweep")
+rsiOSLevel   = input.int(40,  "RSI Max للـ LONG بعد Sweep")
+rrRatio      = input.float(2.0, "R:R", step=0.5)
 
-// ── 1H Bias ───────────────────────────────────
-ema50h  = request.security(syminfo.tickerid, "60", ta.ema(close, 50),  lookahead=barmerge.lookahead_off)
-ema200h = request.security(syminfo.tickerid, "60", ta.ema(close, 200), lookahead=barmerge.lookahead_off)
-bull1h  = ema50h > ema200h
-bear1h  = ema50h < ema200h
+// ══ Previous Day High / Low ════════════════════
+pdh = request.security(syminfo.tickerid, "D", high[1], lookahead=barmerge.lookahead_off)
+pdl = request.security(syminfo.tickerid, "D", low[1],  lookahead=barmerge.lookahead_off)
 
-// ── 5M ────────────────────────────────────────
-e21 = ta.ema(close, 21)
-rsi = ta.rsi(close, 14)
+// ══ Previous Week High / Low ══════════════════
+pwh = request.security(syminfo.tickerid, "W", high[1], lookahead=barmerge.lookahead_off)
+pwl = request.security(syminfo.tickerid, "W", low[1],  lookahead=barmerge.lookahead_off)
+
+// ══ ATR & RSI ═════════════════════════════════
 atr = ta.atr(14)
+rsi = ta.rsi(close, 14)
 
-// ── الشرط الأساسي: السعر كان فوق EMA21 ثم جاء إليه ──
-// 5 من 6 شمعات سابقة كانت فوق EMA21 = pullback حقيقي
-aboveC6 = (close[1] > e21[1] ? 1 : 0) + (close[2] > e21[2] ? 1 : 0) +
-          (close[3] > e21[3] ? 1 : 0) + (close[4] > e21[4] ? 1 : 0) +
-          (close[5] > e21[5] ? 1 : 0) + (close[6] > e21[6] ? 1 : 0)
+// ══ كشف Sweep ════════════════════════════════
+// SHORT Setup: ذيل اخترق PDH/PWH ثم أغلق داخل النطاق (rejection)
+sweptPDH = high > pdh and close < pdh and close < open   // sweep فوق PDH + إغلاق تحته
+sweptPWH = high > pwh and close < pwh and close < open   // sweep فوق PWH
 
-belowC6 = (close[1] < e21[1] ? 1 : 0) + (close[2] < e21[2] ? 1 : 0) +
-          (close[3] < e21[3] ? 1 : 0) + (close[4] < e21[4] ? 1 : 0) +
-          (close[5] < e21[5] ? 1 : 0) + (close[6] < e21[6] ? 1 : 0)
+// LONG Setup: ذيل اخترق PDL/PWL ثم أغلق داخل النطاق
+sweptPDL = low  < pdl and close > pdl and close > open   // sweep تحت PDL + إغلاق فوقه
+sweptPWL = low  < pwl and close > pwl and close > open   // sweep تحت PWL
 
-cRange = high - low + 0.001
+// ══ فلتر RSI ══════════════════════════════════
+// بعد Sweep الأعلى RSI يكون مرتفعاً (overbought)
+// بعد Sweep الأسفل RSI يكون منخفضاً (oversold)
+shortRSI = rsi >= rsiOBLevel
+longRSI  = rsi <= rsiOSLevel
 
-// ── LONG: pullback للـ EMA21 + ارتداد صاعد واضح ──
-bUp = aboveC6 >= 5          // كان فوق EMA21
-    and low  <= e21          // الذيل لمس EMA21
-    and close > e21          // أغلق فوق EMA21
-    and close > open         // شمعة صاعدة
-    and (close - open) / cRange > 0.35   // جسم لا يقل عن 35% (ليس دوجي)
-    and rsi >= rsiMinL and rsi < 68
+// ══ فلتر حجم الـ Sweep ══════════════════════
+// الـ wick فوق المستوى يجب أن يكون ذا معنى (لا يقل عن 30% من ATR)
+wickUp   = high  - math.max(open, close)    // حجم الذيل العلوي
+wickDown = math.min(open, close) - low      // حجم الذيل السفلي
+validSweepUp   = wickUp   >= atr * 0.3
+validSweepDown = wickDown >= atr * 0.3
 
-// ── SHORT: pullback للـ EMA21 + ارتداد هابط واضح ──
-bDn = belowC6 >= 5
-    and high >= e21
-    and close < e21
-    and close < open
-    and (open - close) / cRange > 0.35
-    and rsi <= rsiMaxS and rsi > 32
+// ══ الإشارات ══════════════════════════════════
+shortSetup = (sweptPDH or sweptPWH) and shortRSI and validSweepUp
+longSetup  = (sweptPDL or sweptPWL) and longRSI  and validSweepDown
 
-// ── Cooldown ──────────────────────────────────
-var int lL = -100
-var int lS = -100
+// ══ Cooldown ══════════════════════════════════
+var int lastL = -999
+var int lastS = -999
 
-lSig = bull1h and bUp and (bar_index - lL) >= cooldown
-sSig = bear1h and bDn and (bar_index - lS) >= cooldown
+lSig = longSetup  and (bar_index - lastL) >= cooldownBars
+sSig = shortSetup and (bar_index - lastS) >= cooldownBars
 
 if lSig
-    lL := bar_index
+    lastL := bar_index
 if sSig
-    lS := bar_index
+    lastS := bar_index
 
-// ── SL & TP ───────────────────────────────────
-slL  = ta.lowest(low,  4) - atr * 0.15
-slS  = ta.highest(high,4) + atr * 0.15
-rL   = close - slL
-rS   = slS - close
-tp1L = close + rL * 2
-tp1S = close - rS * 2
+// ══ SL و TP ═══════════════════════════════════
+// SL: خلف الـ wick (أعلى/أدنى شمعة الـ sweep + buffer صغير)
+slShort = high + atr * 0.1
+slLong  = low  - atr * 0.1
+riskS   = slShort - close
+riskL   = close   - slLong
+tp1S    = close - riskS * rrRatio
+tp1L    = close + riskL * rrRatio
 
-// ── Plot ──────────────────────────────────────
-plot(e21, "EMA21", color.blue, 2)
+// ══ Plot المستويات ════════════════════════════
+plot(pdh, "PDH", color.new(color.red,   30), 1, plot.style_stepline)
+plot(pdl, "PDL", color.new(color.green, 30), 1, plot.style_stepline)
+plot(pwh, "PWH", color.new(color.orange,40), 2, plot.style_stepline)
+plot(pwl, "PWL", color.new(color.blue,  40), 2, plot.style_stepline)
 
+// ══ Plot الإشارات ═════════════════════════════
 plotshape(lSig, style=shape.labelup,   location=location.belowbar,
-          color=color.green, text="▲ LONG",  textcolor=color.white, size=size.normal)
+          color=color.green, text="▲ PDL Sweep", textcolor=color.white, size=size.normal)
 plotshape(sSig, style=shape.labeldown, location=location.abovebar,
-          color=color.red,   text="▼ SHORT", textcolor=color.white, size=size.normal)
+          color=color.red,   text="▼ PDH Sweep", textcolor=color.white, size=size.normal)
 
-// SL و TP خطوط
-plot(lSig ? slL  : na, color=color.new(color.red,  20), linewidth=1, style=plot.style_linebr)
-plot(lSig ? tp1L : na, color=color.new(color.green,20), linewidth=1, style=plot.style_linebr)
-plot(sSig ? slS  : na, color=color.new(color.red,  20), linewidth=1, style=plot.style_linebr)
-plot(sSig ? tp1S : na, color=color.new(color.green,20), linewidth=1, style=plot.style_linebr)
+// ── خطوط SL و TP عند الإشارة ──────────────────
+plot(lSig ? slLong  : na, "SL L",  color=color.new(color.red,   0), linewidth=1, style=plot.style_linebr)
+plot(lSig ? tp1L    : na, "TP1 L", color=color.new(color.green, 0), linewidth=1, style=plot.style_linebr)
+plot(sSig ? slShort : na, "SL S",  color=color.new(color.red,   0), linewidth=1, style=plot.style_linebr)
+plot(sSig ? tp1S    : na, "TP1 S", color=color.new(color.green, 0), linewidth=1, style=plot.style_linebr)
 
-bgcolor(bull1h ? color.new(color.green, 96) : bear1h ? color.new(color.red, 96) : na)
+// ══ معلومات ══════════════════════════════════
+var table t = table.new(position.top_right, 2, 5, bgcolor=color.new(color.black,60), border_width=1)
+if barstate.islast
+    table.cell(t,0,0,"PDH", text_color=color.white, text_size=size.small)
+    table.cell(t,1,0, str.tostring(math.round(pdh,2)), text_color=color.red, text_size=size.small)
+    table.cell(t,0,1,"PDL", text_color=color.white, text_size=size.small)
+    table.cell(t,1,1, str.tostring(math.round(pdl,2)), text_color=color.green, text_size=size.small)
+    table.cell(t,0,2,"PWH", text_color=color.white, text_size=size.small)
+    table.cell(t,1,2, str.tostring(math.round(pwh,2)), text_color=color.orange, text_size=size.small)
+    table.cell(t,0,3,"PWL", text_color=color.white, text_size=size.small)
+    table.cell(t,1,3, str.tostring(math.round(pwl,2)), text_color=color.blue, text_size=size.small)
+    table.cell(t,0,4,"RSI", text_color=color.white, text_size=size.small)
+    table.cell(t,1,4, str.tostring(math.round(rsi,1)),
+               text_color= rsi > 70 ? color.red : rsi < 30 ? color.green : color.gray, text_size=size.small)
 
-// ── Alert ─────────────────────────────────────
-alertcondition(lSig, "LONG",  "LONG")
-alertcondition(sSig, "SHORT", "SHORT")
+// ══ Alerts ════════════════════════════════════
+alertcondition(lSig, "PDL/PWL Sweep — LONG",  "LONG")
+alertcondition(sSig, "PDH/PWH Sweep — SHORT", "SHORT")
