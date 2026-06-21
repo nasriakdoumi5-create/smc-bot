@@ -1,7 +1,6 @@
 //@version=5
 indicator("Kill Zone Sweep", overlay=true, max_bars_back=1000)
 
-// ── إعدادات ─────────────────────────────────────
 rsiOB    = input.int(58,    "RSI Short")
 rsiOS    = input.int(42,    "RSI Long")
 minWick  = input.float(0.25,"Min Wick/ATR", step=0.05)
@@ -9,36 +8,31 @@ swingLen = input.int(8,     "Swing Length")
 coolBars = input.int(20,    "Cooldown bars")
 showKZ   = input.bool(true, "Show Kill Zones")
 
-// ── مؤشرات ──────────────────────────────────────
 atr14 = ta.atr(14)
 rsi14 = ta.rsi(close, 14)
 
-// ── PDH / PDL ────────────────────────────────────
 pdh = request.security(syminfo.tickerid, "D", high[1], lookahead=barmerge.lookahead_off)
 pdl = request.security(syminfo.tickerid, "D", low[1],  lookahead=barmerge.lookahead_off)
 
-// ── Kill Zones ───────────────────────────────────
 inLonKZ = not na(time("5", "0700-1100", "UTC"))
 inNYKZ  = not na(time("5", "1330-1700", "UTC"))
 inKZ    = inLonKZ or inNYKZ
 
-// ── Asia Range ───────────────────────────────────
 inAsia  = not na(time("5", "0000-0700", "UTC"))
 asiaEnd = not inAsia and inAsia[1]
 var float prevAsiaH = na
 var float prevAsiaL = na
-var float _asiaH    = na
-var float _asiaL    = na
+var float tmpAsiaH  = na
+var float tmpAsiaL  = na
 if inAsia
-    _asiaH := na(_asiaH) ? high : math.max(_asiaH, high)
-    _asiaL := na(_asiaL) ? low  : math.min(_asiaL, low)
+    tmpAsiaH := na(tmpAsiaH) ? high : math.max(tmpAsiaH, high)
+    tmpAsiaL := na(tmpAsiaL) ? low  : math.min(tmpAsiaL, low)
 if asiaEnd
-    prevAsiaH := _asiaH
-    prevAsiaL := _asiaL
-    _asiaH    := na
-    _asiaL    := na
+    prevAsiaH := tmpAsiaH
+    prevAsiaL := tmpAsiaL
+    tmpAsiaH  := na
+    tmpAsiaL  := na
 
-// ── Swing H/L ────────────────────────────────────
 var float lastSwH = na
 var float lastSwL = na
 ph = ta.pivothigh(high, swingLen, swingLen)
@@ -48,88 +42,75 @@ if not na(ph)
 if not na(pl)
     lastSwL := pl
 
-// ── ذيول ─────────────────────────────────────────
 wUp = high - math.max(open, close)
 wDn = math.min(open, close) - low
 
-// ── شروط السويب (تعبيرات مباشرة) ─────────────────
-sBearCandle = close < open
-sBullCandle = close > open
+cond_pdh  = inKZ    and not na(pdh)       and high > pdh       and close < pdh       and close < open and wUp >= atr14 * minWick and rsi14 >= rsiOB
+cond_pdl  = inKZ    and not na(pdl)       and low  < pdl       and close > pdl       and close > open and wDn >= atr14 * minWick and rsi14 <= rsiOS
+cond_asiH = inLonKZ and not na(prevAsiaH) and high > prevAsiaH and close < prevAsiaH and close < open and wUp >= atr14 * minWick and rsi14 >= rsiOB
+cond_asiL = inLonKZ and not na(prevAsiaL) and low  < prevAsiaL and close > prevAsiaL and close > open and wDn >= atr14 * minWick and rsi14 <= rsiOS
+cond_swH  = inKZ    and not na(lastSwH)   and high > lastSwH   and close < lastSwH   and close < open and wUp >= atr14 * minWick and rsi14 >= rsiOB
+cond_swL  = inKZ    and not na(lastSwL)   and low  < lastSwL   and close > lastSwL   and close > open and wDn >= atr14 * minWick and rsi14 <= rsiOS
 
-pdh_s  = inKZ    and not na(pdh)       and high > pdh       and close < pdh       and sBearCandle and wUp >= atr14 * minWick and rsi14 >= rsiOB
-pdl_l  = inKZ    and not na(pdl)       and low  < pdl       and close > pdl       and sBullCandle and wDn >= atr14 * minWick and rsi14 <= rsiOS
-asiH_s = inLonKZ and not na(prevAsiaH) and high > prevAsiaH and close < prevAsiaH and sBearCandle and wUp >= atr14 * minWick and rsi14 >= rsiOB
-asiL_l = inLonKZ and not na(prevAsiaL) and low  < prevAsiaL and close > prevAsiaL and sBullCandle and wDn >= atr14 * minWick and rsi14 <= rsiOS
-swH_s  = inKZ    and not na(lastSwH)   and high > lastSwH   and close < lastSwH   and sBearCandle and wUp >= atr14 * minWick and rsi14 >= rsiOB
-swL_l  = inKZ    and not na(lastSwL)   and low  < lastSwL   and close > lastSwL   and sBullCandle and wDn >= atr14 * minWick and rsi14 <= rsiOS
+pts_short = (cond_pdh ? 3 : 0) + (cond_asiH ? 2 : 0) + (cond_swH ? 1 : 0)
+pts_long  = (cond_pdl ? 3 : 0) + (cond_asiL ? 2 : 0) + (cond_swL ? 1 : 0)
 
-// ── نقاط الجودة ──────────────────────────────────
-shortPts = (pdh_s  ? 3 : 0) + (asiH_s ? 2 : 0) + (swH_s ? 1 : 0)
-longPts  = (pdl_l  ? 3 : 0) + (asiL_l ? 2 : 0) + (swL_l ? 1 : 0)
-
-// ── Cooldown ─────────────────────────────────────
 var int lastL = -999
 var int lastS = -999
 
-lSig = longPts  > 0 and (bar_index - lastL) >= coolBars
-sSig = shortPts > 0 and (bar_index - lastS) >= coolBars
+sig_long  = pts_long  > 0 and (bar_index - lastL) >= coolBars
+sig_short = pts_short > 0 and (bar_index - lastS) >= coolBars
 
-if lSig
+if sig_long
     lastL := bar_index
-if sSig
+if sig_short
     lastS := bar_index
 
-// ── نجوم وألوان ───────────────────────────────────
-lLabel = longPts  >= 5 ? "▲ LONG ⭐⭐⭐" : longPts  >= 3 ? "▲ LONG ⭐⭐" : "▲ LONG ⭐"
-sLabel = shortPts >= 5 ? "▼ SHORT ⭐⭐⭐" : shortPts >= 3 ? "▼ SHORT ⭐⭐" : "▼ SHORT ⭐"
-lColor = longPts  >= 5 ? color.new(#00c853,0) : longPts  >= 3 ? color.new(#43a047,0) : color.new(#81c784,0)
-sColor = shortPts >= 5 ? color.new(#d50000,0) : shortPts >= 3 ? color.new(#e53935,0) : color.new(#ef9a9a,0)
+txt_long  = pts_long  >= 5 ? "▲ LONG 3" : pts_long  >= 3 ? "▲ LONG 2" : "▲ LONG 1"
+txt_short = pts_short >= 5 ? "▼ SHORT 3" : pts_short >= 3 ? "▼ SHORT 2" : "▼ SHORT 1"
 
-// ── SL / TP ───────────────────────────────────────
-slL  = lSig ? low  - atr14 * 0.1 : na
-slS  = sSig ? high + atr14 * 0.1 : na
-tp1L = lSig ? close + (close - slL) * 2 : na
-tp1S = sSig ? close - (slS - close) * 2 : na
+col_long  = pts_long  >= 5 ? color.new(#00c853,0) : pts_long  >= 3 ? color.new(#43a047,0) : color.new(#81c784,0)
+col_short = pts_short >= 5 ? color.new(#d50000,0) : pts_short >= 3 ? color.new(#e53935,0) : color.new(#ef9a9a,0)
 
-// ── رسم ──────────────────────────────────────────
-plot(pdh,       "PDH",      color.new(color.red,    35), 1, plot.style_stepline)
-plot(pdl,       "PDL",      color.new(color.green,  35), 1, plot.style_stepline)
-plot(prevAsiaH, "Asia H",   color.new(color.orange, 40), 1, plot.style_stepline)
-plot(prevAsiaL, "Asia L",   color.new(color.blue,   40), 1, plot.style_stepline)
-plot(lastSwH,   "Swing H",  color.new(color.red,    65), 1, plot.style_cross)
-plot(lastSwL,   "Swing L",  color.new(color.green,  65), 1, plot.style_cross)
+sl_long  = sig_long  ? low  - atr14 * 0.1 : na
+sl_short = sig_short ? high + atr14 * 0.1 : na
+tp_long  = sig_long  ? close + (close - sl_long)  * 2 : na
+tp_short = sig_short ? close - (sl_short - close) * 2 : na
+
+plot(pdh,       "PDH",    color.new(color.red,    35), 1, plot.style_stepline)
+plot(pdl,       "PDL",    color.new(color.green,  35), 1, plot.style_stepline)
+plot(prevAsiaH, "Asia H", color.new(color.orange, 40), 1, plot.style_stepline)
+plot(prevAsiaL, "Asia L", color.new(color.blue,   40), 1, plot.style_stepline)
+plot(lastSwH,   "Sw H",   color.new(color.red,    65), 1, plot.style_cross)
+plot(lastSwL,   "Sw L",   color.new(color.green,  65), 1, plot.style_cross)
 
 bgcolor(showKZ and inLonKZ ? color.new(color.orange, 90) : showKZ and inNYKZ ? color.new(color.teal, 90) : na, title="KZ")
 
-plotshape(lSig, style=shape.labelup,   location=location.belowbar, color=lColor, text=lLabel, textcolor=color.white, size=size.large)
-plotshape(sSig, style=shape.labeldown, location=location.abovebar, color=sColor, text=sLabel, textcolor=color.white, size=size.large)
+plotshape(sig_long,  style=shape.labelup,   location=location.belowbar, color=col_long,  text=txt_long,  textcolor=color.white, size=size.large)
+plotshape(sig_short, style=shape.labeldown, location=location.abovebar, color=col_short, text=txt_short, textcolor=color.white, size=size.large)
 
-plot(slL,  "SL L",  color.new(color.red,   10), 1, plot.style_linebr)
-plot(tp1L, "TP L",  color.new(color.green, 10), 1, plot.style_linebr)
-plot(slS,  "SL S",  color.new(color.red,   10), 1, plot.style_linebr)
-plot(tp1S, "TP S",  color.new(color.green, 10), 1, plot.style_linebr)
+plot(sl_long,  "SL L", color.new(color.red,   10), 1, plot.style_linebr)
+plot(tp_long,  "TP L", color.new(color.green, 10), 1, plot.style_linebr)
+plot(sl_short, "SL S", color.new(color.red,   10), 1, plot.style_linebr)
+plot(tp_short, "TP S", color.new(color.green, 10), 1, plot.style_linebr)
 
-// ── جدول ─────────────────────────────────────────
-var table t = table.new(position.top_right, 2, 6, bgcolor=color.new(color.black,55), border_width=1)
+var table t = table.new(position.top_right, 2, 5, bgcolor=color.new(color.black,55), border_width=1)
 if barstate.islast
-    table.cell(t,0,0,"Zone",   text_color=color.white,  text_size=size.small)
-    table.cell(t,1,0, inLonKZ ? "London KZ" : inNYKZ ? "NY KZ" : "—", text_color=color.yellow, text_size=size.small)
-    table.cell(t,0,1,"PDH",    text_color=color.white,  text_size=size.small)
-    table.cell(t,1,1, str.tostring(math.round(pdh,2)),  text_color=color.red,    text_size=size.small)
-    table.cell(t,0,2,"PDL",    text_color=color.white,  text_size=size.small)
-    table.cell(t,1,2, str.tostring(math.round(pdl,2)),  text_color=color.lime,   text_size=size.small)
-    table.cell(t,0,3,"Asia H", text_color=color.white,  text_size=size.small)
-    table.cell(t,1,3, str.tostring(math.round(na(prevAsiaH) ? 0.0 : prevAsiaH, 2)), text_color=color.orange, text_size=size.small)
-    table.cell(t,0,4,"RSI",    text_color=color.white,  text_size=size.small)
-    table.cell(t,1,4, str.tostring(math.round(rsi14,1)), text_color=rsi14>=rsiOB ? color.red : rsi14<=rsiOS ? color.lime : color.gray, text_size=size.small)
-    table.cell(t,0,5,"S/L",    text_color=color.white,  text_size=size.small)
-    table.cell(t,1,5, str.tostring(shortPts) + "/" + str.tostring(longPts), text_color=color.yellow, text_size=size.small)
+    table.cell(t, 0, 0, "Zone", text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 0, inLonKZ ? "London KZ" : inNYKZ ? "NY KZ" : "-", text_color=color.yellow, text_size=size.small)
+    table.cell(t, 0, 1, "PDH",  text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 1, str.tostring(math.round(pdh, 2)), text_color=color.red, text_size=size.small)
+    table.cell(t, 0, 2, "PDL",  text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 2, str.tostring(math.round(pdl, 2)), text_color=color.lime, text_size=size.small)
+    table.cell(t, 0, 3, "RSI",  text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 3, str.tostring(math.round(rsi14, 1)), text_color=rsi14 >= rsiOB ? color.red : rsi14 <= rsiOS ? color.lime : color.gray, text_size=size.small)
+    table.cell(t, 0, 4, "S/L",  text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 4, str.tostring(pts_short) + "/" + str.tostring(pts_long), text_color=color.yellow, text_size=size.small)
 
-// ── تنبيهات ───────────────────────────────────────
-alertcondition(lSig and longPts  >= 5,                  "LONG ⭐⭐⭐",  "LONG_HQ")
-alertcondition(lSig and longPts  >= 3 and longPts  < 5, "LONG ⭐⭐",    "LONG_MQ")
-alertcondition(lSig and longPts  < 3,                   "LONG ⭐",      "LONG_LQ")
-alertcondition(sSig and shortPts >= 5,                  "SHORT ⭐⭐⭐", "SHORT_HQ")
-alertcondition(sSig and shortPts >= 3 and shortPts < 5, "SHORT ⭐⭐",   "SHORT_MQ")
-alertcondition(sSig and shortPts < 3,                   "SHORT ⭐",     "SHORT_LQ")
-alertcondition(lSig or sSig,                            "Any Signal",   "SIGNAL")
+alertcondition(sig_long  and pts_long  >= 5,                    "LONG 3",  "LONG_HQ")
+alertcondition(sig_long  and pts_long  >= 3 and pts_long  < 5, "LONG 2",  "LONG_MQ")
+alertcondition(sig_long  and pts_long  < 3,                     "LONG 1",  "LONG_LQ")
+alertcondition(sig_short and pts_short >= 5,                    "SHORT 3", "SHORT_HQ")
+alertcondition(sig_short and pts_short >= 3 and pts_short < 5, "SHORT 2", "SHORT_MQ")
+alertcondition(sig_short and pts_short < 3,                     "SHORT 1", "SHORT_LQ")
+alertcondition(sig_long or sig_short,                           "Signal",  "SIGNAL")
