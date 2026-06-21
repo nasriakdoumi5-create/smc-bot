@@ -86,8 +86,12 @@ plot(lastSwL,   "Sw L",   color.new(color.green,  65), 1, plot.style_cross)
 
 bgcolor(showKZ and inLonKZ ? color.new(color.orange, 90) : showKZ and inNYKZ ? color.new(color.teal, 90) : na, title="KZ")
 
-plotshape(sig_long,  style=shape.labelup,   location=location.belowbar, color=col_long,  text=txt_long,  textcolor=color.white, size=size.large)
-plotshape(sig_short, style=shape.labeldown, location=location.abovebar, color=col_short, text=txt_short, textcolor=color.white, size=size.large)
+plotshape(sig_long  and pts_long  >= 5,                   style=shape.labelup,   location=location.belowbar, color=color.new(#00c853,0), text="▲ LONG ★★★", textcolor=color.white, size=size.large)
+plotshape(sig_long  and pts_long  >= 3 and pts_long  < 5, style=shape.labelup,   location=location.belowbar, color=color.new(#43a047,0), text="▲ LONG ★★",  textcolor=color.white, size=size.large)
+plotshape(sig_long  and pts_long  < 3,                    style=shape.labelup,   location=location.belowbar, color=color.new(#81c784,0), text="▲ LONG ★",   textcolor=color.white, size=size.large)
+plotshape(sig_short and pts_short >= 5,                   style=shape.labeldown, location=location.abovebar, color=color.new(#d50000,0), text="▼ SHORT ★★★",textcolor=color.white, size=size.large)
+plotshape(sig_short and pts_short >= 3 and pts_short < 5, style=shape.labeldown, location=location.abovebar, color=color.new(#e53935,0), text="▼ SHORT ★★", textcolor=color.white, size=size.large)
+plotshape(sig_short and pts_short < 3,                    style=shape.labeldown, location=location.abovebar, color=color.new(#ef9a9a,0), text="▼ SHORT ★",  textcolor=color.white, size=size.large)
 
 plot(sl_long,  "SL L", color.new(color.red,   10), 1, plot.style_linebr)
 plot(tp_long,  "TP L", color.new(color.green, 10), 1, plot.style_linebr)
