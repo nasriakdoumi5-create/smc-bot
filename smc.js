@@ -83,14 +83,13 @@ export function swingLows(bars, len = 10) {
 }
 
 // ══ Session Filter ════════════════════════════
-function inSession(bar) {
-  const d = new Date(bar.time * 1000);
-  const h = d.getUTCHours();
-  const m = d.getUTCMinutes();
-  const mins = h * 60 + m;
-  const asia   = mins >= 0       && mins < 4 * 60;        // UTC 00:00-04:00
-  const london = mins >= 8 * 60  && mins < 12 * 60;       // UTC 08:00-12:00
-  const ny     = mins >= 13 * 60 + 30 && mins < 16 * 60;  // UTC 13:30-16:00
+function inSession(_bar) {
+  // نفحص الوقت الحالي (ليس وقت الـ bar) لتجنب بيانات Yahoo المتأخرة
+  const now  = new Date();
+  const mins = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const asia   = mins >= 1 * 60       && mins < 5 * 60;    // UTC 01:00-05:00
+  const london = mins >= 7 * 60       && mins < 12 * 60;   // UTC 07:00-12:00
+  const ny     = mins >= 13 * 60 + 30 && mins < 22 * 60;   // UTC 13:30-22:00
   return asia || london || ny;
 }
 
@@ -203,7 +202,7 @@ export function analyze(bars5m, bars1h) {
   // ── ③ Liquidity Sweep ─────────────────────
   let recentSweepUp   = false;
   let recentSweepDown = false;
-  for (let i = Math.max(0, n - 20); i < n; i++) {
+  for (let i = Math.max(0, n - 40); i < n; i++) {
     const b = bars5m[i];
     if (lastSH && b.high > lastSH && b.close < lastSH) recentSweepUp   = true;
     if (lastSL && b.low  < lastSL && b.close > lastSL) recentSweepDown = true;
@@ -216,9 +215,9 @@ export function analyze(bars5m, bars1h) {
   for (let i = Math.max(1, n - 30); i < n - 1; i++) {
     const b    = bars5m[i];
     const next = bars5m[i + 1];
-    const bullDisp = next.close > bars5m[i].high && (next.close - next.open) > curATR * 1.5;
+    const bullDisp = next.close > bars5m[i].high && (next.close - next.open) > curATR * 0.8;
     if (bullDisp && b.open > b.close) { bullOB_top = b.open; bullOB_bot = b.close; }
-    const bearDisp = next.close < bars5m[i].low && (next.open - next.close) > curATR * 1.5;
+    const bearDisp = next.close < bars5m[i].low && (next.open - next.close) > curATR * 0.8;
     if (bearDisp && b.close > b.open) { bearOB_top = b.close; bearOB_bot = b.open; }
   }
 
@@ -281,7 +280,7 @@ export function analyze(bars5m, bars1h) {
   const price = last.close;
   let signal = null;
 
-  if (scoreLong >= 5 && scoreLong > scoreShort && htfBull) {
+  if (scoreLong >= 3 && scoreLong > scoreShort && htfBull) {
     const sl   = bullOB_bot ? bullOB_bot - atr1h * 0.5 : price - atr1h;
     const risk = Math.abs(price - sl);
     signal = {
@@ -300,7 +299,7 @@ export function analyze(bars5m, bars1h) {
         recentBullFVG, fibOTE_bull, rsiOversold, volSpike, bullMomentum
       }
     };
-  } else if (scoreShort >= 5 && scoreShort > scoreLong && htfBear) {
+  } else if (scoreShort >= 3 && scoreShort > scoreLong && htfBear) {
     const sl   = bearOB_top ? bearOB_top + atr1h * 0.5 : price + atr1h;
     const risk = Math.abs(sl - price);
     signal = {
