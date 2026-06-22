@@ -15,6 +15,28 @@
  */
 
 // ── مؤشرات ─────────────────────────────────────
+// ADX: يقيس قوة الاتجاه (لا اتجاهه)
+// ADX > 25 = اتجاه قوي | ADX < 20 = سوق متذبذب
+function calcADX(bars, period=14) {
+  const n = bars.length;
+  if (n < period+2) return { adx:20, pdi:15, ndi:15, trend:'RANGING' };
+  const trs=[],pdms=[],ndms=[];
+  for (let i=1;i<n;i++) {
+    const b=bars[i],p=bars[i-1];
+    trs.push(Math.max(b.high-b.low,Math.abs(b.high-p.close),Math.abs(b.low-p.close)));
+    const up=b.high-p.high, dn=p.low-b.low;
+    pdms.push(up>dn&&up>0?up:0);
+    ndms.push(dn>up&&dn>0?dn:0);
+  }
+  const sum=(arr)=>arr.slice(-period).reduce((a,b)=>a+b,0);
+  const trS=sum(trs),pdmS=sum(pdms),ndmS=sum(ndms);
+  const pdi=trS>0?pdmS/trS*100:15;
+  const ndi=trS>0?ndmS/trS*100:15;
+  const adx=pdi+ndi>0?Math.abs(pdi-ndi)/(pdi+ndi)*100:20;
+  const trend=adx>25?(pdi>ndi?'BULL_TREND':'BEAR_TREND'):'RANGING';
+  return { adx:+adx.toFixed(1), pdi:+pdi.toFixed(1), ndi:+ndi.toFixed(1), trend };
+}
+
 function ema(arr, period) {
   const k = 2/(period+1), out = [];
   for (let i = 0; i < arr.length; i++) {
@@ -148,6 +170,14 @@ export function analyzeSimple(bars5m, _bars15m, bars1h) {
   // فلتر Chop: السوق عرضي إذا ATR أقل من 55% من المتوسط
   const notChoppy  = !atrAvgVal || A > atrAvgVal*0.55;
 
+  // ── Market Regime (ADX على 1H) ──────────────────
+  // RANGING: ADX<20 → VWAP Bounce ممتاز (كلا الاتجاهين)
+  // BULL_TREND: ADX>25 + PDI>NDI → فقط LONG
+  // BEAR_TREND: ADX>25 + NDI>PDI → فقط SHORT
+  const regime  = calcADX(bars1h, 14);
+  const noCounterTrendLong  = regime.trend !== 'BEAR_TREND'; // لا LONG في bear قوي
+  const noCounterTrendShort = regime.trend !== 'BULL_TREND'; // لا SHORT في bull قوي
+
   // ── زخم 1H: آخر 3 شمعات 1H ──────────────────
   const last3h    = bars1h.slice(-4, -1); // آخر 3 شمعات مكتملة
   const bull1h    = last3h.filter(b=>b.close>b.open).length >= 2;
@@ -182,8 +212,8 @@ export function analyzeSimple(bars5m, _bars15m, bars1h) {
 
   // ══ قرار الدخول ═══════════════════════════════
   // زخم 1H إلزامي: لا LONG إذا 3 شمعات 1H هابطة
-  const longOk  = htfBull && vwapLong  && bouncedBull && rsiLong  && noSpike && normalATR && notChoppy && bull1h;
-  const shortOk = htfBear && vwapShort && bouncedBear && rsiShort && noSpike && normalATR && notChoppy && bear1h;
+  const longOk  = htfBull && vwapLong  && bouncedBull && rsiLong  && noSpike && normalATR && notChoppy && bull1h && noCounterTrendLong;
+  const shortOk = htfBear && vwapShort && bouncedBear && rsiShort && noSpike && normalATR && notChoppy && bear1h && noCounterTrendShort;
 
   let signal = null;
 
@@ -205,6 +235,8 @@ export function analyzeSimple(bars5m, _bars15m, bars1h) {
         vwap:   +VWAP.toFixed(2),
         score:  [vwapLong,bouncedBull,rsiLong,volOk].filter(Boolean).length,
         maxScore: 4,
+        regime: regime.trend,
+        adx:    regime.adx,
         conditions: { htfBull, vwapBounce:vwapLong, bouncedUp:bouncedBull, rsiOk:rsiLong, volOk },
       };
     }
@@ -226,17 +258,20 @@ export function analyzeSimple(bars5m, _bars15m, bars1h) {
         vwap:   +VWAP.toFixed(2),
         score:  [vwapShort,bouncedBear,rsiShort,volOk].filter(Boolean).length,
         maxScore: 4,
+        regime: regime.trend,
+        adx:    regime.adx,
         conditions: { htfBear, vwapBounce:vwapShort, bouncedDown:bouncedBear, rsiOk:rsiShort, volOk },
       };
     }
   }
 
-  const reason = !noSpike              ? `فلتر Spike — حركة ${recentMove.toFixed(0)} نقطة`
-    : !normalATR                       ? 'تذبذب شديد — خبر كبير محتمل'
-    : !notChoppy                       ? `سوق عرضي — ATR منخفض (${A.toFixed(1)} < ${(atrAvgVal*0.55).toFixed(1)})`
-    : !(vwapLong||vwapShort)           ? `السعر بعيد عن VWAP (${VWAP.toFixed(0)})`
-    : !(bouncedBull||bouncedBear)      ? 'جسم الشمعة ضعيف (<50%)'
-    : !(rsiLong||rsiShort)             ? `RSI محايد (minRSI:${minRsi.toFixed(0)} maxRSI:${maxRsi.toFixed(0)})`
+  const reason = !noSpike                         ? `فلتر Spike — حركة ${recentMove.toFixed(0)} نقطة`
+    : !normalATR                                  ? 'تذبذب شديد — خبر كبير محتمل'
+    : !notChoppy                                  ? `سوق عرضي — ATR منخفض`
+    : !noCounterTrendLong && !noCounterTrendShort ? `ADX ${regime.adx} — ضد الاتجاه القوي`
+    : !(vwapLong||vwapShort)                      ? `السعر بعيد عن VWAP (${VWAP.toFixed(0)})`
+    : !(bouncedBull||bouncedBear)                 ? 'جسم الشمعة ضعيف (<50%)'
+    : !(rsiLong||rsiShort)                        ? `RSI محايد (${minRsi.toFixed(0)}-${maxRsi.toFixed(0)})`
     : 'جميع الشروط متحققة ✅';
 
   return {
