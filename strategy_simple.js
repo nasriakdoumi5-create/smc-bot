@@ -150,8 +150,8 @@ export function analyzeSimple(bars5m, bars15m, bars1h) {
   const bouncedBear = cur.close < cur.open && cur.close < E21_5;
 
   // RSI
-  const rsiLong  = R < 48;
-  const rsiShort = R > 52;
+  const rsiLong  = R < 58;
+  const rsiShort = R > 42;
 
   // PDH/PDL sweep (بونص)
   let pdhSweep = false, pdlSweep = false;

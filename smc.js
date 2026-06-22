@@ -83,14 +83,13 @@ export function swingLows(bars, len = 10) {
 }
 
 // ══ Session Filter ════════════════════════════
-function inSession(bar) {
-  const d = new Date(bar.time * 1000);
-  const h = d.getUTCHours();
-  const m = d.getUTCMinutes();
-  const mins = h * 60 + m;
-  const asia   = mins >= 1 * 60  && mins < 4 * 60;         // UTC 01:00-04:00
-  const london = mins >= 7 * 60  && mins < 11 * 60;        // UTC 07:00-11:00
-  const ny     = mins >= 13 * 60 + 30 && mins < 21 * 60;   // UTC 13:30-21:00 (9:30-17:00 ET)
+function inSession(_bar) {
+  // نفحص الوقت الحالي (ليس وقت الـ bar) لتجنب بيانات Yahoo المتأخرة
+  const now  = new Date();
+  const mins = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const asia   = mins >= 1 * 60       && mins < 5 * 60;    // UTC 01:00-05:00
+  const london = mins >= 7 * 60       && mins < 12 * 60;   // UTC 07:00-12:00
+  const ny     = mins >= 13 * 60 + 30 && mins < 22 * 60;   // UTC 13:30-22:00
   return asia || london || ny;
 }
 
@@ -281,7 +280,7 @@ export function analyze(bars5m, bars1h) {
   const price = last.close;
   let signal = null;
 
-  if (scoreLong >= 4 && scoreLong > scoreShort && htfBull) {
+  if (scoreLong >= 3 && scoreLong > scoreShort && htfBull) {
     const sl   = bullOB_bot ? bullOB_bot - atr1h * 0.5 : price - atr1h;
     const risk = Math.abs(price - sl);
     signal = {
@@ -300,7 +299,7 @@ export function analyze(bars5m, bars1h) {
         recentBullFVG, fibOTE_bull, rsiOversold, volSpike, bullMomentum
       }
     };
-  } else if (scoreShort >= 4 && scoreShort > scoreLong && htfBear) {
+  } else if (scoreShort >= 3 && scoreShort > scoreLong && htfBear) {
     const sl   = bearOB_top ? bearOB_top + atr1h * 0.5 : price + atr1h;
     const risk = Math.abs(sl - price);
     signal = {
