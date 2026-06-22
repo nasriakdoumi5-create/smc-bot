@@ -194,14 +194,19 @@ ${calSummary}
 }
 
 function scheduleDailySummary() {
-  const now  = new Date();
-  const next = new Date();
-  next.setHours(8, 0, 0, 0);
-  if (next <= now) next.setDate(next.getDate() + 1);
-  setTimeout(() => {
+  function nextMorning() {
+    // 8:00 صباحاً بتوقيت الجزائر (UTC+1)
+    const now  = new Date();
+    const next = new Date();
+    // نحسب 7:00 UTC = 8:00 الجزائر
+    next.setUTCHours(7, 0, 0, 0);
+    if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+    return next - now;
+  }
+  setTimeout(function fire() {
     dailySummary();
-    setInterval(dailySummary, 86400000);
-  }, next - now);
+    setTimeout(fire, nextMorning());
+  }, nextMorning());
 }
 
 // ══ بدء التشغيل ══════════════════════════════════
@@ -225,8 +230,7 @@ tg(`🚀 <b>NQ Bot يعمل الآن</b>
 
 <i>الإشارات تصل هنا مع تقييم الجودة ⭐</i>`).catch(() => {});
 
-dailySummary();
-scheduleDailySummary();
+scheduleDailySummary(); // يرسل صباح الخير الساعة 8:00 فقط (UTC+1)
 check();
 setInterval(check, CHECK_MS);
 
