@@ -88,95 +88,141 @@ ${e.forecast ? `📊 التوقع: ${e.forecast}` : ''}
   }
 }
 
-// ══ فحص رمز واحد ══════════════════════════════════
+// ══ فحص رمز واحد — VWAP Bounce + Liquidity ════════
 async function checkSymbol(symbol, t) {
-  const [bars5m, bars15m, bars1h] = await Promise.all([
-    get5mBars(symbol),
-    get15mBars(symbol),
-    get1hBars(symbol),
-  ]);
-
-  const r = analyzeSimple(bars5m, bars15m, bars1h);
-
-  if (r.error) {
-    console.log(`[${t}] ${symbol} ⚠️  ${r.error}`);
+  const bars5m = await get5mBars(symbol);
+  if (!bars5m || bars5m.length < 50) {
+    console.log(`[${t}] ${symbol} ⚠️ بيانات غير كافية`);
     return;
   }
 
+  // ── حساب المؤشرات مباشرة ──
+  const i = bars5m.length - 1;
+  const b = bars5m[i];
+  const p1 = bars5m[i - 1];
+
+  // ATR
+  let atrSum = 0;
+  for (let j = i - 13; j <= i; j++)
+    atrSum += Math.max(bars5m[j].high - bars5m[j].low,
+      Math.abs(bars5m[j].high - bars5m[j-1].close),
+      Math.abs(bars5m[j].low  - bars5m[j-1].close));
+  const atr = atrSum / 14;
+
+  // RSI
+  let g = 0, l = 0;
+  for (let j = i - 13; j <= i; j++) {
+    const d = bars5m[j].close - bars5m[j-1].close;
+    if (d > 0) g += d; else l -= d;
+  }
+  const rsi = l === 0 ? 100 : 100 - 100 / (1 + g / l);
+
+  // VWAP (daily)
+  const barDate = new Date(b.time * 1000);
+  barDate.setUTCHours(0,0,0,0);
+  const dayTs = barDate.getTime() / 1000;
+  let tpv = 0, vn = 0;
+  for (let j = i; j >= 0; j--) {
+    if (bars5m[j].time < dayTs) break;
+    tpv += (bars5m[j].high + bars5m[j].low + bars5m[j].close) / 3;
+    vn++;
+  }
+  const vwap = vn > 0 ? tpv / vn : b.close;
+  const upper = vwap + atr * 1.5;
+  const lower = vwap - atr * 1.5;
+
+  // PDH/PDL
+  const todayTs = dayTs;
+  const yestTs  = todayTs - 86400;
+  let pdh = -Infinity, pdl = Infinity;
+  for (let j = i; j >= 0; j--) {
+    if (bars5m[j].time < yestTs) break;
+    if (bars5m[j].time < todayTs) {
+      pdh = Math.max(pdh, bars5m[j].high);
+      pdl = Math.min(pdl, bars5m[j].low);
+    }
+  }
+  pdh = isFinite(pdh) ? pdh : null;
+  pdl = isFinite(pdl) ? pdl : null;
+
+  // Session check 07:00-20:00 UTC
+  const nowH = new Date(b.time * 1000).getUTCHours();
+  const inSession = nowH >= 7 && nowH < 20;
+
+  const price  = b.close;
+  const wUp    = b.high  - Math.max(b.open, b.close);
+  const wDn    = Math.min(b.open, b.close) - b.low;
   const session = currentSession();
+
   console.log(
-    `[${t}] ${symbol} @ ${r.price} | ${r.htfTrend} | ${session} | ` +
-    `L:${r.scoreLong}/5 S:${r.scoreShort}/5 | RSI:${r.rsi} | ` +
-    (r.debug?.reason ? r.debug.reason : '') +
-    (r.signal ? ` → 🚨 ${r.signal.type} ${r.signal.score}/5` : '')
+    `[${t}] ${symbol} @ ${price.toFixed(2)} | VWAP:${vwap.toFixed(0)} ` +
+    `U:${upper.toFixed(0)} L:${lower.toFixed(0)} | RSI:${rsi.toFixed(0)} | ${session}`
   );
 
-  if (!r.signal) return;
+  if (!inSession) return;
+  if (await isNewsTime()) { console.log(`[${t}] ${symbol} 🚫 خبر جارٍ`); return; }
 
-  // Cooldown لكل رمز على حدة
+  // ── شروط الإشارة ──
+  let sigType = null, reason = '', priority = 0;
+
+  // ① PDH Sweep SHORT (أعلى أولوية)
+  if (pdh && b.high > pdh && b.close < pdh && b.close < b.open && wUp >= atr * 0.15 && rsi >= 55) {
+    sigType = 'SHORT'; reason = '⚡ سحب سيولة PDH'; priority = 5;
+
+  // ② PDL Sweep LONG (أعلى أولوية)
+  } else if (pdl && b.low < pdl && b.close > pdl && b.close > b.open && wDn >= atr * 0.15 && rsi <= 45) {
+    sigType = 'LONG'; reason = '⚡ سحب سيولة PDL'; priority = 5;
+
+  // ③ VWAP Upper Band SHORT
+  } else if (b.high >= upper && b.close < upper && b.close < b.open && wUp >= atr * 0.15 && rsi >= 56) {
+    sigType = 'SHORT'; reason = 'VWAP Upper Band'; priority = 3;
+
+  // ④ VWAP Lower Band LONG
+  } else if (b.low <= lower && b.close > lower && b.close > b.open && wDn >= atr * 0.15 && rsi <= 44) {
+    sigType = 'LONG'; reason = 'VWAP Lower Band'; priority = 3;
+  }
+
+  if (!sigType) return;
+
+  // Cooldown
   const now    = Date.now();
   const sym    = state[symbol];
-  const sigKey = `${r.signal.type}_${Math.round(r.signal.price / 20)}`;
+  const sigKey = `${sigType}_${Math.round(price / 30)}`;
   if (sigKey === sym.lastSignalKey && now - sym.lastSignalTime < COOLDOWN) {
-    console.log(`[${t}] ${symbol} ⏳ Cooldown (${Math.round((COOLDOWN - (now - sym.lastSignalTime)) / 60000)} دقيقة باقية)`);
+    console.log(`[${t}] ${symbol} ⏳ Cooldown`);
     return;
-  }
-
-  if (await isNewsTime()) {
-    console.log(`[${t}] ${symbol} 🚫 خبر جارٍ — تجاهل الإشارة`);
-    return;
-  }
-
-  // ══ Gemini فلتر للإشارات الضعيفة (3/5) ═════
-  const sig  = r.signal;
-  const name = SYMBOL_NAMES[symbol] || symbol;
-  if (sig.score <= 3) {
-    const ai = await validateSignal(sig, name).catch(() => ({ confirm: true, reason: '' }));
-    if (!ai.confirm) {
-      console.log(`[${t}] ${symbol} 🤖 Gemini رفض الإشارة: ${ai.reason}`);
-      return;
-    }
-    sig._aiReason = ai.reason;
   }
 
   sym.lastSignalKey  = sigKey;
   sym.lastSignalTime = now;
   stats.total++;
-  sig.type === 'LONG' ? stats.long++ : stats.short++;
+  sigType === 'LONG' ? stats.long++ : stats.short++;
   stats.bySymbol[symbol] = (stats.bySymbol[symbol] || 0) + 1;
 
-  // ══ رسالة Telegram ══════════════════════════
-  const isBull  = sig.type === 'LONG';
-  const q       = quality(sig.score);
-  const risk    = Math.abs(sig.price - sig.sl);
-  const rr      = risk > 0 ? (Math.abs(sig.tp1 - sig.price) / risk).toFixed(1) : '?';
-  const conds   = Object.entries(sig.conditions).map(([k, v]) => condLine(k, v)).join('\n');
-
-  const pdhLine = sig.pdh ? `📌 PDH: <b>${sig.pdh}</b>  |  PDL: <b>${sig.pdl}</b>` : '';
-  const e21Line = sig.e21_15m
-    ? `📉 EMA21 → 5M: ${sig.e21_5m}  |  15M: ${sig.e21_15m}`
-    : `📉 EMA21 (5M): ${sig.e21_5m}`;
-  const aiLine  = sig._aiReason ? `\n🤖 <i>Gemini: ${sig._aiReason}</i>` : '';
+  const sl   = sigType === 'LONG' ? b.low  - atr * 0.1 : b.high + atr * 0.1;
+  const risk = Math.abs(price - sl);
+  const tp1  = sigType === 'LONG' ? price + risk * 2   : price - risk * 2;
+  const tp2  = sigType === 'LONG' ? price + risk * 3   : price - risk * 3;
+  const name = SYMBOL_NAMES[symbol] || symbol;
+  const stars = priority >= 5 ? '⭐⭐⭐' : priority >= 4 ? '⭐⭐' : '⭐';
 
   await tg(
-`${isBull ? '📈' : '📉'} <b>${sig.type} — ${name}</b>   ${q.stars} ${q.label}
+`${sigType === 'LONG' ? '📈' : '📉'} <b>${sigType} — ${name}</b>   ${stars}
 
-💰 الدخول:  <b>${sig.price}</b>
-🛑 SL:      <b>${sig.sl}</b>   (−${risk.toFixed(0)} نقطة)
-🎯 TP1:     <b>${sig.tp1}</b>   (R:R ${rr}:1)
-🎯 TP2:     <b>${sig.tp2}</b>   (R:R ${(risk > 0 ? Math.abs(sig.tp2 - sig.price)/risk : 0).toFixed(1)}:1)
+💰 الدخول:  <b>${price.toFixed(2)}</b>
+🛑 SL:      <b>${sl.toFixed(2)}</b>   (−${risk.toFixed(0)} نقطة)
+🎯 TP1:     <b>${tp1.toFixed(2)}</b>   (R:R 1:2)
+🎯 TP2:     <b>${tp2.toFixed(2)}</b>   (R:R 1:3)
 
-${e21Line}
-${pdhLine}
-📊 RSI: ${sig.rsi}   |   ATR: ${sig.atr}
+〰️ VWAP: ${vwap.toFixed(2)}   |   RSI: ${rsi.toFixed(0)}   |   ATR: ${atr.toFixed(0)}
+${pdh ? `📌 PDH: ${pdh.toFixed(2)}   |   PDL: ${pdl?.toFixed(2) ?? '-'}` : ''}
+📋 <i>${reason}</i>
 🕐 ${session}   |   ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}
 
-${conds}
-${aiLine}
-<i>⚠️ إدارة المخاطر: لا تخاطر بأكثر من 1-2% من رأس المال</i>`
+<i>⚠️ انتظر إغلاق الشمعة قبل الدخول — لا تخاطر أكثر من 1-2%</i>`
   );
 
-  console.log(`[${t}] ✅ إشارة #${stats.total} — ${symbol} ${sig.type} @ ${sig.price} | ${q.label} (${sig.score}/5)`);
+  console.log(`[${t}] ✅ إشارة #${stats.total} — ${symbol} ${sigType} @ ${price.toFixed(2)} | ${reason}`);
 }
 
 // ══ الفحص الرئيسي (كل الرموز) ════════════════════
