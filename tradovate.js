@@ -181,11 +181,11 @@ class TradovateClient {
 export const tradovate = new TradovateClient();
 
 // ══ دالة التنفيذ المستخدمة في bot.js ══════════
-export async function executeSignal(signal) {
+export async function executeSignal(signal, symbol) {
   const qty = parseInt(process.env.TRADE_QTY || '1');
 
-  // جلب العقد
-  const contract = await tradovate.findContract(process.env.SYMBOL || 'MNQ');
+  // جلب العقد (MNQ أو MES حسب الإشارة)
+  const contract = await tradovate.findContract(symbol || process.env.SYMBOL || 'MNQ');
 
   // تنفيذ
   return tradovate.placeBracketOrder({
