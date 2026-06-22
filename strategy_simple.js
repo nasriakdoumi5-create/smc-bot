@@ -111,16 +111,24 @@ export function analyzeSimple(bars5m, bars15m, bars1h) {
   // PDH / PDL
   const pdhl = getPDHL(bars1h);
 
-  // ══ ② MTF Structure — 15M EMA21 ════════════
-  const c15m  = bars15m.map(b => b.close);
+  // ══ ② MTF Structure — 15M ════════════════════
+  const c15m      = bars15m.map(b => b.close);
   const e21_15arr = ema(c15m, 21);
-  const n15  = bars15m.length - 1;
-  const E21_15 = e21_15arr[n15];
-  const price15 = bars15m[n15].close;
-  const mtfNear = E21_15 && Math.abs(price15 - E21_15) / E21_15 < 0.005;
+  const e50_15arr = ema(c15m, 50);
+  const n15       = bars15m.length - 1;
+  const E21_15    = e21_15arr[n15];
+  const E50_15    = e50_15arr[n15];
+  const price15   = bars15m[n15].close;
+
+  // السعر في منطقة التصحيح: بين EMA21 و EMA50 على 15M
+  const mtfNear = E21_15 && E50_15 && Math.abs(price15 - E21_15) / E21_15 < 0.004;
+  const mtfPullback = E21_15 && (
+    (htfBull && price15 >= E21_15 * 0.998 && price15 <= E50_15 * 1.01) ||
+    (htfBear && price15 <= E21_15 * 1.002 && price15 >= E50_15 * 0.99)
+  );
 
   // ══ ③ LTF Entry — 5M ════════════════════════
-  const c5m    = bars5m.map(b => b.close);
+  const c5m     = bars5m.map(b => b.close);
   const e21_5arr = ema(c5m, 21);
   const atr5arr  = atrCalc(bars5m, 14);
   const rsi5arr  = rsiCalc(bars5m, 14);
@@ -130,6 +138,7 @@ export function analyzeSimple(bars5m, bars15m, bars1h) {
   const p1  = bars5m[n5 - 1];
   const p2  = bars5m[n5 - 2];
   const p3  = bars5m[n5 - 3];
+  const p4  = bars5m[n5 - 4];
 
   const E21_5 = e21_5arr[n5];
   const A     = atr5arr[n5];
@@ -138,43 +147,55 @@ export function analyzeSimple(bars5m, bars15m, bars1h) {
 
   const price = cur.close;
 
-  // لمس EMA21 في آخر 4 شمعات
-  const touchedBull = [p1, p2, p3].some((b, j) => b.low  <= (e21_5arr[n5-1-j] ?? E21_5) * 1.002);
-  const touchedBear = [p1, p2, p3].some((b, j) => b.high >= (e21_5arr[n5-1-j] ?? E21_5) * 0.998);
+  // ① فلتر Spike — لا ندخل بعد حركة مفاجئة كبيرة
+  const recentMove  = Math.abs(p1.close - p3.close);
+  const noSpike     = recentMove < A * 2.0;
 
-  // شمعة ارتداد قوية
-  const body       = Math.abs(cur.close - cur.open);
-  const range      = cur.high - cur.low || 0.01;
-  const strongBody = body / range > 0.38;
-  const bouncedBull = cur.close > cur.open && cur.close > E21_5;
-  const bouncedBear = cur.close < cur.open && cur.close < E21_5;
+  // ② لمس EMA21 حقيقي — الشمعة يجب أن تكون لمست أو تقاطعت مع EMA21
+  const touchedBull = [p1, p2, p3].some((b, j) => {
+    const e = e21_5arr[n5-1-j] ?? E21_5;
+    return b.low <= e * 1.001; // لمس حقيقي من الأعلى
+  });
+  const touchedBear = [p1, p2, p3].some((b, j) => {
+    const e = e21_5arr[n5-1-j] ?? E21_5;
+    return b.high >= e * 0.999; // لمس حقيقي من الأسفل
+  });
 
-  // RSI
-  const rsiLong  = R < 58;
-  const rsiShort = R > 42;
+  // ③ شمعة ارتداد قوية — جسم > 50% + إغلاق قوي
+  const body      = Math.abs(cur.close - cur.open);
+  const range     = cur.high - cur.low || 0.01;
+  const strongBody = body / range > 0.50;
+  const bouncedBull = cur.close > cur.open && strongBody && cur.close > E21_5;
+  const bouncedBear = cur.close < cur.open && strongBody && cur.close < E21_5;
 
-  // PDH/PDL sweep (بونص)
+  // ④ RSI — ضعف حقيقي قبل الارتداد
+  const rsiLong  = R < 50; // ذروة البيع على 5M
+  const rsiShort = R > 50; // ذروة الشراء على 5M
+
+  // ⑤ PDH/PDL sweep — بونص عالي الجودة
   let pdhSweep = false, pdlSweep = false;
   if (pdhl) {
-    pdlSweep = cur.low < pdhl.pdl && cur.close > pdhl.pdl; // كسح PDL + إغلاق فوقه
-    pdhSweep = cur.high > pdhl.pdh && cur.close < pdhl.pdh; // كسح PDH + إغلاق تحته
+    pdlSweep = [p1, p2, p3].some(b => b.low < pdhl.pdl) && cur.close > pdhl.pdl;
+    pdhSweep = [p1, p2, p3].some(b => b.high > pdhl.pdh) && cur.close < pdhl.pdh;
   }
 
-  // ══ النقاط ══════════════════════════════════
-  let scoreLong  = (mtfNear ? 1:0) + (touchedBull ? 1:0) + (bouncedBull ? 1:0) + (rsiLong  ? 1:0) + (pdlSweep ? 1:0);
-  let scoreShort = (mtfNear ? 1:0) + (touchedBear ? 1:0) + (bouncedBear ? 1:0) + (rsiShort ? 1:0) + (pdhSweep ? 1:0);
+  // ══ النقاط (5 شروط) ══════════════════════════
+  const scoreLong  = (mtfNear||mtfPullback?1:0) + (touchedBull?1:0) + (bouncedBull?1:0) + (rsiLong?1:0)  + (pdlSweep?1:0);
+  const scoreShort = (mtfNear||mtfPullback?1:0) + (touchedBear?1:0) + (bouncedBear?1:0) + (rsiShort?1:0) + (pdhSweep?1:0);
 
-  const longOk  = htfBull && scoreLong  >= 3;
-  const shortOk = htfBear && scoreShort >= 3;
+  // الحد الأدنى 4/5 + لا Spike
+  const longOk  = htfBull && scoreLong  >= 4 && noSpike;
+  const shortOk = htfBear && scoreShort >= 4 && noSpike;
 
   // ══ بناء الإشارة ════════════════════════════
   let signal = null;
 
   if (longOk && (!shortOk || scoreLong >= scoreShort)) {
     const recentLow = Math.min(p1.low, p2.low, p3.low);
-    const sl   = recentLow - A * 0.3;
+    const sl   = Math.min(recentLow, E21_5) - A * 0.25;
     const risk = price - sl;
-    if (risk > 0 && risk < A * 6) {
+    // نسبة خطر معقولة: 0.5 إلى 3× ATR
+    if (risk > A * 0.5 && risk < A * 3) {
       signal = {
         type:     'LONG',
         score:    scoreLong,
@@ -190,14 +211,14 @@ export function analyzeSimple(bars5m, bars15m, bars1h) {
         e21_15m:  E21_15 ? +E21_15.toFixed(2) : null,
         pdh:      pdhl?.pdh ? +pdhl.pdh.toFixed(2) : null,
         pdl:      pdhl?.pdl ? +pdhl.pdl.toFixed(2) : null,
-        conditions: { htfBull, mtfNear, touchedEma21: touchedBull, bouncedUp: bouncedBull, rsiOk: rsiLong, pdlSweep },
+        conditions: { htfBull, mtfNear: mtfNear||mtfPullback, touchedEma21: touchedBull, bouncedUp: bouncedBull, rsiOk: rsiLong, pdlSweep },
       };
     }
   } else if (shortOk) {
     const recentHigh = Math.max(p1.high, p2.high, p3.high);
-    const sl   = recentHigh + A * 0.3;
+    const sl   = Math.max(recentHigh, E21_5) + A * 0.25;
     const risk = sl - price;
-    if (risk > 0 && risk < A * 6) {
+    if (risk > A * 0.5 && risk < A * 3) {
       signal = {
         type:     'SHORT',
         score:    scoreShort,
@@ -213,16 +234,17 @@ export function analyzeSimple(bars5m, bars15m, bars1h) {
         e21_15m:  E21_15 ? +E21_15.toFixed(2) : null,
         pdh:      pdhl?.pdh ? +pdhl.pdh.toFixed(2) : null,
         pdl:      pdhl?.pdl ? +pdhl.pdl.toFixed(2) : null,
-        conditions: { htfBear, mtfNear, touchedEma21: touchedBear, bouncedDown: bouncedBear, rsiOk: rsiShort, pdhSweep },
+        conditions: { htfBear, mtfNear: mtfNear||mtfPullback, touchedEma21: touchedBear, bouncedDown: bouncedBear, rsiOk: rsiShort, pdhSweep },
       };
     }
   }
 
-  const reason = !htfBull && !htfBear   ? 'لا اتجاه HTF'
-    : !(touchedBull || touchedBear)      ? `لم يلمس EMA21 بعد (5M: ${E21_5?.toFixed(0)})`
-    : !(bouncedBull || bouncedBear)      ? 'لا شمعة ارتداد'
-    : !(rsiLong || rsiShort)             ? `RSI محايد (${R.toFixed(0)})`
-    : (scoreLong < 3 && scoreShort < 3)  ? `النقاط غير كافية (L:${scoreLong} S:${scoreShort}/5)`
+  const reason = !htfBull && !htfBear         ? 'لا اتجاه HTF'
+    : !noSpike                                 ? `فلتر Spike — حركة مفاجئة ${recentMove.toFixed(0)} نقطة`
+    : !(touchedBull || touchedBear)            ? `لم يلمس EMA21 (${E21_5?.toFixed(0)})`
+    : !(bouncedBull || bouncedBear)            ? 'جسم الشمعة ضعيف (<50%)'
+    : !(rsiLong || rsiShort)                   ? `RSI محايد (${R.toFixed(0)}) — يحتاج <50 أو >50`
+    : (scoreLong < 4 && scoreShort < 4)        ? `النقاط غير كافية (L:${scoreLong} S:${scoreShort}/5)`
     : 'جميع الشروط متحققة';
 
   return {
@@ -238,6 +260,6 @@ export function analyzeSimple(bars5m, bars15m, bars1h) {
     signal,
     debug: { htfBull, htfBear, mtfNear, touchedBull, touchedBear,
              bouncedBull, bouncedBear, rsiLong, rsiShort, strongBody,
-             pdlSweep, pdhSweep, reason },
+             noSpike, pdlSweep, pdhSweep, reason },
   };
 }
