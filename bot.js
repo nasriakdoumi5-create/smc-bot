@@ -418,12 +418,13 @@ function scheduleDailySummary() {
 
 // ══ بدء التشغيل ══════════════════════════════════
 console.log('═'.repeat(52));
-console.log('  🤖  NQ + ES Bot — VWAP Bounce v3');
+console.log('  🤖  NQ + ES Bot — VWAP Bounce v4');
 console.log('═'.repeat(52));
 console.log(`  📊 Instruments : MNQ + MES`);
-console.log(`  🎯 Target      : RR 1.5:1 | WR 61.7%`);
+console.log(`  🎯 Target      : RR 1.5:1 | WR 63%+`);
 console.log(`  🛑 Daily limit : ${MAX_DAILY_LOSSES} losses → halt`);
-console.log(`  📋 Commands    : /win /loss /status /reset`);
+console.log(`  🤖 Auto-track  : WIN/LOSS يُسجَّل تلقائياً`);
+console.log(`  📋 Commands    : /status /trades /reset`);
 console.log(`  ⏰ Sessions    : London 07-12 | NY 13:30-15:30 UTC`);
 console.log('═'.repeat(52));
 
