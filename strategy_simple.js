@@ -136,16 +136,19 @@ export function analyzeSimple(bars5m, _bars15m, bars1h) {
   const atrAvgVal = ema(atr5.map(v=>v??0),20)[n5];
   const normalATR  = !atrAvgVal || A < atrAvgVal*2.0;
 
+  // ── زخم 1H: آخر 3 شمعات 1H ──────────────────
+  const last3h    = bars1h.slice(-4, -1); // آخر 3 شمعات مكتملة
+  const bull1h    = last3h.filter(b=>b.close>b.open).length >= 2;
+  const bear1h    = last3h.filter(b=>b.close<b.open).length >= 2;
+
   // ── VWAP Bounce LONG ──
   // السعر كان تحت VWAP ثم ارتد للأعلى
   const wasBelow    = [p1,p2,p3].some(b => b.low  < VWAP_1*1.001);
-  const crossUp     = cur.close > VWAP && p1.close < VWAP_1*1.002;
   const touchedDown = Math.min(p1.low,p2.low,p3.low) <= VWAP*1.003;
   const vwapLong    = (wasBelow || touchedDown) && cur.close >= VWAP*0.999;
 
   // ── VWAP Bounce SHORT ──
   const wasAbove    = [p1,p2,p3].some(b => b.high > VWAP_1*0.999);
-  const crossDown   = cur.close < VWAP && p1.close > VWAP_1*0.998;
   const touchedUp   = Math.max(p1.high,p2.high,p3.high) >= VWAP*0.997;
   const vwapShort   = (wasAbove || touchedUp) && cur.close <= VWAP*1.001;
 
@@ -166,8 +169,9 @@ export function analyzeSimple(bars5m, _bars15m, bars1h) {
   const volOk = !VOLAVG || VOL >= VOLAVG*0.7;
 
   // ══ قرار الدخول ═══════════════════════════════
-  const longOk  = htfBull && vwapLong  && bouncedBull && rsiLong  && noSpike && normalATR;
-  const shortOk = htfBear && vwapShort && bouncedBear && rsiShort && noSpike && normalATR;
+  // زخم 1H إلزامي: لا LONG إذا 3 شمعات 1H هابطة
+  const longOk  = htfBull && vwapLong  && bouncedBull && rsiLong  && noSpike && normalATR && bull1h;
+  const shortOk = htfBear && vwapShort && bouncedBear && rsiShort && noSpike && normalATR && bear1h;
 
   let signal = null;
 

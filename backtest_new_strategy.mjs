@@ -94,14 +94,22 @@ function inSession(t) {
   return (m>=7*60&&m<12*60)||(m>=13*60+30&&m<17*60);
 }
 
+// زخم 1H: آخر 3 شمعات 1H — هل الزخم يوافق الاتجاه؟
+function get1HMomentum(bars1h, targetTime) {
+  const recent = bars1h.filter(b=>b.time<=targetTime).slice(-4);
+  if (recent.length < 3) return null;
+  const last3  = recent.slice(-3);
+  const bullBars = last3.filter(b=>b.close>b.open).length;
+  const bearBars = last3.filter(b=>b.close<b.open).length;
+  return { bullish: bullBars >= 2, bearish: bearBars >= 2 };
+}
+
 function runBacktest(bars5m, bars1h, label, rr=1.5, hold=24) {
   const vwap5 = calcVWAP(bars5m);
   const atr5  = atrArr(bars5m,14);
   const rsi5  = rsiArr(bars5m,14);
   const atrEma= ema(atr5.map(v=>v??0),20);
   const htfMap= buildHTF(bars1h);
-  const volArr= bars5m.map(b=>b.volume||0);
-  const volEma= ema(volArr,20);
 
   const results=[];
   let lastSigTime=0;
@@ -124,6 +132,10 @@ function runBacktest(bars5m, bars1h, label, rr=1.5, hold=24) {
     // فلتر Spike
     if (Math.abs(p1.close-p4.close)>=A*2.5) continue;
 
+    // زخم 1H — لا LONG إذا آخر 3 شمعات 1H هابطة (والعكس)
+    const mom=get1HMomentum(bars1h,cur.time);
+    if (!mom) continue;
+
     // ── شروط LONG ──
     const wasBelow  = [p1,p2,p3].some(b=>b.low<VWAP1*1.001);
     const touchedDn = Math.min(p1.low,p2.low,p3.low)<=VWAP*1.003;
@@ -132,6 +144,7 @@ function runBacktest(bars5m, bars1h, label, rr=1.5, hold=24) {
     const rsiL      = minRsi < 48;
     const body      = Math.abs(cur.close-cur.open), range=cur.high-cur.low||0.01;
     const bounceL   = cur.close>cur.open && body/range>0.50;
+    const momentumL = mom.bullish; // آخر 3 شمعات 1H صاعدة (2 من 3)
 
     // ── شروط SHORT ──
     const wasAbove  = [p1,p2,p3].some(b=>b.high>VWAP1*0.999);
@@ -140,10 +153,11 @@ function runBacktest(bars5m, bars1h, label, rr=1.5, hold=24) {
     const maxRsi    = Math.max(rsi5[i-1],rsi5[i-2],rsi5[i-3]);
     const rsiS      = maxRsi > 52;
     const bounceS   = cur.close<cur.open && body/range>0.50;
+    const momentumS = mom.bearish; // آخر 3 شمعات 1H هابطة (2 من 3)
 
     let type=null;
-    if (htf==='BULL'&&vwapL&&bounceL&&rsiL) type='LONG';
-    else if (htf==='BEAR'&&vwapS&&bounceS&&rsiS) type='SHORT';
+    if (htf==='BULL'&&vwapL&&bounceL&&rsiL&&momentumL) type='LONG';
+    else if (htf==='BEAR'&&vwapS&&bounceS&&rsiS&&momentumS) type='SHORT';
     if (!type) continue;
 
     const price=cur.close;
@@ -207,8 +221,9 @@ function print({label,results,rr}) {
   console.log(`│  إشارات/شهر: ${String(mo).padEnd(33)}│`);
   console.log(`│  ربح شهري ($75/صفقة): $${m$.padEnd(21)}│`);
   console.log(`└${'─'.repeat(46)}┘`);
-  const ok=parseFloat(wr)>=50;
-  console.log(`\n  ${ok?'✅ مربحة':'❌ تحتاج تحسين'} — نجاح ${wr}%\n`);
+  // مربحة إذا Expectancy > 0 (مع RR 2:1 يكفي 34% win rate)
+  const ok = parseFloat(exp) > 0;
+  console.log(`\n  ${ok?'✅ مربحة':'❌ خاسرة'} — WR:${wr}% | Expectancy:${exp}R\n`);
   if (!results.length) console.log('  ⚠️  لا إشارات في هذه الفترة\n');
 }
 
