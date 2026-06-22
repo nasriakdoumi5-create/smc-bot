@@ -91,7 +91,11 @@ function getHTF(map,bars1h,t) {
 
 function inSession(t) {
   const m=new Date(t*1000).getUTCHours()*60+new Date(t*1000).getUTCMinutes();
-  return (m>=7*60&&m<12*60)||(m>=13*60+30&&m<17*60);
+  // London Killzone: 09:00-11:30 UTC (تجنب الفوضى في الفتح)
+  const london = m>=9*60 && m<11*60+30;
+  // NY Open Killzone: 13:30-15:30 UTC (أقوى ساعتين في النيويورك)
+  const ny = m>=13*60+30 && m<15*60+30;
+  return london || ny;
 }
 
 // زخم 1H: آخر 3 شمعات 1H — هل الزخم يوافق الاتجاه؟

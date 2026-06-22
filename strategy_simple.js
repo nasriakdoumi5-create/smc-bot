@@ -76,11 +76,20 @@ function calcVWAP(bars) {
 // ── اسم الجلسة الحالية ─────────────────────────
 export function currentSession() {
   const mins = new Date().getUTCHours()*60 + new Date().getUTCMinutes();
-  if (mins >= 7*60  && mins < 11*60)    return '🇬🇧 London';
-  if (mins >= 11*60 && mins < 13*60+30) return '🔀 London/NY';
-  if (mins >= 13*60+30 && mins < 21*60) return '🇺🇸 New York';
-  if (mins >= 1*60  && mins <  4*60)    return '🌏 Asia';
+  if (mins >= 9*60  && mins < 11*60+30)  return '🇬🇧 London KZ';
+  if (mins >= 11*60+30 && mins < 13*60+30) return '🔀 London/NY';
+  if (mins >= 13*60+30 && mins < 15*60+30) return '🇺🇸 NY Open KZ';
+  if (mins >= 7*60 && mins < 9*60)       return '🇬🇧 London Early';
+  if (mins >= 1*60  && mins <  4*60)     return '🌏 Asia';
   return '🌙 Off-Hours';
+}
+
+// ── Killzone فلتر — فقط London KZ + NY Open KZ ─
+export function isKillzone() {
+  const mins = new Date().getUTCHours()*60 + new Date().getUTCMinutes();
+  const london = mins >= 9*60 && mins < 11*60+30;
+  const ny     = mins >= 13*60+30 && mins < 15*60+30;
+  return london || ny;
 }
 
 // ══ التحليل الرئيسي ════════════════════════════
