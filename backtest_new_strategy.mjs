@@ -30,6 +30,27 @@ function ema(arr, p) {
   return o;
 }
 
+// ADX: قوة الاتجاه على 1H
+function calcADX(bars1h, period=14) {
+  const n=bars1h.length;
+  if (n<period+2) return 'RANGING';
+  const trs=[],pdms=[],ndms=[];
+  for (let i=1;i<n;i++) {
+    const b=bars1h[i],p=bars1h[i-1];
+    trs.push(Math.max(b.high-b.low,Math.abs(b.high-p.close),Math.abs(b.low-p.close)));
+    const up=b.high-p.high,dn=p.low-b.low;
+    pdms.push(up>dn&&up>0?up:0);
+    ndms.push(dn>up&&dn>0?dn:0);
+  }
+  const sum=(arr,from)=>arr.slice(from-period,from).reduce((a,b)=>a+b,0);
+  const idx=trs.length;
+  const trS=sum(trs,idx),pdmS=sum(pdms,idx),ndmS=sum(ndms,idx);
+  const pdi=trS>0?pdmS/trS*100:15;
+  const ndi=trS>0?ndmS/trS*100:15;
+  const adx=pdi+ndi>0?Math.abs(pdi-ndi)/(pdi+ndi)*100:20;
+  return adx>25?(pdi>ndi?'BULL_TREND':'BEAR_TREND'):'RANGING';
+}
+
 function atrArr(bars,p=14) {
   const tr=bars.map((b,i)=>i===0?b.high-b.low:
     Math.max(b.high-b.low,Math.abs(b.high-bars[i-1].close),Math.abs(b.low-bars[i-1].close)));
@@ -166,6 +187,13 @@ function runBacktest(bars5m, bars1h, label, rr=1.5, hold=24, compCache=null) {
     const mom=get1HMomentum(bars1h,cur.time);
     if (!mom) continue;
 
+    // ── Market Regime (ADX على 1H حتى هذا الوقت) ──
+    const recentH1=bars1h.filter(b=>b.time<=cur.time);
+    const regime=calcADX(recentH1,14);
+    // لا LONG في BEAR_TREND قوي، لا SHORT في BULL_TREND قوي
+    if (regime==='BEAR_TREND') { /* skip LONG below */ }
+    if (regime==='BULL_TREND') { /* skip SHORT below */ }
+
     // ── Divergence مع الأداة المقابلة (اختياري) ──
     // LONG: NQ تحت VWAP + ES فوق VWAP → ارتداد عالي الاحتمال
     // SHORT: NQ فوق VWAP + ES تحت VWAP → هبوط عالي الاحتمال
@@ -202,8 +230,8 @@ function runBacktest(bars5m, bars1h, label, rr=1.5, hold=24, compCache=null) {
     const momentumS = mom.bearish;
 
     let type=null;
-    if (htf==='BULL'&&vwapL&&bounceL&&rsiL&&momentumL) type='LONG';
-    else if (htf==='BEAR'&&vwapS&&bounceS&&rsiS&&momentumS) type='SHORT';
+    if (htf==='BULL'&&vwapL&&bounceL&&rsiL&&momentumL&&regime!=='BEAR_TREND') type='LONG';
+    else if (htf==='BEAR'&&vwapS&&bounceS&&rsiS&&momentumS&&regime!=='BULL_TREND') type='SHORT';
     if (!type) continue;
 
     const price=cur.close;
