@@ -1,0 +1,172 @@
+// @version=5
+strategy("VWAP Bounce — NQ+ES | ADX Filter | v3",
+     overlay=true,
+     margin_long=100, margin_short=100,
+     default_qty_type=strategy.fixed,
+     default_qty_value=1,
+     initial_capital=50000,
+     commission_type=strategy.commission.cash_per_contract,
+     commission_value=5)
+
+// ══ الإعدادات ══════════════════════════════════════
+rr       = input.float(1.5,  "نسبة RR",           step=0.5)
+atrPer   = input.int(14,     "ATR Period")
+rsiPer   = input.int(14,     "RSI Period")
+adxPer   = input.int(14,     "ADX Period")
+ema1     = input.int(21,     "EMA Fast (1H)")
+ema2     = input.int(50,     "EMA Slow (1H)")
+showSig  = input.bool(true,  "عرض الإشارات")
+showVwap = input.bool(true,  "عرض VWAP")
+
+// ══ فلتر الجلسة (London + NY Open) ════════════════
+londonStart = input.session("0700-1200", "London", group="جلسات UTC")
+nyStart     = input.session("1330-1530", "NY Open", group="جلسات UTC")
+inLondon    = not na(time("5", londonStart, "America/New_York")) == false
+inNY        = not na(time("5", nyStart,     "America/New_York")) == false
+
+// استخدام وقت UTC مباشرة
+h = hour(time, "UTC")
+m = minute(time, "UTC")
+totalMins = h * 60 + m
+inSession = (totalMins >= 7*60 and totalMins < 12*60) or
+             (totalMins >= 13*60+30 and totalMins < 15*60+30)
+
+// ══ VWAP يومي ══════════════════════════════════════
+vwapVal = ta.vwap(hlc3)
+
+// ══ ATR + RSI ══════════════════════════════════════
+atrVal  = ta.atr(atrPer)
+atrAvg  = ta.ema(atrVal, 20)
+rsiVal  = ta.rsi(close, rsiPer)
+
+// ══ Chop Filter ════════════════════════════════════
+notChoppy = atrVal > atrAvg * 0.55
+normalATR = atrVal < atrAvg * 2.0
+
+// ══ ADX — Market Regime ════════════════════════════
+[diPlus, diMinus, adxVal] = ta.dmi(adxPer, adxPer)
+isBullTrend = adxVal > 25 and diPlus  > diMinus
+isBearTrend = adxVal > 25 and diMinus > diPlus
+isRanging   = adxVal <= 25
+
+// ══ HTF Bias — EMA على 1H ══════════════════════════
+ema21_1h = request.security(syminfo.tickerid, "60", ta.ema(close, ema1), lookahead=barmerge.lookahead_off)
+ema50_1h = request.security(syminfo.tickerid, "60", ta.ema(close, ema2), lookahead=barmerge.lookahead_off)
+htfBull  = ema21_1h > ema50_1h
+htfBear  = ema21_1h < ema50_1h
+
+// ══ زخم 1H: آخر 3 شمعات ══════════════════════════
+close_1h  = request.security(syminfo.tickerid, "60", close,  lookahead=barmerge.lookahead_off)
+open_1h   = request.security(syminfo.tickerid, "60", open,   lookahead=barmerge.lookahead_off)
+bull1h_1  = close_1h[1] > open_1h[1]
+bull1h_2  = close_1h[2] > open_1h[2]
+bull1h_3  = close_1h[3] > open_1h[3]
+bear1h_1  = close_1h[1] < open_1h[1]
+bear1h_2  = close_1h[2] < open_1h[2]
+bear1h_3  = close_1h[3] < open_1h[3]
+momBull   = (bull1h_1 ? 1 : 0) + (bull1h_2 ? 1 : 0) + (bull1h_3 ? 1 : 0) >= 2
+momBear   = (bear1h_1 ? 1 : 0) + (bear1h_2 ? 1 : 0) + (bear1h_3 ? 1 : 0) >= 2
+
+// ══ VWAP Bounce LONG ══════════════════════════════
+wasBelow   = low[1] < vwapVal[1] * 1.001 or low[2] < vwapVal[2] * 1.001 or low[3] < vwapVal[3] * 1.001
+touchedDn  = math.min(low[1], low[2], low[3]) <= vwapVal * 1.003
+vwapLong   = (wasBelow or touchedDn) and close >= vwapVal * 0.999
+
+// ══ VWAP Bounce SHORT ══════════════════════════════
+wasAbove   = high[1] > vwapVal[1] * 0.999 or high[2] > vwapVal[2] * 0.999 or high[3] > vwapVal[3] * 0.999
+touchedUp  = math.max(high[1], high[2], high[3]) >= vwapVal * 0.997
+vwapShort  = (wasAbove or touchedUp) and close <= vwapVal * 1.001
+
+// ══ شمعة ارتداد قوية ══════════════════════════════
+bodySize   = math.abs(close - open)
+rangeSize  = high - low + 0.001
+strongBody = bodySize / rangeSize > 0.50
+bounceBull = close > open and strongBody
+bounceBear = close < open and strongBody
+
+// ══ RSI على شمعات التراجع ══════════════════════════
+minRsi = math.min(rsiVal[1], rsiVal[2], rsiVal[3])
+maxRsi = math.max(rsiVal[1], rsiVal[2], rsiVal[3])
+rsiLong  = minRsi < 48
+rsiShort = maxRsi > 52
+
+// ══ فلتر Spike ═════════════════════════════════════
+recentMove = math.abs(close[1] - close[4])
+noSpike    = recentMove < atrVal * 2.5
+
+// ══ قرار الدخول ════════════════════════════════════
+longOk  = htfBull and vwapLong  and bounceBull and rsiLong  and noSpike and normalATR and notChoppy and momBull and not isBearTrend and inSession
+shortOk = htfBear and vwapShort and bounceBear and rsiShort and noSpike and normalATR and notChoppy and momBear and not isBullTrend and inSession
+
+// ══ حساب مستويات الصفقة ════════════════════════════
+recentLow  = math.min(low[1], low[2], low[3])
+recentHigh = math.max(high[1], high[2], high[3])
+
+longSL   = math.min(recentLow,  vwapVal) - atrVal * 0.3
+shortSL  = math.max(recentHigh, vwapVal) + atrVal * 0.3
+
+longRisk  = close - longSL
+shortRisk = shortSL - close
+
+longTP  = close + longRisk  * rr
+shortTP = close - shortRisk * rr
+
+longBE  = close + longRisk  * 0.7
+shortBE = close - shortRisk * 0.7
+
+validLong  = longOk  and longRisk  > atrVal * 0.3 and longRisk  < atrVal * 2.5
+validShort = shortOk and shortRisk > atrVal * 0.3 and shortRisk < atrVal * 2.5
+
+// ══ تنفيذ الصفقات ══════════════════════════════════
+if validLong and strategy.position_size == 0
+    strategy.entry("LONG", strategy.long)
+    strategy.exit("EXIT_L", "LONG", stop=longSL, limit=longTP)
+
+if validShort and strategy.position_size == 0
+    strategy.entry("SHORT", strategy.short)
+    strategy.exit("EXIT_S", "SHORT", stop=shortSL, limit=shortTP)
+
+// ══ رسم VWAP ═══════════════════════════════════════
+plot(showVwap ? vwapVal : na, "VWAP", color=color.new(color.yellow, 0), linewidth=2)
+
+// ══ رسم EMA 1H ══════════════════════════════════════
+plot(ema21_1h, "EMA21 1H", color=color.new(color.green, 40), linewidth=1)
+plot(ema50_1h, "EMA50 1H", color=color.new(color.red,   40), linewidth=1)
+
+// ══ إشارات الدخول ══════════════════════════════════
+plotshape(showSig and validLong,  "LONG",  shape.labelup,   location.belowbar, color.new(color.green, 0), text="L", textcolor=color.white, size=size.small)
+plotshape(showSig and validShort, "SHORT", shape.labeldown, location.abovebar, color.new(color.red,   0), text="S", textcolor=color.white, size=size.small)
+
+// ══ مستويات SL / TP / BE ══════════════════════════
+var line slLine = na
+var line tpLine = na
+var line beLine = na
+
+if validLong
+    slLine := line.new(bar_index, longSL,  bar_index+20, longSL,  color=color.red,    width=1, style=line.style_dashed)
+    tpLine := line.new(bar_index, longTP,  bar_index+20, longTP,  color=color.green,  width=1, style=line.style_dashed)
+    beLine := line.new(bar_index, longBE,  bar_index+20, longBE,  color=color.orange, width=1, style=line.style_dotted)
+
+if validShort
+    slLine := line.new(bar_index, shortSL, bar_index+20, shortSL, color=color.red,    width=1, style=line.style_dashed)
+    tpLine := line.new(bar_index, shortTP, bar_index+20, shortTP, color=color.green,  width=1, style=line.style_dashed)
+    beLine := line.new(bar_index, shortBE, bar_index+20, shortBE, color=color.orange, width=1, style=line.style_dotted)
+
+// ══ لون الخلفية حسب الجلسة ════════════════════════
+bgcolor(inSession ? color.new(color.blue, 95) : na, title="Killzone")
+
+// ══ جدول معلومات ADX + Regime ══════════════════════
+var table infoTable = table.new(position.top_right, 2, 5, border_width=1)
+if barstate.islast
+    regime = isBullTrend ? "🐂 BULL" : isBearTrend ? "🐻 BEAR" : "↔ RANGING"
+    regCol = isBullTrend ? color.green : isBearTrend ? color.red : color.gray
+    table.cell(infoTable, 0, 0, "Regime",  text_color=color.white, bgcolor=color.navy)
+    table.cell(infoTable, 1, 0, regime,    text_color=color.white, bgcolor=regCol)
+    table.cell(infoTable, 0, 1, "ADX",     text_color=color.white, bgcolor=color.navy)
+    table.cell(infoTable, 1, 1, str.tostring(adxVal, "#.0"), text_color=color.white, bgcolor=color.navy)
+    table.cell(infoTable, 0, 2, "RSI",     text_color=color.white, bgcolor=color.navy)
+    table.cell(infoTable, 1, 2, str.tostring(rsiVal, "#.0"), text_color=color.white, bgcolor=color.navy)
+    table.cell(infoTable, 0, 3, "VWAP",    text_color=color.white, bgcolor=color.navy)
+    table.cell(infoTable, 1, 3, str.tostring(vwapVal, "#.2"), text_color=color.white, bgcolor=color.navy)
+    table.cell(infoTable, 0, 4, "Session", text_color=color.white, bgcolor=color.navy)
+    table.cell(infoTable, 1, 4, inSession ? "✅ KZ" : "🌙 OFF", text_color=color.white, bgcolor=inSession ? color.green : color.gray)
