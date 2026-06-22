@@ -27,16 +27,19 @@ const INSTRUMENTS = [
 // ══ حالة كل أداة ══════════════════════════════════
 const instState = {};
 for (const inst of INSTRUMENTS) {
-  instState[inst.symbol] = { lastSignalTime: 0, lastSignalKey: '' };
+  instState[inst.symbol] = { lastSignalTime: 0, dailySignals: 0 };
 }
 
 // ══ الحالة اليومية ════════════════════════════════
+const MAX_SIGNALS_PER_INST = 3;  // حد أقصى 3 إشارات/أداة/يوم للحفاظ على الجودة
 const daily = { losses: 0, wins: 0, signals: 0, halted: false, date: '' };
 
 function resetDailyIfNeeded() {
-  const today = new Date().toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid' });
+  // UTC — متوافق مع نوافذ الجلسات
+  const today = new Date().toISOString().slice(0, 10);
   if (daily.date !== today) {
     Object.assign(daily, { losses: 0, wins: 0, signals: 0, halted: false, date: today });
+    for (const inst of INSTRUMENTS) instState[inst.symbol].dailySignals = 0;
   }
 }
 
@@ -158,12 +161,19 @@ async function processInstrument(inst, session) {
   const r = analyzeSimple(bars5m, bars15m, bars1h);
   if (r.error || !r.signal) return;
 
-  const now    = Date.now();
-  const sigKey = `${r.signal.type}_${Math.round(r.signal.price / 20)}`;
-  if (sigKey === s.lastSignalKey && now - s.lastSignalTime < COOLDOWN) return;
+  const now = Date.now();
 
-  s.lastSignalKey  = sigKey;
+  // فلتر الجودة — فقط ⭐⭐ أو ⭐⭐⭐ (score >= 2)
+  if (r.signal.score < 2) return;
+
+  // cooldown زمني بحت (لا يعتمد على السعر)
+  if (now - s.lastSignalTime < COOLDOWN) return;
+
+  // حد أقصى للإشارات اليومية لكل أداة
+  if (s.dailySignals >= MAX_SIGNALS_PER_INST) return;
+
   s.lastSignalTime = now;
+  s.dailySignals++;
   stats.total++;
   daily.signals++;
   r.signal.type === 'LONG' ? stats.long++ : stats.short++;

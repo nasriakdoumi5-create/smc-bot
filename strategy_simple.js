@@ -184,31 +184,31 @@ export function analyzeSimple(bars5m, _bars15m, bars1h) {
   const bear1h    = last3h.filter(b=>b.close<b.open).length >= 2;
 
   // ── VWAP Bounce LONG ──
-  // السعر كان تحت VWAP ثم ارتد للأعلى
-  const wasBelow    = [p1,p2,p3].some(b => b.low  < VWAP_1*1.001);
-  const touchedDown = Math.min(p1.low,p2.low,p3.low) <= VWAP*1.003;
-  const vwapLong    = (wasBelow || touchedDown) && cur.close >= VWAP*0.999;
+  // يجب أن يكون السعر قد تجاوز VWAP للأسفل فعلاً (لا مجرد اقتراب)
+  const wasBelow    = [p1,p2,p3].some(b => b.low  < VWAP_1);      // تجاوز حقيقي لأسفل
+  const touchedDown = Math.min(p1.low,p2.low,p3.low) <= VWAP;     // لمس VWAP بالضبط
+  const vwapLong    = (wasBelow || touchedDown) && cur.close > VWAP; // الإغلاق فوق VWAP
 
   // ── VWAP Bounce SHORT ──
-  const wasAbove    = [p1,p2,p3].some(b => b.high > VWAP_1*0.999);
-  const touchedUp   = Math.max(p1.high,p2.high,p3.high) >= VWAP*0.997;
-  const vwapShort   = (wasAbove || touchedUp) && cur.close <= VWAP*1.001;
+  const wasAbove    = [p1,p2,p3].some(b => b.high > VWAP_1);      // تجاوز حقيقي لأعلى
+  const touchedUp   = Math.max(p1.high,p2.high,p3.high) >= VWAP;  // لمس VWAP بالضبط
+  const vwapShort   = (wasAbove || touchedUp) && cur.close < VWAP; // الإغلاق تحت VWAP
 
-  // ── شمعة ارتداد ──
+  // ── شمعة ارتداد قوية — 60% حد أدنى (أعلى من 50%) ──
   const body       = Math.abs(cur.close-cur.open);
   const range      = cur.high-cur.low||0.01;
-  const strongBody  = body/range > 0.50;
+  const strongBody  = body/range > 0.60;
   const bouncedBull = cur.close>cur.open && strongBody;
   const bouncedBear = cur.close<cur.open && strongBody;
 
-  // ── RSI على شمعات التراجع (لا الارتداد) ──
+  // ── RSI أكثر صرامة على شمعات التراجع ──
   const minRsi = Math.min(rsi5[n5-1],rsi5[n5-2],rsi5[n5-3]);
   const maxRsi = Math.max(rsi5[n5-1],rsi5[n5-2],rsi5[n5-3]);
-  const rsiLong  = minRsi < 48; // كان منخفضاً أثناء التراجع
-  const rsiShort = maxRsi > 52; // كان مرتفعاً أثناء الصعود
+  const rsiLong  = minRsi < 45; // كان منخفضاً (أكثر صرامة من 48)
+  const rsiShort = maxRsi > 55; // كان مرتفعاً (أكثر صرامة من 52)
 
-  // ── حجم (تأكيد) ──
-  const volOk = !VOLAVG || VOL >= VOLAVG*0.7;
+  // ── حجم أعلى من المتوسط (تأكيد اهتمام المؤسسات) ──
+  const volOk = !VOLAVG || VOL >= VOLAVG*0.85;
 
   // ══ قرار الدخول ═══════════════════════════════
   // زخم 1H إلزامي: لا LONG إذا 3 شمعات 1H هابطة
@@ -233,7 +233,7 @@ export function analyzeSimple(bars5m, _bars15m, bars1h) {
         rsi:    +R.toFixed(1),
         atr:    +A.toFixed(2),
         vwap:   +VWAP.toFixed(2),
-        score:  [vwapLong,bouncedBull,rsiLong,volOk].filter(Boolean).length,
+        score:  [volOk, body/range>0.70, minRsi<40, regime.trend==='RANGING'].filter(Boolean).length + 1,
         maxScore: 4,
         regime: regime.trend,
         adx:    regime.adx,
@@ -256,7 +256,7 @@ export function analyzeSimple(bars5m, _bars15m, bars1h) {
         rsi:    +R.toFixed(1),
         atr:    +A.toFixed(2),
         vwap:   +VWAP.toFixed(2),
-        score:  [vwapShort,bouncedBear,rsiShort,volOk].filter(Boolean).length,
+        score:  [volOk, body/range>0.70, maxRsi>60, regime.trend==='RANGING'].filter(Boolean).length + 1,
         maxScore: 4,
         regime: regime.trend,
         adx:    regime.adx,
