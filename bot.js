@@ -7,7 +7,7 @@
  */
 
 import { get5mBars, get15mBars, get1hBars }          from './data.js';
-import { analyzeSimple, currentSession }              from './strategy_simple.js';
+import { analyzeSimple, currentSession, isKillzone }  from './strategy_simple.js';
 import { getUpcomingHigh, isNewsTime, todaySummary }  from './calendar.js';
 import { createServer }                               from 'http';
 
@@ -79,6 +79,12 @@ async function check() {
 
   try {
     await checkNews();
+
+    // فلتر Killzone — فقط London (09-11:30 UTC) + NY Open (13:30-15:30 UTC)
+    if (!isKillzone()) {
+      console.log(`[${t}] 🌙 خارج Killzone — لا فحص`);
+      return;
+    }
 
     // جلب البيانات (3 timeframes معاً)
     const [bars5m, bars15m, bars1h] = await Promise.all([
