@@ -108,13 +108,13 @@ async function processInstrument(inst, session) {
   const rr     = risk > 0 ? (Math.abs(sig.tp1 - sig.price) / risk).toFixed(1) : '?';
   const conds  = Object.entries(sig.conditions).map(([k, v]) => condLine(k, v)).join('\n');
 
+  const pts = (sig.tp1 - sig.price) * (isBull ? 1 : -1);
   await tg(
 `${isBull ? '📈' : '📉'} <b>${sig.type} — ${inst.name}</b>   ${q.stars} ${q.label}
 
 💰 الدخول:  <b>${sig.price}</b>
 🛑 SL:      <b>${sig.sl}</b>   (−${risk.toFixed(0)} نقطة)
-🎯 TP1:     <b>${sig.tp1}</b>   (R:R ${rr}:1)
-🎯 TP2:     <b>${sig.tp2}</b>   (R:R ${(risk > 0 ? Math.abs(sig.tp2 - sig.price)/risk : 0).toFixed(1)}:1)
+🎯 TP:      <b>${sig.tp1}</b>   (+${pts.toFixed(0)} نقطة | R:R 1.5:1)
 
 📊 VWAP: <b>${sig.vwap}</b>
 📊 RSI: ${sig.rsi}   |   ATR: ${sig.atr}
@@ -122,7 +122,7 @@ async function processInstrument(inst, session) {
 
 ${conds}
 
-<i>⚠️ إدارة المخاطر: لا تخاطر بأكثر من 1-2% من رأس المال</i>`
+<i>⚠️ أغلق عند TP — لا تنتظر أكثر (WR 61.7% @ 1.5R)</i>`
   );
 
   console.log(`  ✅ ${inst.name} — ${sig.type} @ ${sig.price} | ${q.label} (${sig.score}/4)`);
@@ -218,12 +218,12 @@ tg(`🚀 <b>NQ + ES Bot يعمل الآن</b>
 📊 <b>الأدوات:</b> NQ Futures + ES Futures
 📐 <b>الاستراتيجية:</b> VWAP Bounce Scalping
 ⏱ <b>Timeframes:</b> 1H Bias + 5M Entry
-🎯 <b>الهدف:</b> TP1=1.5R | TP2=2.5R
+🎯 <b>الهدف:</b> TP = 1.5R (هدف وحيد — أغلق عنده)
 🔍 <b>فحص:</b> كل 5 دقائق (كلا الأداتين)
 ⏸ <b>Cooldown:</b> 30 دقيقة لكل أداة بشكل مستقل
 ⏰ <b>جلسات:</b> London 07-12 | NY Open 13:30-15:30
 
-<i>~38 إشارة/شهر — ضعف الفرص بنفس مستوى الأمان ⭐</i>`).catch(() => {});
+<i>44 إشارة/شهر | WR 61.7% | Exp 0.543R ⭐</i>`).catch(() => {});
 
 scheduleDailySummary();
 check();
