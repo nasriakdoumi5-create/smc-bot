@@ -84,10 +84,10 @@ export function currentSession() {
   return '🌙 Off-Hours';
 }
 
-// ── Killzone فلتر — فقط London KZ + NY Open KZ ─
+// ── فلتر الجلسة — London + NY Open (بدون المساء المتأخر) ─
 export function isKillzone() {
   const mins = new Date().getUTCHours()*60 + new Date().getUTCMinutes();
-  const london = mins >= 9*60 && mins < 11*60+30;
+  const london = mins >= 7*60 && mins < 12*60;
   const ny     = mins >= 13*60+30 && mins < 15*60+30;
   return london || ny;
 }
