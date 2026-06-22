@@ -108,7 +108,33 @@ function get1HMomentum(bars1h, targetTime) {
   return { bullish: bullBars >= 2, bearish: bearBars >= 2 };
 }
 
-function runBacktest(bars5m, bars1h, label, rr=1.5, hold=24) {
+// ── بناء كاش VWAP للمقارنة بين الأدوات ──────────
+function buildVWAPCache(bars5m) {
+  const vwap = calcVWAP(bars5m);
+  // Map: time → { price, vwap, dev: (price-vwap)/vwap }
+  const map = new Map();
+  for (let i=0; i<bars5m.length; i++) {
+    if (!vwap[i]) continue;
+    map.set(bars5m[i].time, {
+      price: bars5m[i].close,
+      vwap:  vwap[i],
+      dev:   (bars5m[i].close - vwap[i]) / vwap[i],
+    });
+  }
+  return { map, bars: bars5m };
+}
+
+// ── إيجاد بيانات الأداة المقابلة عند وقت معين ───
+function getCompAt(cache, targetTime) {
+  let best = null;
+  for (const b of cache.bars) {
+    if (b.time <= targetTime + 5*60) best = b.time;
+    else break;
+  }
+  return best ? cache.map.get(best) : null;
+}
+
+function runBacktest(bars5m, bars1h, label, rr=1.5, hold=24, compCache=null) {
   const vwap5 = calcVWAP(bars5m);
   const atr5  = atrArr(bars5m,14);
   const rsi5  = rsiArr(bars5m,14);
@@ -136,9 +162,25 @@ function runBacktest(bars5m, bars1h, label, rr=1.5, hold=24) {
     // فلتر Spike
     if (Math.abs(p1.close-p4.close)>=A*2.5) continue;
 
-    // زخم 1H — لا LONG إذا آخر 3 شمعات 1H هابطة (والعكس)
+    // زخم 1H
     const mom=get1HMomentum(bars1h,cur.time);
     if (!mom) continue;
+
+    // ── Divergence مع الأداة المقابلة (اختياري) ──
+    // LONG: NQ تحت VWAP + ES فوق VWAP → ارتداد عالي الاحتمال
+    // SHORT: NQ فوق VWAP + ES تحت VWAP → هبوط عالي الاحتمال
+    let divOk = true; // بدون divergence → نقبل الإشارة عادية
+    if (compCache) {
+      const comp = getCompAt(compCache, cur.time);
+      if (comp) {
+        const nqDev  = (cur.close - VWAP) / VWAP;
+        // divergence: NQ تحت VWAP بينما ES فوق (أو العكس)
+        const divL = nqDev < 0    && comp.dev > 0.0003; // NQ ضعيف + ES قوي → LONG
+        const divS = nqDev > 0    && comp.dev < -0.0003; // NQ قوي + ES ضعيف → SHORT
+        divOk = divL || divS;
+      }
+    }
+    if (!divOk) continue;
 
     // ── شروط LONG ──
     const wasBelow  = [p1,p2,p3].some(b=>b.low<VWAP1*1.001);
@@ -148,7 +190,7 @@ function runBacktest(bars5m, bars1h, label, rr=1.5, hold=24) {
     const rsiL      = minRsi < 48;
     const body      = Math.abs(cur.close-cur.open), range=cur.high-cur.low||0.01;
     const bounceL   = cur.close>cur.open && body/range>0.50;
-    const momentumL = mom.bullish; // آخر 3 شمعات 1H صاعدة (2 من 3)
+    const momentumL = mom.bullish;
 
     // ── شروط SHORT ──
     const wasAbove  = [p1,p2,p3].some(b=>b.high>VWAP1*0.999);
@@ -157,7 +199,7 @@ function runBacktest(bars5m, bars1h, label, rr=1.5, hold=24) {
     const maxRsi    = Math.max(rsi5[i-1],rsi5[i-2],rsi5[i-3]);
     const rsiS      = maxRsi > 52;
     const bounceS   = cur.close<cur.open && body/range>0.50;
-    const momentumS = mom.bearish; // آخر 3 شمعات 1H هابطة (2 من 3)
+    const momentumS = mom.bearish;
 
     let type=null;
     if (htf==='BULL'&&vwapL&&bounceL&&rsiL&&momentumL) type='LONG';
@@ -244,36 +286,59 @@ try {
   const to  =new Date(nq5m[nq5m.length-1].time*1000).toLocaleDateString('ar-DZ');
   console.log(`✅ NQ: ${nq5m.length} شمعة 5M | ES: ${es5m.length} شمعة 5M | ${from} → ${to}\n`);
 
-  // ══ NQ Futures ══
-  const nqRes15 = runBacktest(nq5m,nq1h,'NQ Futures | RR 1.5:1 | Hold 2h', 1.5,24);
-  const nqRes20 = runBacktest(nq5m,nq1h,'NQ Futures | RR 2.0:1 | Hold 2h', 2.0,24);
-  print(nqRes15);
-  print(nqRes20);
+  // ── بناء كاش VWAP لكل أداة (للـ divergence) ──
+  const nqCache = buildVWAPCache(nq5m);
+  const esCache = buildVWAPCache(es5m);
 
-  // ══ ES Futures ══
-  const esRes15 = runBacktest(es5m,es1h,'ES Futures | RR 1.5:1 | Hold 2h', 1.5,24);
-  const esRes20 = runBacktest(es5m,es1h,'ES Futures | RR 2.0:1 | Hold 2h', 2.0,24);
-  print(esRes15);
-  print(esRes20);
+  // ══ NQ بدون divergence ══
+  const nqRes15 = runBacktest(nq5m,nq1h,'NQ Futures | RR 1.5:1', 1.5,24);
+  const nqRes20 = runBacktest(nq5m,nq1h,'NQ Futures | RR 2.0:1', 2.0,24);
+  print(nqRes15); print(nqRes20);
 
-  // ══ ملخص مجمع ══
-  const combined15 = [...nqRes15.results, ...esRes15.results];
-  const combined20 = [...nqRes20.results, ...esRes20.results];
-  const w15=combined15.filter(r=>r.outcome==='WIN').length;
-  const l15=combined15.filter(r=>r.outcome==='LOSS').length;
-  const w20=combined20.filter(r=>r.outcome==='WIN').length;
-  const l20=combined20.filter(r=>r.outcome==='LOSS').length;
-  const exp15=l15+w15>0?((w15/(w15+l15)*1.5)-(l15/(w15+l15))).toFixed(3):0;
-  const exp20=l20+w20>0?((w20/(w20+l20)*2.0)-(l20/(w20+l20))).toFixed(3):0;
-  const mo15=Math.round(combined15.length/2);
-  const mo20=Math.round(combined20.length/2);
+  // ══ ES بدون divergence ══
+  const esRes15 = runBacktest(es5m,es1h,'ES Futures | RR 1.5:1', 1.5,24);
+  const esRes20 = runBacktest(es5m,es1h,'ES Futures | RR 2.0:1', 2.0,24);
+  print(esRes15); print(esRes20);
 
-  console.log(`\n${'═'.repeat(52)}`);
-  console.log(`  🎯 ملخص NQ + ES مجمع (60 يوم)`);
-  console.log(`${'═'.repeat(52)}`);
-  console.log(`  RR 1.5:1 → ${combined15.length} إشارة | WR:${w15+l15>0?(w15/(w15+l15)*100).toFixed(1):0}% | Exp:${exp15}R | $${(mo15*parseFloat(exp15)*75).toFixed(0)}/شهر`);
-  console.log(`  RR 2.0:1 → ${combined20.length} إشارة | WR:${w20+l20>0?(w20/(w20+l20)*100).toFixed(1):0}% | Exp:${exp20}R | $${(mo20*parseFloat(exp20)*75).toFixed(0)}/شهر`);
-  console.log(`${'═'.repeat(52)}\n`);
+  // ══ NQ مع Divergence (NQ تحت VWAP + ES فوق VWAP) ══
+  const nqDiv15 = runBacktest(nq5m,nq1h,'NQ+Divergence | RR 1.5:1', 1.5,24, esCache);
+  const nqDiv20 = runBacktest(nq5m,nq1h,'NQ+Divergence | RR 2.0:1', 2.0,24, esCache);
+  print(nqDiv15); print(nqDiv20);
+
+  // ══ ملخص مقارنة ══
+  function summary(r15, r20, label) {
+    const w15=r15.results.filter(r=>r.outcome==='WIN').length;
+    const l15=r15.results.filter(r=>r.outcome==='LOSS').length;
+    const w20=r20.results.filter(r=>r.outcome==='WIN').length;
+    const l20=r20.results.filter(r=>r.outcome==='LOSS').length;
+    const e15=w15+l15>0?((w15/(w15+l15)*1.5)-(l15/(w15+l15))).toFixed(3):0;
+    const e20=w20+l20>0?((w20/(w20+l20)*2.0)-(l20/(w20+l20))).toFixed(3):0;
+    const mo15=Math.round(r15.results.length/2);
+    const mo20=Math.round(r20.results.length/2);
+    console.log(`  ${label}`);
+    console.log(`    RR 1.5 → ${r15.results.length} إشارة | WR:${w15+l15>0?(w15/(w15+l15)*100).toFixed(1):0}% | Exp:${e15}R | $${(mo15*parseFloat(e15)*75).toFixed(0)}/شهر`);
+    console.log(`    RR 2.0 → ${r20.results.length} إشارة | WR:${w20+l20>0?(w20/(w20+l20)*100).toFixed(1):0}% | Exp:${e20}R | $${(mo20*parseFloat(e20)*75).toFixed(0)}/شهر`);
+  }
+
+  // مجمع NQ+ES بدون divergence
+  const c15=[...nqRes15.results,...esRes15.results];
+  const c20=[...nqRes20.results,...esRes20.results];
+  const cw15=c15.filter(r=>r.outcome==='WIN').length, cl15=c15.filter(r=>r.outcome==='LOSS').length;
+  const cw20=c20.filter(r=>r.outcome==='WIN').length, cl20=c20.filter(r=>r.outcome==='LOSS').length;
+  const ce15=cw15+cl15>0?((cw15/(cw15+cl15)*1.5)-(cl15/(cw15+cl15))).toFixed(3):0;
+  const ce20=cw20+cl20>0?((cw20/(cw20+cl20)*2.0)-(cl20/(cw20+cl20))).toFixed(3):0;
+
+  console.log(`\n${'═'.repeat(56)}`);
+  console.log(`  🎯 المقارنة النهائية (60 يوم)`);
+  console.log(`${'═'.repeat(56)}`);
+  summary(nqRes15, nqRes20,  '📊 NQ وحده:');
+  summary(esRes15, esRes20,  '📈 ES وحده:');
+  summary(nqDiv15, nqDiv20,  '🔀 NQ+Divergence (ES مرجع):');
+  console.log(`  ─────────────────────────────────────────────`);
+  console.log(`  📦 NQ+ES مجمع (بدون divergence):`);
+  console.log(`    RR 1.5 → ${c15.length} إشارة | WR:${cw15+cl15>0?(cw15/(cw15+cl15)*100).toFixed(1):0}% | Exp:${ce15}R | $${(Math.round(c15.length/2)*parseFloat(ce15)*75).toFixed(0)}/شهر`);
+  console.log(`    RR 2.0 → ${c20.length} إشارة | WR:${cw20+cl20>0?(cw20/(cw20+cl20)*100).toFixed(1):0}% | Exp:${ce20}R | $${(Math.round(c20.length/2)*parseFloat(ce20)*75).toFixed(0)}/شهر`);
+  console.log(`${'═'.repeat(56)}\n`);
 
 } catch(e) {
   console.error('\n❌ خطأ:',e.message);
