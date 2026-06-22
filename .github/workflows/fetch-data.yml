@@ -1,0 +1,69 @@
+name: Fetch Market Data
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch NQ + ES data from Yahoo Finance
+        run: |
+          node - <<'EOF'
+          const fs = require('fs');
+
+          async function fetchYahoo(ticker, interval, range) {
+            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${interval}&range=${range}&includePrePost=false`;
+            const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+            if (!r.ok) throw new Error(`HTTP ${r.status} for ${ticker}`);
+            const j = await r.json();
+            const res = j.chart?.result?.[0];
+            if (!res) throw new Error(`No data for ${ticker}`);
+            const ts = res.timestamp, q = res.indicators.quote[0];
+            return ts.map((t,i) => ({
+              time: t, open: q.open[i], high: q.high[i],
+              low: q.low[i], close: q.close[i], volume: q.volume[i] || 0
+            })).filter(b => b.close != null && b.high != null);
+          }
+
+          async function main() {
+            fs.mkdirSync('data', { recursive: true });
+            const tickers = [
+              ['NQ=F', 'nq_5m',  '5m',  '60d'],
+              ['NQ=F', 'nq_1h',  '60m', '60d'],
+              ['ES=F', 'es_5m',  '5m',  '60d'],
+              ['ES=F', 'es_1h',  '60m', '60d'],
+            ];
+            for (const [ticker, name, interval, range] of tickers) {
+              try {
+                console.log(`Fetching ${name}...`);
+                const bars = await fetchYahoo(ticker, interval, range);
+                fs.writeFileSync(`data/${name}.json`, JSON.stringify(bars));
+                console.log(`  ✅ ${bars.length} bars saved to data/${name}.json`);
+              } catch(e) {
+                console.error(`  ❌ ${name}: ${e.message}`);
+                process.exit(1);
+              }
+            }
+            fs.writeFileSync('data/fetched_at.txt', new Date().toISOString());
+            console.log('Done!');
+          }
+
+          main().catch(e => { console.error(e); process.exit(1); });
+          EOF
+
+      - name: Commit data
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git diff --staged --quiet || git commit -m "chore: fetch market data $(date -u +%Y-%m-%dT%H:%M)"
+          git push
