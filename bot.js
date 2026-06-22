@@ -34,8 +34,15 @@ for (const inst of INSTRUMENTS) {
 const activeTrades = new Map(); // symbol → { entry, sl, tp, be, type, openTime, beNotified }
 
 // ══ الحالة اليومية ════════════════════════════════
-const MAX_SIGNALS_PER_INST = 3;  // حد أقصى 3 إشارات/أداة/يوم للحفاظ على الجودة
+const MAX_SIGNALS_PER_INST = 3;
 const daily = { losses: 0, wins: 0, signals: 0, halted: false, date: '' };
+
+// ══ إحصائيات الجلسة الحالية ══════════════════════
+const session = { name: '', wins: 0, losses: 0, timeouts: 0, signals: 0 };
+
+function resetSession(name) {
+  Object.assign(session, { name, wins: 0, losses: 0, timeouts: 0, signals: 0 });
+}
 
 function resetDailyIfNeeded() {
   // UTC — متوافق مع نوافذ الجلسات
@@ -218,6 +225,7 @@ async function checkActiveTrades() {
 
       if (result === 'WIN') {
         daily.wins++;
+        session.wins++;
         await tg(
 `✅ <b>ربح تلقائي — ${trade.name}</b>
 🎯 TP وصل: <b>${resultPrice}</b>
@@ -228,6 +236,7 @@ async function checkActiveTrades() {
 
       } else if (result === 'LOSS') {
         daily.losses++;
+        session.losses++;
         if (daily.losses >= MAX_DAILY_LOSSES) {
           daily.halted = true;
           await tg(
@@ -246,6 +255,7 @@ async function checkActiveTrades() {
         }
 
       } else {
+        session.timeouts++;
         await tg(
 `⏳ <b>انتهاء الوقت — ${trade.name}</b>
 لم يصل TP أو SL خلال ساعتين
@@ -291,6 +301,7 @@ async function processInstrument(inst, session) {
   s.dailySignals++;
   stats.total++;
   daily.signals++;
+  session.signals++;
   r.signal.type === 'LONG' ? stats.long++ : stats.short++;
   inst.symbol === 'MNQ' ? stats.nq++ : stats.es++;
 
@@ -403,6 +414,68 @@ ${calSummary}
   } catch (e) { console.error('[Daily]', e.message); }
 }
 
+// ══ تقرير نهاية الجلسة ════════════════════════════
+async function sendSessionSummary(sessionName) {
+  if (session.signals === 0) return; // لا إشارات → لا تقرير
+  const total  = session.wins + session.losses + session.timeouts;
+  const wr     = total > 0 ? Math.round(session.wins / total * 100) : 0;
+  const bars   = '█'.repeat(Math.round(wr/10)) + '░'.repeat(10-Math.round(wr/10));
+  const status = wr >= 60 ? '✅ جلسة ممتازة' : wr >= 50 ? '⚖️ جلسة متعادلة' : '⚠️ جلسة صعبة';
+
+  await tg(
+`📋 <b>تقرير جلسة ${sessionName}</b>
+─────────────────────
+📊 الإشارات: ${session.signals}
+✅ أرباح:   ${session.wins}
+❌ خسائر:   ${session.losses}
+⏳ Timeout: ${session.timeouts}
+─────────────────────
+📈 WR: ${wr}%  ${bars}
+${status}
+─────────────────────
+📅 اليوم: ✅ ${daily.wins} ربح | ❌ ${daily.losses} خسارة`
+  ).catch(() => {});
+}
+
+function scheduleSessionSummaries() {
+  // نهاية London: 12:00 UTC | نهاية NY: 15:30 UTC
+  const sessions = [
+    { name: '🇬🇧 London (07-12 UTC)', endH: 12, endM: 0  },
+    { name: '🇺🇸 NY Open (13:30-15:30 UTC)', endH: 15, endM: 30 },
+  ];
+
+  for (const s of sessions) {
+    (function schedule(sess) {
+      function msUntilEnd() {
+        const now  = new Date();
+        const next = new Date();
+        next.setUTCHours(sess.endH, sess.endM, 0, 0);
+        if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+        return next - now;
+      }
+      setTimeout(async function fire() {
+        await sendSessionSummary(sess.name);
+        resetSession(sess.name);
+        setTimeout(fire, msUntilEnd());
+      }, msUntilEnd());
+    })(s);
+  }
+
+  // إعادة تعيين جلسة London عند بدايتها 07:00 UTC
+  (function scheduleReset() {
+    function msUntil7() {
+      const now = new Date(), next = new Date();
+      next.setUTCHours(7, 0, 0, 0);
+      if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+      return next - now;
+    }
+    setTimeout(function fire() {
+      resetSession('🇬🇧 London');
+      setTimeout(fire, msUntil7());
+    }, msUntil7());
+  })();
+}
+
 function scheduleDailySummary() {
   function nextMorning() {
     const now = new Date(), next = new Date();
@@ -443,6 +516,7 @@ tg(`🚀 <b>NQ + ES Bot v4 يعمل</b>
 /reset  — إعادة تعيين
 /help   — قائمة الأوامر`).catch(() => {});
 
+scheduleSessionSummaries();
 scheduleDailySummary();
 check();
 setInterval(check, CHECK_MS);
