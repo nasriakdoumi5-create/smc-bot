@@ -145,6 +145,9 @@ export function analyzeSimple(bars5m, _bars15m, bars1h) {
   const atrAvgVal = ema(atr5.map(v=>v??0),20)[n5];
   const normalATR  = !atrAvgVal || A < atrAvgVal*2.0;
 
+  // فلتر Chop: السوق عرضي إذا ATR أقل من 55% من المتوسط
+  const notChoppy  = !atrAvgVal || A > atrAvgVal*0.55;
+
   // ── زخم 1H: آخر 3 شمعات 1H ──────────────────
   const last3h    = bars1h.slice(-4, -1); // آخر 3 شمعات مكتملة
   const bull1h    = last3h.filter(b=>b.close>b.open).length >= 2;
@@ -179,8 +182,8 @@ export function analyzeSimple(bars5m, _bars15m, bars1h) {
 
   // ══ قرار الدخول ═══════════════════════════════
   // زخم 1H إلزامي: لا LONG إذا 3 شمعات 1H هابطة
-  const longOk  = htfBull && vwapLong  && bouncedBull && rsiLong  && noSpike && normalATR && bull1h;
-  const shortOk = htfBear && vwapShort && bouncedBear && rsiShort && noSpike && normalATR && bear1h;
+  const longOk  = htfBull && vwapLong  && bouncedBull && rsiLong  && noSpike && normalATR && notChoppy && bull1h;
+  const shortOk = htfBear && vwapShort && bouncedBear && rsiShort && noSpike && normalATR && notChoppy && bear1h;
 
   let signal = null;
 
@@ -196,6 +199,7 @@ export function analyzeSimple(bars5m, _bars15m, bars1h) {
         tp1:    +(price+risk*1.5).toFixed(2),
         tp2:    +(price+risk*2.5).toFixed(2),
         risk:   +risk.toFixed(2),
+        be:     +(price+risk*0.7).toFixed(2),  // نقطة تحريك SL للدخول
         rsi:    +R.toFixed(1),
         atr:    +A.toFixed(2),
         vwap:   +VWAP.toFixed(2),
@@ -216,6 +220,7 @@ export function analyzeSimple(bars5m, _bars15m, bars1h) {
         tp1:    +(price-risk*1.5).toFixed(2),
         tp2:    +(price-risk*2.5).toFixed(2),
         risk:   +risk.toFixed(2),
+        be:     +(price-risk*0.7).toFixed(2),  // نقطة تحريك SL للدخول
         rsi:    +R.toFixed(1),
         atr:    +A.toFixed(2),
         vwap:   +VWAP.toFixed(2),
@@ -228,6 +233,7 @@ export function analyzeSimple(bars5m, _bars15m, bars1h) {
 
   const reason = !noSpike              ? `فلتر Spike — حركة ${recentMove.toFixed(0)} نقطة`
     : !normalATR                       ? 'تذبذب شديد — خبر كبير محتمل'
+    : !notChoppy                       ? `سوق عرضي — ATR منخفض (${A.toFixed(1)} < ${(atrAvgVal*0.55).toFixed(1)})`
     : !(vwapLong||vwapShort)           ? `السعر بعيد عن VWAP (${VWAP.toFixed(0)})`
     : !(bouncedBull||bouncedBear)      ? 'جسم الشمعة ضعيف (<50%)'
     : !(rsiLong||rsiShort)             ? `RSI محايد (minRSI:${minRsi.toFixed(0)} maxRSI:${maxRsi.toFixed(0)})`
