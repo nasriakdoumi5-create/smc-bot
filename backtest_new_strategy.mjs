@@ -273,7 +273,13 @@ function print({label,results,rr}) {
   if (!results.length) console.log('  ⚠️  لا إشارات في هذه الفترة\n');
 }
 
-console.log('\n📊 VWAP Bounce Backtest — NQ + ES Futures\n');
+// قص البيانات لآخر N يوم
+function sliceDays(bars, days) {
+  const cutoff = (Date.now()/1000) - days*24*60*60;
+  return bars.filter(b => b.time >= cutoff);
+}
+
+console.log('\n📊 VWAP Bounce Backtest — NQ + ES | 60 يوم vs 30 يوم\n');
 try {
   const [nq5m,nq1h,es5m,es1h]=await Promise.all([
     fetchYahoo('NQ=F','5m','60d'),
@@ -282,26 +288,32 @@ try {
     fetchYahoo('ES=F','60m','60d'),
   ]);
 
-  const from=new Date(nq5m[0].time*1000).toLocaleDateString('ar-DZ');
-  const to  =new Date(nq5m[nq5m.length-1].time*1000).toLocaleDateString('ar-DZ');
-  console.log(`✅ NQ: ${nq5m.length} شمعة 5M | ES: ${es5m.length} شمعة 5M | ${from} → ${to}\n`);
+  // آخر 30 يوم
+  const nq5m_30 = sliceDays(nq5m, 30);
+  const es5m_30 = sliceDays(es5m, 30);
 
-  // ── بناء كاش VWAP لكل أداة (للـ divergence) ──
-  const nqCache = buildVWAPCache(nq5m);
-  const esCache = buildVWAPCache(es5m);
+  const from60=new Date(nq5m[0].time*1000).toLocaleDateString('ar-DZ');
+  const from30=new Date(nq5m_30[0].time*1000).toLocaleDateString('ar-DZ');
+  const to    =new Date(nq5m[nq5m.length-1].time*1000).toLocaleDateString('ar-DZ');
+  console.log(`✅ 60 يوم: ${nq5m.length} شمعة NQ | ${es5m.length} شمعة ES | ${from60} → ${to}`);
+  console.log(`✅ 30 يوم: ${nq5m_30.length} شمعة NQ | ${es5m_30.length} شمعة ES | ${from30} → ${to}\n`);
 
-  // ══ NQ بدون divergence ══
-  const nqRes15 = runBacktest(nq5m,nq1h,'NQ Futures | RR 1.5:1', 1.5,24);
-  const nqRes20 = runBacktest(nq5m,nq1h,'NQ Futures | RR 2.0:1', 2.0,24);
-  print(nqRes15); print(nqRes20);
+  // ══ 60 يوم ══
+  const nqRes15 = runBacktest(nq5m,nq1h,'NQ | 60 يوم | RR 1.5', 1.5,24);
+  const esRes15 = runBacktest(es5m,es1h,'ES | 60 يوم | RR 1.5', 1.5,24);
+  print(nqRes15); print(esRes15);
 
-  // ══ ES بدون divergence ══
-  const esRes15 = runBacktest(es5m,es1h,'ES Futures | RR 1.5:1', 1.5,24);
-  const esRes20 = runBacktest(es5m,es1h,'ES Futures | RR 2.0:1', 2.0,24);
-  print(esRes15); print(esRes20);
+  // ══ 30 يوم (الشهر الأخير) ══
+  const nqRes15_30 = runBacktest(nq5m_30,nq1h,'NQ | 30 يوم | RR 1.5', 1.5,24);
+  const esRes15_30 = runBacktest(es5m_30,es1h,'ES | 30 يوم | RR 1.5', 1.5,24);
+  print(nqRes15_30); print(esRes15_30);
 
-  // ══ NQ مع Divergence (NQ تحت VWAP + ES فوق VWAP) ══
-  const nqDiv15 = runBacktest(nq5m,nq1h,'NQ+Divergence | RR 1.5:1', 1.5,24, esCache);
+  // ══ NQ مع Divergence ══
+  const esCache    = buildVWAPCache(es5m);
+  const esCache_30 = buildVWAPCache(es5m_30);
+  const nqDiv15    = runBacktest(nq5m,   nq1h,'NQ+Div | 60 يوم | RR 1.5', 1.5,24, esCache);
+  const nqDiv15_30 = runBacktest(nq5m_30,nq1h,'NQ+Div | 30 يوم | RR 1.5', 1.5,24, esCache_30);
+  print(nqDiv15); print(nqDiv15_30);
   const nqDiv20 = runBacktest(nq5m,nq1h,'NQ+Divergence | RR 2.0:1', 2.0,24, esCache);
   print(nqDiv15); print(nqDiv20);
 
@@ -320,25 +332,44 @@ try {
     console.log(`    RR 2.0 → ${r20.results.length} إشارة | WR:${w20+l20>0?(w20/(w20+l20)*100).toFixed(1):0}% | Exp:${e20}R | $${(mo20*parseFloat(e20)*75).toFixed(0)}/شهر`);
   }
 
-  // مجمع NQ+ES بدون divergence
-  const c15=[...nqRes15.results,...esRes15.results];
-  const c20=[...nqRes20.results,...esRes20.results];
-  const cw15=c15.filter(r=>r.outcome==='WIN').length, cl15=c15.filter(r=>r.outcome==='LOSS').length;
-  const cw20=c20.filter(r=>r.outcome==='WIN').length, cl20=c20.filter(r=>r.outcome==='LOSS').length;
-  const ce15=cw15+cl15>0?((cw15/(cw15+cl15)*1.5)-(cl15/(cw15+cl15))).toFixed(3):0;
-  const ce20=cw20+cl20>0?((cw20/(cw20+cl20)*2.0)-(cl20/(cw20+cl20))).toFixed(3):0;
+  // ── ملخص مقارنة 60 vs 30 يوم ──────────────────
+  function quickSummary(results, rr, label) {
+    const w=results.filter(r=>r.outcome==='WIN').length;
+    const l=results.filter(r=>r.outcome==='LOSS').length;
+    const t=results.filter(r=>r.outcome==='TIMEOUT').length;
+    const exp=w+l>0?((w/(w+l)*rr)-(l/(w+l))).toFixed(3):0;
+    const mo=Math.round(results.length/2);
+    const wr=w+l>0?(w/(w+l)*100).toFixed(1):'0';
+    return `${label.padEnd(28)} ${String(results.length).padStart(3)} إشارة | WR:${wr.padStart(5)}% | Exp:${exp}R | $${(mo*parseFloat(exp)*75).toFixed(0)}/شهر`;
+  }
 
-  console.log(`\n${'═'.repeat(56)}`);
-  console.log(`  🎯 المقارنة النهائية (60 يوم)`);
-  console.log(`${'═'.repeat(56)}`);
-  summary(nqRes15, nqRes20,  '📊 NQ وحده:');
-  summary(esRes15, esRes20,  '📈 ES وحده:');
-  summary(nqDiv15, nqDiv20,  '🔀 NQ+Divergence (ES مرجع):');
-  console.log(`  ─────────────────────────────────────────────`);
-  console.log(`  📦 NQ+ES مجمع (بدون divergence):`);
-  console.log(`    RR 1.5 → ${c15.length} إشارة | WR:${cw15+cl15>0?(cw15/(cw15+cl15)*100).toFixed(1):0}% | Exp:${ce15}R | $${(Math.round(c15.length/2)*parseFloat(ce15)*75).toFixed(0)}/شهر`);
-  console.log(`    RR 2.0 → ${c20.length} إشارة | WR:${cw20+cl20>0?(cw20/(cw20+cl20)*100).toFixed(1):0}% | Exp:${ce20}R | $${(Math.round(c20.length/2)*parseFloat(ce20)*75).toFixed(0)}/شهر`);
-  console.log(`${'═'.repeat(56)}\n`);
+  const c60=[...nqRes15.results,...esRes15.results];
+  const c30=[...nqRes15_30.results,...esRes15_30.results];
+
+  console.log(`\n${'═'.repeat(70)}`);
+  console.log(`  🎯 ملخص المقارنة النهائية — RR 1.5:1`);
+  console.log(`${'═'.repeat(70)}`);
+  console.log(`  📅 60 يوم:`);
+  console.log(`    ${quickSummary(nqRes15.results,   1.5, '📊 NQ وحده')}`);
+  console.log(`    ${quickSummary(esRes15.results,   1.5, '📈 ES وحده')}`);
+  console.log(`    ${quickSummary(c60,               1.5, '📦 NQ+ES مجمع')}`);
+  console.log(`    ${quickSummary(nqDiv15.results,   1.5, '🔀 NQ+Divergence')}`);
+  console.log(`  ──────────────────────────────────────────────────────────────`);
+  console.log(`  📅 30 يوم (الشهر الأخير):`);
+  console.log(`    ${quickSummary(nqRes15_30.results,1.5, '📊 NQ وحده')}`);
+  console.log(`    ${quickSummary(esRes15_30.results,1.5, '📈 ES وحده')}`);
+  console.log(`    ${quickSummary(c30,               1.5, '📦 NQ+ES مجمع')}`);
+  console.log(`    ${quickSummary(nqDiv15_30.results,1.5, '🔀 NQ+Divergence')}`);
+  console.log(`${'═'.repeat(70)}`);
+
+  // تقييم الثبات
+  const w60=c60.filter(r=>r.outcome==='WIN').length, l60=c60.filter(r=>r.outcome==='LOSS').length;
+  const w30=c30.filter(r=>r.outcome==='WIN').length, l30=c30.filter(r=>r.outcome==='LOSS').length;
+  const wr60=w60+l60>0?(w60/(w60+l60)*100):0;
+  const wr30=w30+l30>0?(w30/(w30+l30)*100):0;
+  const stable = Math.abs(wr60-wr30) < 10;
+  console.log(`\n  ${stable?'✅ الاستراتيجية مستقرة':'⚠️  تذبذب بين الفترتين'} — WR فرق: ${Math.abs(wr60-wr30).toFixed(1)}%`);
+  console.log(`  60 يوم: ${wr60.toFixed(1)}%  |  30 يوم: ${wr30.toFixed(1)}%\n`);
 
 } catch(e) {
   console.error('\n❌ خطأ:',e.message);
