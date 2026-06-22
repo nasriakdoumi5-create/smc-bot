@@ -6,7 +6,8 @@
  * ═══════════════════════════════════════════════════
  */
 
-import { get5mBars, get15mBars, get1hBars }          from './data.js';
+import { get5mBars, get15mBars, get1hBars }          from './data_tradovate.js';
+import { executeSignal }                              from './tradovate.js';
 import { analyzeSimple, currentSession, isKillzone }  from './strategy_simple.js';
 import { getUpcomingHigh, isNewsTime, todaySummary }  from './calendar.js';
 import { createServer }                               from 'http';
@@ -333,6 +334,17 @@ ${conds}
   });
 
   console.log(`  ✅ ${inst.name} — ${sig.type} @ ${sig.price} | ${q.label} (${sig.score}/4)`);
+
+  // تنفيذ تلقائي على حساب Tradovate Demo
+  if (process.env.TRADOVATE_USERNAME) {
+    try {
+      await executeSignal(sig, inst.symbol);
+      console.log(`  [Tradovate] ✅ أمر مُنفَّذ: ${inst.symbol} ${sig.type}`);
+    } catch (err) {
+      console.error(`  [Tradovate] ❌ فشل التنفيذ:`, err.message);
+      await tg(`⚠️ <b>Tradovate: فشل التنفيذ</b>\n${err.message}`).catch(() => {});
+    }
+  }
 }
 
 // ══ الفحص الرئيسي ════════════════════════════════
@@ -418,20 +430,38 @@ function scheduleDailySummary() {
 
 // ══ بدء التشغيل ══════════════════════════════════
 console.log('═'.repeat(52));
-console.log('  🤖  NQ + ES Bot — VWAP Bounce v4');
+console.log('  🤖  NQ + ES Bot — VWAP Bounce v5');
 console.log('═'.repeat(52));
 console.log(`  📊 Instruments : MNQ + MES`);
 console.log(`  🎯 Target      : RR 1.5:1 | WR 63%+`);
 console.log(`  🛑 Daily limit : ${MAX_DAILY_LOSSES} losses → halt`);
 console.log(`  🤖 Auto-track  : WIN/LOSS يُسجَّل تلقائياً`);
+console.log(`  📡 Data        : Tradovate (real-time)`);
+console.log(`  🔌 Execution   : ${process.env.TRADOVATE_USERNAME ? 'Tradovate Demo' : 'إشارات فقط'}`);
 console.log(`  📋 Commands    : /status /trades /reset`);
 console.log(`  ⏰ Sessions    : London 07-12 | NY 13:30-15:30 UTC`);
 console.log('═'.repeat(52));
 
-tg(`🚀 <b>NQ + ES Bot v4 يعمل</b>
+// اختبار اتصال Tradovate عند البدء
+import('./tradovate.js').then(({ tradovate }) => {
+  if (!process.env.TRADOVATE_USERNAME) return;
+  tradovate.ensureToken()
+    .then(() => tradovate.getAccount())
+    .then(acc => {
+      console.log(`  [Tradovate] ✅ متصل — ${acc.name} (${process.env.TRADOVATE_ENV || 'demo'})`);
+      tg(`✅ <b>Tradovate متصل</b>\n📋 الحساب: <b>${acc.name}</b>\n🌐 البيئة: ${(process.env.TRADOVATE_ENV || 'demo').toUpperCase()}\n📡 البيانات: لحظية (real-time)`).catch(() => {});
+    })
+    .catch(err => {
+      console.error(`  [Tradovate] ❌ فشل الاتصال:`, err.message);
+      tg(`⚠️ <b>Tradovate: فشل الاتصال</b>\n${err.message}`).catch(() => {});
+    });
+}).catch(() => {});
+
+tg(`🚀 <b>NQ + ES Bot v5 يعمل</b>
 
 📊 <b>الأدوات:</b> NQ + ES Futures
 🎯 <b>الهدف:</b> TP = 1.5R | WR 63%+
+📡 <b>البيانات:</b> Tradovate (لحظية — لا تأخير)
 🤖 <b>تتبع تلقائي:</b> البوت يسجّل WIN/LOSS وحده
 🔔 <b>Breakeven:</b> تنبيه تلقائي عند 0.7R
 🛑 <b>حد الخسارة:</b> ${MAX_DAILY_LOSSES} خسائر/يوم ثم توقف تلقائي
