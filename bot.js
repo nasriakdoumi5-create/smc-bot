@@ -10,6 +10,7 @@ import { get5mBars, get15mBars, get1hBars }          from './data.js';
 import { analyzeSimple, currentSession }              from './strategy_simple.js';
 import { getUpcomingHigh, isNewsTime, todaySummary }  from './calendar.js';
 import { validateSignal }                             from './gemini.js';
+import { analyzeVWAP, formatSignalsMsg }              from './vwap_signals.js';
 import { createServer }                               from 'http';
 
 // ══ إعدادات ══════════════════════════════════════
@@ -343,3 +344,87 @@ createServer(async (req, res) => {
 }).listen(process.env.PORT || 3000, () => {
   console.log(`  🌐 Health check + Webhook: port ${process.env.PORT || 3000}`);
 });
+
+// ══ Telegram Polling — أوامر المستخدم ═════════════
+let tgOffset = 0;
+
+async function pollTelegram() {
+  try {
+    const res  = await fetch(`https://api.telegram.org/bot${TOKEN}/getUpdates?offset=${tgOffset}&timeout=25`);
+    const data = await res.json();
+    for (const upd of data.result || []) {
+      tgOffset = upd.update_id + 1;
+      const msg = upd.message;
+      if (!msg?.text) continue;
+      const text   = msg.text.trim().toLowerCase();
+      const chatId = msg.chat.id;
+
+      if (text.startsWith('/signals') || text.startsWith('/إشارات')) {
+        await handleSignalsCmd(chatId);
+      } else if (text.startsWith('/status') || text.startsWith('/حالة')) {
+        await handleStatusCmd(chatId);
+      } else if (text.startsWith('/help') || text.startsWith('/مساعدة')) {
+        await tg(`📋 <b>الأوامر المتاحة:</b>\n\n/signals — أفضل 3 إشارات الآن\n/status  — حالة البوت\n/help    — هذه القائمة`);
+      }
+    }
+  } catch (e) {
+    console.error('[Poll]', e.message);
+  }
+  setTimeout(pollTelegram, 2000);
+}
+
+async function handleSignalsCmd(chatId) {
+  const loadMsg = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text: '⏳ جاري التحليل...' }),
+  }).then(r => r.json()).catch(() => null);
+
+  try {
+    const result = await analyzeVWAP('MNQ');
+    const msg    = formatSignalsMsg(result);
+    await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'HTML' }),
+    });
+  } catch (e) {
+    await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: `❌ خطأ: ${e.message}` }),
+    });
+  }
+}
+
+async function handleStatusCmd(chatId) {
+  const session = currentSession();
+  await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      parse_mode: 'HTML',
+      text:
+`🤖 <b>حالة البوت</b>
+🟢 يعمل منذ: ${Math.round(process.uptime() / 60)} دقيقة
+📊 الرموز: ${SYMBOLS.join(', ')}
+🕐 الجلسة: ${session}
+📈 إشارات اليوم: ${stats.total} (LONG: ${stats.long} | SHORT: ${stats.short})
+⏱ ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}`,
+    }),
+  });
+}
+
+// ══ إشارات تلقائية 09:00 CEST (07:00 UTC) ═════════
+function scheduleDailySignals() {
+  const now  = new Date();
+  const next = new Date();
+  next.setUTCHours(7, 0, 0, 0);
+  if (next <= now) next.setDate(next.getDate() + 1);
+  setTimeout(async () => {
+    console.log('[DailySignals] إرسال إشارات الصباح...');
+    await handleSignalsCmd(CHAT_ID);
+    setInterval(() => handleSignalsCmd(CHAT_ID), 86400000);
+  }, next - now);
+  console.log(`  📡 Daily signals: كل يوم 09:00 CEST`);
+}
+
+pollTelegram();
+scheduleDailySignals();
