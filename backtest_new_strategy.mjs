@@ -1,10 +1,18 @@
 /**
- * Backtest v3 — توازن بين الجودة والكمية
- * Yahoo Finance: آخر 60 يوم 5M + 1H
+ * Backtest v4 — إعادة بناء كاملة
  *
- * v1: RSI<50, 4/4 → 44 إشارة، 30.8% (كثير وضعيف)
- * v2: RSI<45, 5/5 → 0 إشارات (صارم جداً)
- * v3: RSI<48, 4/5 + EMA trend + killzone موسّع → هدف 15-20 إشارة بجودة أعلى
+ * المشكلة المكتشفة في v1-v3:
+ * ① HTF (EMA50/200 على 1H) بطيء جداً — يقول "bull" حتى بعد أسابيع من الانهيار
+ * ② RSI كان اختيارياً فجاء LONG بـ RSI:65 (ذروة شراء)
+ * ③ 139 إشارة في 60 يوم = كمية بلا جودة
+ *
+ * الحل v4:
+ * ① HTF سريع: السعر > EMA21(1H) + EMA21(1H) > EMA50(1H) معاً
+ *    → لو نزل السعر تحت EMA21 على 1H، نوقف LONG فوراً
+ * ② RSI مطلوب دائماً: < 50 للشراء / > 50 للبيع (ليس اختيارياً)
+ * ③ Cooldown زمني: 45 دقيقة حقيقية (ليس عد شمعات)
+ * ④ حد أقصى: إشارة واحدة فقط كل 2 ساعة
+ * ⑤ 4 شروط إلزامية كلها (ليس 4 من 5)
  */
 
 async function fetchYahoo(ticker, interval, range) {
@@ -17,7 +25,7 @@ async function fetchYahoo(ticker, interval, range) {
   const q  = res.indicators.quote[0];
   return ts.map((t,i) => ({
     time: t, open: q.open[i], high: q.high[i],
-    low:  q.low[i], close: q.close[i], volume: q.volume[i] || 0
+    low:  q.low[i], close: q.close[i], volume: q.volume[i]||0
   })).filter(b => b.close != null && b.high != null);
 }
 
@@ -33,7 +41,7 @@ function ema(arr, p) {
 
 function atrArr(bars, p=14) {
   const tr = bars.map((b,i) => i===0 ? b.high-b.low :
-    Math.max(b.high-b.low, Math.abs(b.high-bars[i-1].close), Math.abs(b.low-bars[i-1].close)));
+    Math.max(b.high-b.low,Math.abs(b.high-bars[i-1].close),Math.abs(b.low-bars[i-1].close)));
   const o = [];
   for (let i = 0; i < bars.length; i++) {
     if (i < p-1)   { o.push(null); continue; }
@@ -57,25 +65,39 @@ function rsiArr(bars, p=14) {
   return o;
 }
 
-// London كامل + NY open (بدون آخر الجلسة)
 function inSession(unixTime) {
   const mins = new Date(unixTime*1000).getUTCHours()*60 + new Date(unixTime*1000).getUTCMinutes();
-  const london = mins >= 7*60    && mins < 12*60;   // 07:00-12:00 UTC
-  const nyOpen  = mins >= 13*60+30 && mins < 17*60; // 13:30-17:00 UTC (فقط الفتح)
+  const london = mins >= 7*60    && mins < 12*60;
+  const nyOpen  = mins >= 13*60+30 && mins < 17*60;
   return london || nyOpen;
 }
 
-function getHTFBias(bars1h, targetTime) {
-  const relevant = bars1h.filter(b => b.time <= targetTime);
-  if (relevant.length < 200) return null;
-  const closes = relevant.map(b => b.close);
-  const e50  = ema(closes, 50);
-  const e200 = ema(closes, 200);
-  const n = e50.length - 1;
-  if (!e50[n] || !e200[n]) return null;
-  const gap = Math.abs(e50[n] - e200[n]) / e200[n];
-  if (gap < 0.001) return null; // تقاطع هامشي — تجاهل
-  return { bull: e50[n] > e200[n], bear: e50[n] < e200[n], gap };
+// ── HTF سريع: يوقف LONG فوراً لو السعر نزل تحت EMA21(1H) ──
+function buildHTFCache(bars1h) {
+  const closes = bars1h.map(b => b.close);
+  const e21    = ema(closes, 21);
+  const e50    = ema(closes, 50);
+  // نبني خريطة timestamp → bias
+  const map = new Map();
+  for (let i = 50; i < bars1h.length; i++) {
+    const price = bars1h[i].close;
+    const E21   = e21[i], E50 = e50[i];
+    if (!E21 || !E50) { map.set(bars1h[i].time, null); continue; }
+    const bull = price > E21 && E21 > E50;  // سعر فوق EMA21، وEMA21 فوق EMA50
+    const bear = price < E21 && E21 < E50;  // سعر تحت EMA21، وEMA21 تحت EMA50
+    map.set(bars1h[i].time, bull ? 'BULL' : bear ? 'BEAR' : null);
+  }
+  return map;
+}
+
+function getHTFBias(htfMap, bars1h, targetTime) {
+  // نأخذ آخر 1H bar قبل وقت الإشارة
+  let best = null;
+  for (const b of bars1h) {
+    if (b.time <= targetTime) best = b.time;
+    else break;
+  }
+  return best ? (htfMap.get(best) ?? null) : null;
 }
 
 function runBacktest(bars5m, bars1h, label, rrMultiple=2.0, holdBars=36) {
@@ -85,8 +107,11 @@ function runBacktest(bars5m, bars1h, label, rrMultiple=2.0, holdBars=36) {
   const e21_5  = ema(closes, 21);
   const e50_5  = ema(closes, 50);
 
+  const htfMap = buildHTFCache(bars1h);
+
   const results = [];
-  let lastEntryBar = -12;
+  let lastSignalTime = 0;  // timestamp حقيقي للـ cooldown
+  const COOLDOWN_SEC = 45 * 60; // 45 دقيقة
 
   for (let i = 55; i < bars5m.length - holdBars - 2; i++) {
     const cur = bars5m[i];
@@ -101,63 +126,53 @@ function runBacktest(bars5m, bars1h, label, rrMultiple=2.0, holdBars=36) {
     const R   = rsi5[i];
     if (!E21 || !E50 || !A) continue;
 
+    // ① جلسة
     if (!inSession(cur.time)) continue;
-    if (i - lastEntryBar < 10) continue;
 
-    const htf = getHTFBias(bars1h, cur.time);
+    // ② Cooldown زمني (45 دقيقة)
+    if (cur.time - lastSignalTime < COOLDOWN_SEC) continue;
+
+    // ③ HTF سريع
+    const htf = getHTFBias(htfMap, bars1h, cur.time);
     if (!htf) continue;
 
-    // فلتر Spike
+    // ④ فلتر Spike
     const recentMove = Math.abs(p1.close - p4.close);
     if (recentMove >= A * 2.5) continue;
 
-    // ① EMA trend على 5M — الأهم
+    // ── شروط LONG (كلها إلزامية) ──
     const emaTrendLong  = E21 > E50;
+    const touchedBull   = [p1,p2,p3,p4].some((b,j) => b.low  <= (e21_5[i-1-j]??E21)*1.001);
+    const body_r        = cur.high - cur.low || 0.01;
+    const body_b        = Math.abs(cur.close - cur.open);
+    const bouncedBull   = cur.close > cur.open && body_b/body_r > 0.55 && cur.close > E21;
+    const rsiLong       = R < 50; // إلزامي
+
+    // ── شروط SHORT (كلها إلزامية) ──
     const emaTrendShort = E21 < E50;
+    const touchedBear   = [p1,p2,p3,p4].some((b,j) => b.high >= (e21_5[i-1-j]??E21)*0.999);
+    const bouncedBear   = cur.close < cur.open && body_b/body_r > 0.55 && cur.close < E21;
+    const rsiShort      = R > 50;
 
-    // ② لمس EMA21
-    const touchedBull = [p1,p2,p3,p4].some((b,j) => b.low  <= (e21_5[i-1-j]??E21) * 1.001);
-    const touchedBear = [p1,p2,p3,p4].some((b,j) => b.high >= (e21_5[i-1-j]??E21) * 0.999);
-
-    // ③ شمعة ارتداد — جسم > 55%
-    const body       = Math.abs(cur.close - cur.open);
-    const range      = cur.high - cur.low || 0.01;
-    const strongBody  = body / range > 0.55;
-    const bouncedBull = cur.close > cur.open && strongBody && cur.close > E21;
-    const bouncedBear = cur.close < cur.open && strongBody && cur.close < E21;
-
-    // ④ RSI — 48/52 (توازن بين 50 و45)
-    const rsiLong  = R < 48;
-    const rsiShort = R > 52;
-
-    // ⑤ HTF قوي
-    const htfOk = htf.gap > 0.003; // فارق > 0.3%
-
-    // النقاط (5 شروط)
-    const scoreLong  = (emaTrendLong?1:0)  + (touchedBull?1:0) + (bouncedBull?1:0) + (rsiLong?1:0)  + (htfOk?1:0);
-    const scoreShort = (emaTrendShort?1:0) + (touchedBear?1:0) + (bouncedBear?1:0) + (rsiShort?1:0) + (htfOk?1:0);
-
-    // 4/5 — يكفي 4 شروط من 5
+    // كل الشروط مطلوبة
     let type = null;
-    if (htf.bull && emaTrendLong  && scoreLong  >= 4) type = 'LONG';
-    else if (htf.bear && emaTrendShort && scoreShort >= 4) type = 'SHORT';
+    if (htf==='BULL' && emaTrendLong  && touchedBull  && bouncedBull  && rsiLong)  type = 'LONG';
+    else if (htf==='BEAR' && emaTrendShort && touchedBear  && bouncedBear  && rsiShort) type = 'SHORT';
     if (!type) continue;
-
-    const score = type==='LONG' ? scoreLong : scoreShort;
 
     const price = cur.close;
     let sl, risk;
-    if (type === 'LONG') {
-      const recentLow  = Math.min(p1.low, p2.low, p3.low, p4.low);
-      sl   = Math.min(recentLow, E21) - A * 0.3;
+    if (type==='LONG') {
+      const recentLow  = Math.min(p1.low,p2.low,p3.low,p4.low);
+      sl   = Math.min(recentLow, E21) - A*0.3;
       risk = price - sl;
     } else {
-      const recentHigh = Math.max(p1.high, p2.high, p3.high, p4.high);
-      sl   = Math.max(recentHigh, E21) + A * 0.3;
+      const recentHigh = Math.max(p1.high,p2.high,p3.high,p4.high);
+      sl   = Math.max(recentHigh, E21) + A*0.3;
       risk = sl - price;
     }
 
-    if (risk < A * 0.4 || risk > A * 2.5) continue;
+    if (risk < A*0.4 || risk > A*2.5) continue;
     const tp = type==='LONG' ? price+risk*rrMultiple : price-risk*rrMultiple;
 
     let outcome='TIMEOUT', barsHeld=0;
@@ -170,8 +185,8 @@ function runBacktest(bars5m, bars1h, label, rrMultiple=2.0, holdBars=36) {
     const d = new Date(cur.time*1000).toLocaleDateString('ar-DZ',{day:'2-digit',month:'2-digit',year:'2-digit'});
     const t = new Date(cur.time*1000).toLocaleTimeString('ar-DZ',{hour:'2-digit',minute:'2-digit'});
     results.push({ d, t, type, price:+price.toFixed(1), sl:+sl.toFixed(1), tp:+tp.toFixed(1),
-      risk:+risk.toFixed(1), rsi:+R.toFixed(0), score, outcome, barsHeld });
-    lastEntryBar = i;
+      risk:+risk.toFixed(1), rsi:+R.toFixed(0), outcome, barsHeld });
+    lastSignalTime = cur.time;
   }
 
   return { label, results, rrMultiple };
@@ -181,19 +196,19 @@ function print({ label, results, rrMultiple }) {
   const wins    = results.filter(r=>r.outcome==='WIN').length;
   const losses  = results.filter(r=>r.outcome==='LOSS').length;
   const timeout = results.filter(r=>r.outcome==='TIMEOUT').length;
-  const decided = wins + losses;
+  const decided = wins+losses;
   const wr      = decided>0 ? (wins/decided*100).toFixed(1) : '0';
   const pnl     = (wins*rrMultiple - losses).toFixed(1);
   const exp     = decided>0 ? ((wins/decided*rrMultiple)-(losses/decided)).toFixed(3) : '0';
-  const perWeek = (results.length / (60/7)).toFixed(1);
+  const perWeek = (results.length/(60/7)).toFixed(1);
 
-  console.log(`\n${'═'.repeat(62)}`);
+  console.log(`\n${'═'.repeat(64)}`);
   console.log(`  ${label}`);
-  console.log(`${'═'.repeat(62)}`);
+  console.log(`${'═'.repeat(64)}`);
 
   results.forEach((r,idx) => {
     const icon = r.outcome==='WIN'?'✅':r.outcome==='LOSS'?'❌':'⏳';
-    console.log(`  ${String(idx+1).padStart(2)}. ${icon} ${r.d} ${r.t} ${r.type.padEnd(5)} @ ${String(r.price).padStart(8)} SL:${r.sl} RSI:${r.rsi} [${r.score}/5]`);
+    console.log(`  ${String(idx+1).padStart(2)}. ${icon} ${r.d} ${r.t} ${r.type.padEnd(5)} @ ${String(r.price).padStart(8)} SL:${r.sl} RSI:${r.rsi}`);
   });
 
   console.log(`\n┌${'─'.repeat(46)}┐`);
@@ -206,10 +221,8 @@ function print({ label, results, rrMultiple }) {
   console.log(`│  P&L الكلي                : ${(pnl+'R').padEnd(20)}│`);
   console.log(`│  Expectancy/صفقة          : ${(exp+'R').padEnd(20)}│`);
 
-  const perTrade_risk = 75;
-  const monthlySignals = results.length / 2;
-  const monthly$ = (monthlySignals * parseFloat(exp) * perTrade_risk).toFixed(0);
-
+  const monthlySignals = results.length/2;
+  const monthly$ = (monthlySignals * parseFloat(exp) * 75).toFixed(0);
   console.log(`│${'─'.repeat(46)}│`);
   console.log(`│  بمخاطرة $75/صفقة:                           │`);
   console.log(`│  إشارات/شهر تقريباً: ${String(Math.round(monthlySignals)).padEnd(26)}│`);
@@ -217,30 +230,29 @@ function print({ label, results, rrMultiple }) {
   console.log(`└${'─'.repeat(46)}┘`);
 
   const pass = parseFloat(wr) >= 50;
-  console.log(`\n  ${pass ? '✅ مربحة' : '❌ تحتاج تحسين'} — نجاح ${wr}%`);
+  console.log(`\n  ${pass?'✅ مربحة':'❌ تحتاج تحسين'} — نجاح ${wr}%\n`);
 
-  if (results.length === 0) {
-    console.log('\n  ⚠️  لا إشارات — السوق كان في range أو الشروط لا تتطابق مع هذه الفترة');
+  if (results.length===0) {
+    console.log('  ⚠️  لا إشارات — النزول الحاد أوقف كل الـ LONG، والسوق لم يكن في bear كاف للـ SHORT');
   }
 }
 
-// ── تشغيل ─────────────────────────────────────────
-console.log('\n🔍 جاري جلب بيانات NQ الحقيقية من Yahoo Finance...');
+console.log('\n🔍 جاري جلب بيانات NQ الحقيقية...\n');
 
 try {
   const [bars5m, bars1h] = await Promise.all([
-    fetchYahoo('NQ=F', '5m',  '60d'),
-    fetchYahoo('NQ=F', '60m', '60d'),
+    fetchYahoo('NQ=F','5m','60d'),
+    fetchYahoo('NQ=F','60m','60d'),
   ]);
 
   const from = new Date(bars5m[0].time*1000).toLocaleDateString('ar-DZ');
   const to   = new Date(bars5m[bars5m.length-1].time*1000).toLocaleDateString('ar-DZ');
   console.log(`✅ ${bars5m.length} شمعة 5M | ${bars1h.length} شمعة 1H | ${from} → ${to}\n`);
 
-  print(runBacktest(bars5m, bars1h, 'v3 — RSI 48/52 | EMA trend | 4/5 | RR 2:1',   2.0, 36));
-  print(runBacktest(bars5m, bars1h, 'v3 — RSI 48/52 | EMA trend | 4/5 | RR 2.5:1', 2.5, 36));
+  print(runBacktest(bars5m, bars1h, 'v4 — HTF سريع | شروط إلزامية | Cooldown 45min | RR 2:1',   2.0, 36));
+  print(runBacktest(bars5m, bars1h, 'v4 — HTF سريع | شروط إلزامية | Cooldown 45min | RR 2.5:1', 2.5, 36));
 
 } catch(e) {
   console.error('\n❌ خطأ:', e.message);
-  console.log('   تأكد من اتصال الإنترنت وأنك في: C:\\Users\\nasri\\smc-bot\\smc-bot');
+  console.log('   في مجلد: C:\\Users\\nasri\\smc-bot\\smc-bot');
 }
