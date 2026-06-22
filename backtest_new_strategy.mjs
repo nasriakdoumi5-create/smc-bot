@@ -231,18 +231,49 @@ function print({label,results,rr}) {
   if (!results.length) console.log('  ⚠️  لا إشارات في هذه الفترة\n');
 }
 
-console.log('\n📊 VWAP Bounce Backtest — NQ Futures\n');
+console.log('\n📊 VWAP Bounce Backtest — NQ + ES Futures\n');
 try {
-  const [bars5m,bars1h]=await Promise.all([
+  const [nq5m,nq1h,es5m,es1h]=await Promise.all([
     fetchYahoo('NQ=F','5m','60d'),
     fetchYahoo('NQ=F','60m','60d'),
+    fetchYahoo('ES=F','5m','60d'),
+    fetchYahoo('ES=F','60m','60d'),
   ]);
-  const from=new Date(bars5m[0].time*1000).toLocaleDateString('ar-DZ');
-  const to  =new Date(bars5m[bars5m.length-1].time*1000).toLocaleDateString('ar-DZ');
-  console.log(`✅ ${bars5m.length} شمعة 5M | ${bars1h.length} شمعة 1H | ${from} → ${to}\n`);
 
-  print(runBacktest(bars5m,bars1h,'VWAP Bounce | RR 1.5:1 | Hold 2h',  1.5,24));
-  print(runBacktest(bars5m,bars1h,'VWAP Bounce | RR 2.0:1 | Hold 2h',  2.0,24));
+  const from=new Date(nq5m[0].time*1000).toLocaleDateString('ar-DZ');
+  const to  =new Date(nq5m[nq5m.length-1].time*1000).toLocaleDateString('ar-DZ');
+  console.log(`✅ NQ: ${nq5m.length} شمعة 5M | ES: ${es5m.length} شمعة 5M | ${from} → ${to}\n`);
+
+  // ══ NQ Futures ══
+  const nqRes15 = runBacktest(nq5m,nq1h,'NQ Futures | RR 1.5:1 | Hold 2h', 1.5,24);
+  const nqRes20 = runBacktest(nq5m,nq1h,'NQ Futures | RR 2.0:1 | Hold 2h', 2.0,24);
+  print(nqRes15);
+  print(nqRes20);
+
+  // ══ ES Futures ══
+  const esRes15 = runBacktest(es5m,es1h,'ES Futures | RR 1.5:1 | Hold 2h', 1.5,24);
+  const esRes20 = runBacktest(es5m,es1h,'ES Futures | RR 2.0:1 | Hold 2h', 2.0,24);
+  print(esRes15);
+  print(esRes20);
+
+  // ══ ملخص مجمع ══
+  const combined15 = [...nqRes15.results, ...esRes15.results];
+  const combined20 = [...nqRes20.results, ...esRes20.results];
+  const w15=combined15.filter(r=>r.outcome==='WIN').length;
+  const l15=combined15.filter(r=>r.outcome==='LOSS').length;
+  const w20=combined20.filter(r=>r.outcome==='WIN').length;
+  const l20=combined20.filter(r=>r.outcome==='LOSS').length;
+  const exp15=l15+w15>0?((w15/(w15+l15)*1.5)-(l15/(w15+l15))).toFixed(3):0;
+  const exp20=l20+w20>0?((w20/(w20+l20)*2.0)-(l20/(w20+l20))).toFixed(3):0;
+  const mo15=Math.round(combined15.length/2);
+  const mo20=Math.round(combined20.length/2);
+
+  console.log(`\n${'═'.repeat(52)}`);
+  console.log(`  🎯 ملخص NQ + ES مجمع (60 يوم)`);
+  console.log(`${'═'.repeat(52)}`);
+  console.log(`  RR 1.5:1 → ${combined15.length} إشارة | WR:${w15+l15>0?(w15/(w15+l15)*100).toFixed(1):0}% | Exp:${exp15}R | $${(mo15*parseFloat(exp15)*75).toFixed(0)}/شهر`);
+  console.log(`  RR 2.0:1 → ${combined20.length} إشارة | WR:${w20+l20>0?(w20/(w20+l20)*100).toFixed(1):0}% | Exp:${exp20}R | $${(mo20*parseFloat(exp20)*75).toFixed(0)}/شهر`);
+  console.log(`${'═'.repeat(52)}\n`);
 
 } catch(e) {
   console.error('\n❌ خطأ:',e.message);
