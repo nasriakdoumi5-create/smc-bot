@@ -1,10 +1,11 @@
 """
 create_free_listing.py
-Creates a free Budget Tracker Lite listing on Etsy (€0).
-The file contains a link to the full version.
+Creates a free Budget Tracker Lite listing on Etsy (€0.20).
+Generates thumbnail, uploads file + image, then activates.
 """
-import json, os, time, requests, urllib.parse, io
+import json, os, time, requests, urllib.parse, io, glob, re
 from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont
 
 CLIENT_ID  = "pluc0garrgcjzhim0hawxf0k"
 SECRET     = "hc89hlqkd6"
@@ -93,6 +94,116 @@ nasritools.etsy.com
 ================================================================
 """
 
+SIZE = 2000
+OUT_DIR = Path("thumbnails/free")
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+def hex2rgb(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+def load_font(size):
+    for c in ["arialbd.ttf","calibrib.ttf","C:/Windows/Fonts/arialbd.ttf",
+              "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]:
+        try: return ImageFont.truetype(c, size)
+        except: continue
+    for p in ["C:/Windows/Fonts/*.ttf","/usr/share/fonts/**/*.ttf"]:
+        for f in glob.glob(p, recursive=True):
+            try: return ImageFont.truetype(f, size)
+            except: continue
+    try: return ImageFont.load_default(size=size)
+    except: return ImageFont.load_default()
+
+def draw_rounded_rect(draw, xy, r, fill):
+    x0,y0,x1,y1 = xy
+    draw.rectangle([x0+r,y0,x1-r,y1],fill=fill)
+    draw.rectangle([x0,y0+r,x1,y1-r],fill=fill)
+    for cx,cy in [(x0,y0),(x1-r*2,y0),(x0,y1-r*2),(x1-r*2,y1-r*2)]:
+        draw.ellipse([cx,cy,cx+r*2,cy+r*2],fill=fill)
+
+def make_free_thumbnail(lid):
+    bg, accent, card = "#F8FAFF", "#2563EB", "#FFFFFF"
+    text_main, text_sub = "#1B2A4A", "#475569"
+    star_color = "#F59E0B"
+
+    img  = Image.new("RGB", (SIZE,SIZE), hex2rgb(bg))
+    draw = ImageDraw.Draw(img)
+
+    f_badge = load_font(48); f_title = load_font(112)
+    f_sub   = load_font(58); f_free  = load_font(160)
+    f_check = load_font(58); f_cta   = load_font(68)
+    f_small = load_font(38); f_stars = load_font(72)
+
+    # FREE badge (top left)
+    badge = "🎁 FREE DOWNLOAD"
+    try:
+        bb = f_badge.getbbox(badge); bw = bb[2]-bb[0]+56; bh = bb[3]-bb[1]+28
+    except: bw,bh = 380,70
+    draw_rounded_rect(draw,(80,80,80+bw,80+bh),16,hex2rgb("#059669"))
+    draw.text((80+28,80+14-bb[1]),badge,font=f_badge,fill=(255,255,255))
+
+    # Stars (top right)
+    try:
+        sb = f_stars.getbbox("★★★★★")
+        draw.text((SIZE-80-(sb[2]-sb[0]),80),"★★★★★",font=f_stars,fill=hex2rgb(star_color))
+        rb = f_small.getbbox("100% Free — No Email")
+        draw.text((SIZE-80-(rb[2]-rb[0]),80+90),"100% Free — No Email",font=f_small,fill=hex2rgb(text_sub))
+    except: pass
+
+    # Big FREE text
+    try:
+        fb = f_free.getbbox("FREE")
+        draw.text(((SIZE-(fb[2]-fb[0]))//2, 200), "FREE", font=f_free, fill=hex2rgb(accent))
+    except: pass
+
+    # Title
+    title = "BUDGET TRACKER"
+    try:
+        tb = f_title.getbbox(title)
+        draw.text(((SIZE-(tb[2]-tb[0]))//2, 380), title, font=f_title, fill=hex2rgb(text_main))
+    except: pass
+
+    sub = "Google Sheets Template"
+    try:
+        sb2 = f_sub.getbbox(sub)
+        draw.text(((SIZE-(sb2[2]-sb2[0]))//2, 510), sub, font=f_sub, fill=hex2rgb(accent))
+    except: pass
+
+    # Divider
+    draw.rectangle([80,600,SIZE-80,606],fill=hex2rgb(accent))
+
+    # Features
+    feats = ["Monthly Budget & Expense Tracker",
+             "Auto-Calculating Formulas",
+             "Income vs Expense Overview",
+             "Works on Phone & Desktop",
+             "No Signup — Instant Access"]
+    for i, feat in enumerate(feats):
+        y = 640 + i*110
+        draw.ellipse([80,y+6,126,y+52],fill=hex2rgb(accent))
+        try: draw.text((93,y+6),"✓",font=f_check,fill=hex2rgb(bg))
+        except: pass
+        draw.text((146,y),feat,font=f_check,fill=hex2rgb(text_sub))
+
+    # CTA
+    cta_y = SIZE-188
+    draw_rounded_rect(draw,(80,cta_y,SIZE-80,cta_y+116),22,hex2rgb(accent))
+    cta = "⬇ DOWNLOAD FOR FREE"
+    try:
+        cb = f_cta.getbbox(cta)
+        draw.text(((SIZE-(cb[2]-cb[0]))//2, cta_y+22), cta, font=f_cta, fill=(255,255,255))
+    except: pass
+
+    wm = "nasritools.etsy.com"
+    try:
+        wb = f_small.getbbox(wm)
+        draw.text((SIZE-wb[2]-wb[0]-60,SIZE-52),wm,font=f_small,fill=hex2rgb(text_sub))
+    except: pass
+
+    path = OUT_DIR / f"free_{lid}.png"
+    img.save(path,"PNG",quality=95)
+    return path
+
 def get_token():
     t = json.loads(TOKEN_FILE.read_text())
     if time.time() >= t.get("expires_at", 0) - 60:
@@ -158,6 +269,16 @@ def upload_file(token, lid):
     )
     return r.ok, r.status_code
 
+def upload_image(token, lid, path):
+    with open(path,"rb") as f:
+        r = requests.post(
+            f"{API}/shops/{SHOP_ID}/listings/{lid}/images",
+            headers=auth_headers(token),
+            files={"image":(path.name,f,"image/png")},
+            data={"rank":1}, timeout=60,
+        )
+    return r.ok, r.status_code
+
 def activate_listing(token, lid):
     r = requests.patch(
         f"{API}/shops/{SHOP_ID}/listings/{lid}",
@@ -173,35 +294,57 @@ def main():
 
     token = get_token()
 
-    print("[1] Fetching return policy...")
-    rp_id, sp_id = get_active_listing_meta(token)
-    print(f"    return_policy_id={rp_id} | shipping_profile_id={sp_id}")
+    # Listing 4526750401 already created in previous run — skip creation
+    EXISTING_LID = 4526750401
 
-    print("[2] Creating listing...")
-    token = get_token()
-    ok, code, result = create_listing(token, rp_id, sp_id)
-    if not ok:
-        print(f"    FAIL ({code}): {result}")
+    if EXISTING_LID:
+        lid = EXISTING_LID
+        print(f"[*] Using existing listing_id={lid}")
+    else:
+        print("[1] Fetching return policy...")
+        rp_id, sp_id = get_active_listing_meta(token)
+        print(f"    return_policy_id={rp_id} | shipping_profile_id={sp_id}")
+
+        print("[2] Creating listing...")
+        token = get_token()
+        ok, code, result = create_listing(token, rp_id, sp_id)
+        if not ok:
+            print(f"    FAIL ({code}): {result}")
+            return
+        lid = result["listing_id"]
+        print(f"    OK — listing_id={lid}")
+        time.sleep(2)
+
+        print("[3] Uploading digital file...")
+        token = get_token()
+        f_ok, f_code = upload_file(token, lid)
+        print(f"    {'OK' if f_ok else f'FAIL ({f_code})'}")
+        time.sleep(2)
+
+    print("[4] Generating FREE thumbnail...")
+    try:
+        img_path = make_free_thumbnail(lid)
+        print(f"    OK — {img_path}")
+    except Exception as e:
+        print(f"    FAIL: {e}")
         return
-    lid = result["listing_id"]
-    print(f"    OK — listing_id={lid}")
 
-    time.sleep(2)
-
-    print("[3] Uploading digital file...")
+    print("[5] Uploading image...")
     token = get_token()
-    f_ok, f_code = upload_file(token, lid)
-    print(f"    {'OK' if f_ok else f'FAIL ({f_code})'}")
+    i_ok, i_code = upload_image(token, lid, img_path)
+    print(f"    {'OK' if i_ok else f'FAIL ({i_code})'}")
+    if not i_ok:
+        return
     time.sleep(2)
 
-    print("[4] Activating listing...")
+    print("[6] Activating listing...")
     token = get_token()
     a_ok, a_code, a_text = activate_listing(token, lid)
     if a_ok:
         print(f"    OK ✅ — LIVE!")
-        print(f"\n  Listing URL: https://www.etsy.com/listing/{lid}")
+        print(f"\n  ✅ Listing URL: https://www.etsy.com/listing/{lid}")
     else:
-        print(f"    FAIL ({a_code}): {a_text[:100]}")
+        print(f"    FAIL ({a_code}): {a_text[:150]}")
 
     print("=" * 65)
 
