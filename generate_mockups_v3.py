@@ -420,8 +420,7 @@ def make_transformation(lid, title, data):
     except: pass
 
     # Big result card
-    rrect(draw,(ax,380,ax+780,ax-770),20,ac)  # placeholder
-    draw.rounded_rectangle([ax,380,ax+780,620], radius=20, fill=ac)
+    draw.rounded_rectangle([ax,380,ax+780,620], radius=20, fill=hex2rgb(accent))
     try:
         rb = f100.getbbox(res_num)
         draw.text((ax+(780-(rb[2]-rb[0]))//2, 395-rb[1]),
