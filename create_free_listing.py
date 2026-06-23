@@ -125,7 +125,7 @@ def create_listing(token, return_policy_id, shipping_profile_id):
     data = (
         f"title={urllib.parse.quote(TITLE)}"
         f"&description={urllib.parse.quote(DESCRIPTION)}"
-        f"&price=0"
+        f"&price=0.20"
         f"&quantity=999"
         f"&who_made=i_did"
         f"&when_made=2020_2025"
