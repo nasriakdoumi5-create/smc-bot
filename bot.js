@@ -3,9 +3,10 @@
  * صفقة واحدة يومياً | RR 1.5 | 5M
  */
 
-import { get5mBars }    from './data_tradovate.js';
-import { analyze1400 }  from './strategy_1400.js';
-import { createServer } from 'http';
+import { get5mBars }        from './data_tradovate.js';
+import { analyze1400 }      from './strategy_1400.js';
+import { fetchCalendar }    from './calendar.js';
+import { createServer }     from 'http';
 
 // ══ إعدادات ══════════════════════════════════════
 const TOKEN    = process.env.TELEGRAM_TOKEN   || '8986679008:AAHmT44SZeoUzdkiaKg-OlnA3NHOonHZ2cw';
@@ -21,7 +22,19 @@ let lastUpdateId = 0;
 let running      = false;
 let activeTrade  = null;
 
-const daily = { traded: false, losses: 0, wins: 0, halted: false, date: '' };
+const daily  = { traded: false, losses: 0, wins: 0, halted: false, date: '' };
+const weekly = { wins: 0, losses: 0, timeouts: 0, week: '' };
+
+function currentWeek() {
+  const d = new Date();
+  const jan1 = new Date(d.getUTCFullYear(), 0, 1);
+  return `${d.getUTCFullYear()}-W${Math.ceil(((d - jan1) / 86400000 + jan1.getUTCDay() + 1) / 7)}`;
+}
+
+function resetWeeklyIfNeeded() {
+  const w = currentWeek();
+  if (weekly.week !== w) Object.assign(weekly, { wins: 0, losses: 0, timeouts: 0, week: w });
+}
 
 // ══ Telegram ══════════════════════════════════════
 async function tg(text) {
@@ -135,6 +148,7 @@ async function checkActiveTrade() {
 
     if (result === 'WIN') {
       daily.wins++;
+      weekly.wins++;
       await tg(
 `✅ <b>ربح — MNQ</b>
 🎯 TP: <b>${resultPrice}</b>
@@ -145,6 +159,7 @@ async function checkActiveTrade() {
 
     } else if (result === 'LOSS') {
       daily.losses++;
+      weekly.losses++;
       if (daily.losses >= MAX_DAILY_LOSSES) {
         daily.halted = true;
         await tg(
@@ -161,6 +176,7 @@ async function checkActiveTrade() {
 ⚠️ خسارة #${daily.losses} — تبقّى ${MAX_DAILY_LOSSES - daily.losses} قبل الإيقاف`);
       }
     } else {
+      weekly.timeouts++;
       await tg(
 `⏳ <b>Timeout — MNQ</b>
 لم يصل TP أو SL خلال ${TIMEOUT_HOURS} ساعات
@@ -232,6 +248,7 @@ async function tick() {
   try {
     await pollCommands();
     resetDailyIfNeeded();
+    resetWeeklyIfNeeded();
     await checkActiveTrade();
   } catch (e) {
     console.error('[tick]', e.message);
@@ -258,7 +275,67 @@ function schedule1400() {
   console.log(`  ⏰ إشارة 14:00 UTC خلال ${mins} دقيقة`);
 }
 
-// ══ ملخص صباحي ════════════════════════════════════
+// ══ أخبار اليوم المهمة ════════════════════════════
+async function sendDailyNews() {
+  try {
+    const events = await fetchCalendar();
+    const now    = new Date();
+    const today  = now.toISOString().slice(0, 10);
+
+    const usd = events
+      .filter(e => {
+        const d = new Date(e.date);
+        return e.country === 'USD'
+          && (e.impact === 'High' || e.impact === 'Medium')
+          && d.toISOString().slice(0, 10) === today;
+      })
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    if (!usd.length) {
+      await tg(`📰 <b>أخبار USD اليوم</b>\n✅ لا توجد أخبار مهمة اليوم`);
+      return;
+    }
+
+    const lines = usd.map(e => {
+      const t       = new Date(e.date).toISOString().slice(11, 16); // HH:MM UTC
+      const impact  = e.impact === 'High' ? '🔴' : '🟡';
+      const fore    = e.forecast ? ` | توقع: <b>${e.forecast}</b>` : '';
+      const prev    = e.previous ? ` | سابق: ${e.previous}` : '';
+      return `${impact} <b>${t} UTC</b> — ${e.title}${fore}${prev}`;
+    }).join('\n');
+
+    await tg(`📰 <b>أخبار USD المهمة — ${today}</b>\n\n${lines}\n\n⏰ الإشارة: 14:00 UTC`);
+  } catch (e) {
+    console.error('[News]', e.message);
+  }
+}
+
+// ══ تقرير أسبوعي (الجمعة 21:00 UTC) ══════════════
+async function sendWeeklyReport() {
+  resetWeeklyIfNeeded();
+  const total = weekly.wins + weekly.losses + weekly.timeouts;
+  const wr    = total > 0 ? Math.round(weekly.wins / total * 100) : 0;
+  const bar   = '█'.repeat(Math.round(wr / 10)) + '░'.repeat(10 - Math.round(wr / 10));
+  const status = wr >= 60 ? '✅ أسبوع ممتاز' : wr >= 50 ? '⚖️ أسبوع متعادل' : '⚠️ أسبوع صعب';
+
+  await tg(
+`📊 <b>التقرير الأسبوعي — MNQ Bot</b>
+📅 ${weekly.week}
+─────────────────
+✅ أرباح:  ${weekly.wins}
+❌ خسائر:  ${weekly.losses}
+⏳ Timeout: ${weekly.timeouts}
+📈 الإجمالي: ${total} صفقة
+─────────────────
+🎯 نسبة النجاح: <b>${wr}%</b>
+${bar}
+${status}
+─────────────────
+🤖 MNQ | 14:00 UTC | RR 1:${RR_RATIO}`
+  ).catch(() => {});
+}
+
+// ══ ملخص صباحي + أخبار اليوم ═════════════════════
 function scheduleDailySummary() {
   function msUntil8() {
     const now = new Date(), next = new Date();
@@ -266,17 +343,38 @@ function scheduleDailySummary() {
     if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
     return next - now;
   }
-  setTimeout(function fire() {
-    tg(
+  setTimeout(async function fire() {
+    await tg(
 `🌅 <b>صباح الخير — MNQ Bot</b>
 📅 ${new Date().toISOString().slice(0, 10)}
 ✅ أرباح أمس: ${daily.wins}
 ❌ خسائر أمس: ${daily.losses}
-⏰ إشارة اليوم: 14:00 UTC
-🤖 البوت يعمل`
+⏰ إشارة اليوم: 14:00 UTC`
     ).catch(() => {});
+    await sendDailyNews();
     setTimeout(fire, msUntil8());
   }, msUntil8());
+}
+
+// ══ تقرير أسبوعي كل جمعة 21:00 UTC ══════════════
+function scheduleWeeklyReport() {
+  function msUntilFriday21() {
+    const now  = new Date();
+    const next = new Date();
+    // الجمعة = 5
+    const daysUntil = (5 - now.getUTCDay() + 7) % 7 || 7;
+    next.setUTCDate(now.getUTCDate() + daysUntil);
+    next.setUTCHours(21, 0, 0, 0);
+    if (next <= now) next.setUTCDate(next.getUTCDate() + 7);
+    return next - now;
+  }
+  setTimeout(function fire() {
+    sendWeeklyReport();
+    setTimeout(fire, msUntilFriday21());
+  }, msUntilFriday21());
+
+  const mins = Math.round(msUntilFriday21() / 60000 / 60);
+  console.log(`  📊 تقرير أسبوعي خلال ${mins} ساعة`);
 }
 
 // ══ بدء التشغيل ══════════════════════════════════
@@ -304,6 +402,7 @@ tg(
 
 schedule1400();
 scheduleDailySummary();
+scheduleWeeklyReport();
 setInterval(tick, 60 * 1000);
 tick();
 
