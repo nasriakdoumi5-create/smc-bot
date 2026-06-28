@@ -1,31 +1,40 @@
 /**
- * SMC Elite Strategy Engine v2
- * 9 شروط — الإشارة عند 6+/9
- * ① HTF Trend  ② Session  ③ Liquidity Sweep
- * ④ Order Block  ⑤ FVG  ⑥ Fibonacci OTE  ⑦ RSI
- * ⑧ Volume Spike  ⑨ Momentum Rejection
+ * SMC Elite Strategy Engine v3 — High Probability
+ * ════════════════════════════════════════════════
+ * الهدف: 65%+ نسبة نجاح بتشديد جميع الشروط
+ *
+ * MANDATORY (يجب كلها):
+ *   ① HTF Trend قوي: EMA21 > EMA50 > EMA200
+ *   ② Killzone حقيقية: London 07-10 | NY 13:30-15:30
+ *   ③ Liquidity Sweep حديث (آخر 20 شمعة)
+ *
+ * SCORED — يجب 4 من 6:
+ *   ④ Order Block (displacement > 1.0×ATR)
+ *   ⑤ Fair Value Gap (آخر 8 شمعات)
+ *   ⑥ Fibonacci OTE 61.8-78.6%
+ *   ⑦ RSI ذروة حقيقية < 35 أو > 65
+ *   ⑧ حجم تداول حقيقي > 1.3× المتوسط
+ *   ⑨ رفض قوي: جسم > 65% من النطاق
  */
 
-// ══ EMA ══════════════════════════════════════
+// ══ EMA ══════════════════════════════════════════
 export function ema(bars, period, key = 'close') {
   const k = 2 / (period + 1);
-  const result = [];
   let prev = null;
-  for (const bar of bars) {
+  return bars.map(bar => {
     const val = bar[key];
-    if (prev === null) { prev = val; result.push(val); continue; }
+    if (prev === null) { prev = val; return val; }
     prev = val * k + prev * (1 - k);
-    result.push(prev);
-  }
-  return result;
+    return prev;
+  });
 }
 
-// ══ ATR ══════════════════════════════════════
+// ══ ATR ══════════════════════════════════════════
 export function atr(bars, period = 14) {
   const trs = bars.map((b, i) => {
     if (i === 0) return b.high - b.low;
-    const prev = bars[i - 1].close;
-    return Math.max(b.high - b.low, Math.abs(b.high - prev), Math.abs(b.low - prev));
+    const p = bars[i - 1].close;
+    return Math.max(b.high - b.low, Math.abs(b.high - p), Math.abs(b.low - p));
   });
   const result = [];
   let avg = trs.slice(0, period).reduce((a, b) => a + b, 0) / period;
@@ -38,7 +47,7 @@ export function atr(bars, period = 14) {
   return [...Array(pad).fill(null), ...result];
 }
 
-// ══ RSI ══════════════════════════════════════
+// ══ RSI ══════════════════════════════════════════
 export function rsi(bars, period = 14) {
   const result = Array(period).fill(null);
   let gains = 0, losses = 0;
@@ -59,7 +68,7 @@ export function rsi(bars, period = 14) {
   return result;
 }
 
-// ══ Swing Highs/Lows ═════════════════════════
+// ══ Swing Highs/Lows (lookup = 10 شمعة) ══════════
 export function swingHighs(bars, len = 10) {
   return bars.map((_, i) => {
     if (i < len || i >= bars.length - len) return null;
@@ -82,254 +91,271 @@ export function swingLows(bars, len = 10) {
   });
 }
 
-// ══ Session Filter ════════════════════════════
-function inSession(_bar) {
-  // نفحص الوقت الحالي (ليس وقت الـ bar) لتجنب بيانات Yahoo المتأخرة
+// ══ ① Killzone — London Open + NY Open فقط ═══════
+function inKillzone() {
   const now  = new Date();
   const mins = now.getUTCHours() * 60 + now.getUTCMinutes();
-  const asia   = mins >= 1 * 60       && mins < 5 * 60;    // UTC 01:00-05:00
-  const london = mins >= 7 * 60       && mins < 12 * 60;   // UTC 07:00-12:00
-  const ny     = mins >= 13 * 60 + 30 && mins < 22 * 60;   // UTC 13:30-22:00
-  return asia || london || ny;
+  const londonOpen = mins >= 7 * 60  && mins < 10 * 60;      // 07:00-10:00 UTC
+  const nyOpen     = mins >= 13 * 60 + 30 && mins < 15 * 60 + 30; // 13:30-15:30 UTC
+  return londonOpen || nyOpen;
 }
 
-// ══ Volume Spike ══════════════════════════════
-function volumeSpike(bars, n, lookback = 20) {
-  const recent = bars.slice(Math.max(0, n - lookback), n);
-  const avgVol = recent.reduce((s, b) => s + (b.volume || 0), 0) / recent.length;
+// ══ ⑧ حجم تداول — صارم، بدون auto-pass ═══════════
+function volumeCheck(bars, n, lookback = 20) {
+  const vols = bars.slice(Math.max(0, n - lookback), n).map(b => b.volume || 0);
+  const avgVol = vols.reduce((s, v) => s + v, 0) / vols.length;
   const curVol = bars[n - 1].volume || 0;
-  // إذا لا توجد بيانات حجم (Futures على Yahoo) — نعتبره محايداً true
-  if (avgVol === 0) return { spike: true, ratio: 1, noData: true };
-  return { spike: curVol > avgVol * 1.5, ratio: +(curVol / avgVol).toFixed(1), noData: false };
+  if (avgVol < 10) return { ok: false, ratio: 0, noData: true }; // futures بدون volume حقيقي
+  return { ok: curVol > avgVol * 1.3, ratio: +(curVol / avgVol).toFixed(1), noData: false };
 }
 
-// ══ Momentum Rejection ═══════════════════════
-// شمعة هابطة/صاعدة قوية بعد لمس مستوى = رفض
-function momentumRejection(bars, n, curATR) {
+// ══ ⑨ رفض قوي — جسم > 65% ═══════════════════════
+function strongRejection(bars, n, curATR) {
   const last = bars[n - 1];
   const prev = bars[n - 2];
   const body     = Math.abs(last.close - last.open);
   const bodyPrev = Math.abs(prev.close - prev.open);
+  const range    = last.high - last.low || 0.01;
 
-  // رفض هبوطي: شمعة هابطة بعد صعود — جسم كبير
-  const bearRej = last.close < last.open && body > curATR * 0.6 && prev.close > prev.open;
-  // رفض صاعدي: شمعة صاعدة بعد هبوط — جسم كبير
-  const bullRej = last.close > last.open && body > curATR * 0.6 && prev.close < prev.open;
+  const bearRej = last.close < last.open
+    && body / range > 0.65
+    && body > curATR * 0.5
+    && prev.close > prev.open;
+
+  const bullRej = last.close > last.open
+    && body / range > 0.65
+    && body > curATR * 0.5
+    && prev.close < prev.open;
 
   return { bearRej, bullRej };
 }
 
-// ══ Resistance/Support Touch ═════════════════
-// هل السعر لمس مستوى مقاومة/دعم مهم
-function nearLevel(price, level, atrVal) {
-  return Math.abs(price - level) < atrVal * 0.5;
-}
-
-// ══ 1M Entry Confirmation ═════════════════════
-// تأكيد الدخول على الدقيقة: شمعة رفض + اتجاه متوافق
+// ══ 1M Confirmation ══════════════════════════════
 export function confirm1m(bars1m, direction) {
-  if (!bars1m || bars1m.length < 5) return { confirmed: true, reason: 'no 1m data' };
-  const n    = bars1m.length;
-  const last = bars1m[n - 1];
-  const prev = bars1m[n - 2];
-  const body = Math.abs(last.close - last.open);
-  const range = last.high - last.low || 1;
+  if (!bars1m || bars1m.length < 5) return { confirmed: false, reason: 'لا بيانات 1M' };
+  const last  = bars1m[bars1m.length - 1];
+  const body  = Math.abs(last.close - last.open);
+  const range = last.high - last.low || 0.01;
 
   if (direction === 'LONG') {
-    // شمعة صاعدة + جسم > 40% من النطاق + إغلاق فوق المنتصف
-    const bullCandle = last.close > last.open;
-    const strongBody = body / range > 0.4;
-    const aboveMid   = last.close > (last.high + last.low) / 2;
-    const confirmed  = bullCandle && strongBody && aboveMid;
-    return { confirmed, reason: confirmed ? '1M شمعة صاعدة قوية' : '1M لا تأكيد صاعد بعد' };
+    const ok = last.close > last.open && body / range > 0.45
+      && last.close > (last.high + last.low) / 2;
+    return { confirmed: ok, reason: ok ? '1M شمعة صاعدة قوية ✅' : '1M لا تأكيد بعد ⏳' };
   } else {
-    // شمعة هابطة + جسم > 40% + إغلاق تحت المنتصف
-    const bearCandle = last.close < last.open;
-    const strongBody = body / range > 0.4;
-    const belowMid   = last.close < (last.high + last.low) / 2;
-    const confirmed  = bearCandle && strongBody && belowMid;
-    return { confirmed, reason: confirmed ? '1M شمعة هابطة قوية' : '1M لا تأكيد هابط بعد' };
+    const ok = last.close < last.open && body / range > 0.45
+      && last.close < (last.high + last.low) / 2;
+    return { confirmed: ok, reason: ok ? '1M شمعة هابطة قوية ✅' : '1M لا تأكيد بعد ⏳' };
   }
 }
 
-// ══ Main Analysis ════════════════════════════
+// ══ التحليل الرئيسي ══════════════════════════════
 export function analyze(bars5m, bars1h) {
   if (bars5m.length < 50 || bars1h.length < 200) {
     return { error: 'not enough data' };
   }
 
-  // ── ① HTF Trend ───────────────────────────
+  // ════════════════════════════════════════════════
+  // ① HTF TREND — يجب EMA21 > EMA50 > EMA200 (قوي)
+  // ════════════════════════════════════════════════
+  const ema21h  = ema(bars1h, 21);
   const ema50h  = ema(bars1h, 50);
   const ema200h = ema(bars1h, 200);
-  const ema21h  = ema(bars1h, 21);
-  const lastEma50  = ema50h[ema50h.length - 1];
-  const lastEma200 = ema200h[ema200h.length - 1];
-  const lastEma21  = ema21h[ema21h.length - 1];
-  const htfBull = lastEma50 > lastEma200;
-  const htfBear = lastEma50 < lastEma200;
-  // تأكيد إضافي: EMA21 يؤكد الاتجاه
-  const htfBullStrong = htfBull && lastEma21 > lastEma50;
-  const htfBearStrong = htfBear && lastEma21 < lastEma50;
+  const E21  = ema21h[ema21h.length - 1];
+  const E50  = ema50h[ema50h.length - 1];
+  const E200 = ema200h[ema200h.length - 1];
 
-  // ── آخر bar ───────────────────────────────
+  // اتجاه قوي: 3 EMAs مرتبة
+  const htfBull       = E50 > E200;
+  const htfBear       = E50 < E200;
+  const htfBullStrong = E21 > E50 && E50 > E200;  // ← إلزامي للـ LONG
+  const htfBearStrong = E21 < E50 && E50 < E200;  // ← إلزامي للـ SHORT
+
+  // ════════════════════════════════════════════════
+  // ② KILLZONE — إلزامي
+  // ════════════════════════════════════════════════
+  const sessionOk = inKillzone();
+
+  // ── آخر شمعة ─────────────────────────────────
   const n    = bars5m.length;
   const last = bars5m[n - 1];
-  const prev = bars5m[n - 2];
 
-  // ── ② Session ─────────────────────────────
-  const sessionOk = inSession(last);
-
-  // ── ATR و RSI ─────────────────────────────
+  // ── ATR و RSI ──────────────────────────────────
   const atrArr   = atr(bars5m, 14);
   const atr1hArr = atr(bars1h, 14);
   const rsiArr   = rsi(bars5m, 14);
-  const curATR   = atrArr[n - 1] || 0;
+  const curATR   = atrArr[n - 1] || 1;
   const atr1h    = atr1hArr[atr1hArr.length - 1] || curATR * 3;
   const curRSI   = rsiArr[n - 1] || 50;
 
-  // ── Swing H/L ─────────────────────────────
+  // ── Swing H/L ──────────────────────────────────
   const sHighs = swingHighs(bars5m, 10);
   const sLows  = swingLows(bars5m, 10);
 
-  let lastSH = null, lastSL = null;
-  let lastSHIdx = -1, lastSLIdx = -1;
+  let lastSH = null, lastSL = null, lastSHIdx = -1, lastSLIdx = -1;
   for (let i = n - 1; i >= 0; i--) {
     if (lastSH === null && sHighs[i] !== null) { lastSH = sHighs[i]; lastSHIdx = i; }
     if (lastSL === null && sLows[i]  !== null) { lastSL = sLows[i];  lastSLIdx = i; }
     if (lastSH && lastSL) break;
   }
 
-  // ── ③ Liquidity Sweep ─────────────────────
+  // ════════════════════════════════════════════════
+  // ③ LIQUIDITY SWEEP — إلزامي (آخر 20 شمعة)
+  // ════════════════════════════════════════════════
   let recentSweepUp   = false;
   let recentSweepDown = false;
-  for (let i = Math.max(0, n - 40); i < n; i++) {
+  for (let i = Math.max(0, n - 20); i < n; i++) {
     const b = bars5m[i];
     if (lastSH && b.high > lastSH && b.close < lastSH) recentSweepUp   = true;
     if (lastSL && b.low  < lastSL && b.close > lastSL) recentSweepDown = true;
   }
 
-  // ── ④ Order Block ─────────────────────────
+  // ════════════════════════════════════════════════
+  // ④ ORDER BLOCK — displacement إلزامي > 1.0×ATR
+  // ════════════════════════════════════════════════
   let bullOB_top = null, bullOB_bot = null;
   let bearOB_top = null, bearOB_bot = null;
+  let swingLowForSL = null, swingHighForSL = null;
 
-  for (let i = Math.max(1, n - 30); i < n - 1; i++) {
+  for (let i = Math.max(1, n - 20); i < n - 1; i++) {
     const b    = bars5m[i];
     const next = bars5m[i + 1];
-    const bullDisp = next.close > bars5m[i].high && (next.close - next.open) > curATR * 0.8;
-    if (bullDisp && b.open > b.close) { bullOB_top = b.open; bullOB_bot = b.close; }
-    const bearDisp = next.close < bars5m[i].low && (next.open - next.close) > curATR * 0.8;
-    if (bearDisp && b.close > b.open) { bearOB_top = b.close; bearOB_bot = b.open; }
+    const bullDisp = (next.close - next.open) > curATR * 1.0 && next.close > b.high;
+    if (bullDisp && b.open > b.close) {
+      bullOB_top = b.open; bullOB_bot = b.close;
+      swingLowForSL = Math.min(b.low, next.low);
+    }
+    const bearDisp = (next.open - next.close) > curATR * 1.0 && next.close < b.low;
+    if (bearDisp && b.close > b.open) {
+      bearOB_top = b.close; bearOB_bot = b.open;
+      swingHighForSL = Math.max(b.high, next.high);
+    }
   }
 
-  const inBullOB = bullOB_top && last.close <= bullOB_top && last.close >= bullOB_bot;
-  const inBearOB = bearOB_top && last.close <= bearOB_top && last.close >= bearOB_bot;
+  const inBullOB = !!(bullOB_top && last.close <= bullOB_top && last.close >= bullOB_bot);
+  const inBearOB = !!(bearOB_top && last.close <= bearOB_top && last.close >= bearOB_bot);
 
-  // ── ⑤ Fair Value Gap ──────────────────────
+  // ════════════════════════════════════════════════
+  // ⑤ FAIR VALUE GAP — آخر 8 شمعات فقط
+  // ════════════════════════════════════════════════
   let recentBullFVG = false;
   let recentBearFVG = false;
-  for (let i = Math.max(2, n - 15); i < n; i++) {
-    if (bars5m[i].low  > bars5m[i - 2].high) recentBullFVG = true;
-    if (bars5m[i].high < bars5m[i - 2].low)  recentBearFVG = true;
+  for (let i = Math.max(2, n - 8); i < n; i++) {
+    const gap = bars5m[i].low - bars5m[i - 2].high;
+    const gap2 = bars5m[i - 2].low - bars5m[i].high;
+    if (gap > curATR * 0.3)  recentBullFVG = true;
+    if (gap2 > curATR * 0.3) recentBearFVG = true;
   }
 
-  // ── ⑥ Fibonacci OTE ───────────────────────
-  let fibOTE_bull = false;
-  let fibOTE_bear = false;
+  // ════════════════════════════════════════════════
+  // ⑥ FIBONACCI OTE 61.8-78.6%
+  // ════════════════════════════════════════════════
+  let fibOTE_bull = false, fibOTE_bear = false;
   if (lastSH && lastSL) {
-    const rng  = lastSH - lastSL;
-    const p    = last.close;
+    const rng = lastSH - lastSL;
+    const p   = last.close;
     fibOTE_bull = p >= (lastSH - rng * 0.786) && p <= (lastSH - rng * 0.618);
     fibOTE_bear = p >= (lastSL + rng * 0.618) && p <= (lastSL + rng * 0.786);
   }
 
-  // ── ⑦ RSI ─────────────────────────────────
-  const rsiOversold   = curRSI < 40;
-  const rsiOverbought = curRSI > 60;
+  // ════════════════════════════════════════════════
+  // ⑦ RSI — ذروة حقيقية (< 35 أو > 65)
+  // ════════════════════════════════════════════════
+  const rsiOversold   = curRSI < 35;   // أكثر صرامة من 40
+  const rsiOverbought = curRSI > 65;   // أكثر صرامة من 60
 
-  // ── ⑧ Volume Spike ────────────────────────
-  const volData = volumeSpike(bars5m, n);
-  const volSpike = volData.spike;
+  // ════════════════════════════════════════════════
+  // ⑧ VOLUME — حقيقي فقط
+  // ════════════════════════════════════════════════
+  const volData  = volumeCheck(bars5m, n);
+  const volSpike = volData.ok && !volData.noData;
 
-  // ── ⑨ Momentum Rejection ──────────────────
-  const momentum = momentumRejection(bars5m, n, curATR);
-  const bullMomentum = momentum.bullRej;
-  const bearMomentum = momentum.bearRej;
+  // ════════════════════════════════════════════════
+  // ⑨ STRONG REJECTION — جسم > 65%
+  // ════════════════════════════════════════════════
+  const rejection = strongRejection(bars5m, n, curATR);
+  const bullMomentum = rejection.bullRej;
+  const bearMomentum = rejection.bearRej;
 
-  // ── Score (9 شروط) ────────────────────────
-  const scoreLong  = (htfBull          ? 1 : 0)
-                   + (sessionOk         ? 1 : 0)
-                   + (recentSweepDown   ? 1 : 0)
-                   + (inBullOB          ? 1 : 0)
-                   + (recentBullFVG     ? 1 : 0)
-                   + (fibOTE_bull       ? 1 : 0)
-                   + (rsiOversold       ? 1 : 0)
-                   + (volSpike          ? 1 : 0)
-                   + (bullMomentum      ? 1 : 0);
+  // ════════════════════════════════════════════════
+  // SCORE (6 شروط اختيارية)
+  // ════════════════════════════════════════════════
+  const scoreLong  = (inBullOB      ? 1 : 0)
+                   + (recentBullFVG ? 1 : 0)
+                   + (fibOTE_bull   ? 1 : 0)
+                   + (rsiOversold   ? 1 : 0)
+                   + (volSpike      ? 1 : 0)
+                   + (bullMomentum  ? 1 : 0);
 
-  const scoreShort = (htfBear           ? 1 : 0)
-                   + (sessionOk          ? 1 : 0)
-                   + (recentSweepUp      ? 1 : 0)
-                   + (inBearOB           ? 1 : 0)
-                   + (recentBearFVG      ? 1 : 0)
-                   + (fibOTE_bear        ? 1 : 0)
-                   + (rsiOverbought      ? 1 : 0)
-                   + (volSpike           ? 1 : 0)
-                   + (bearMomentum       ? 1 : 0);
+  const scoreShort = (inBearOB      ? 1 : 0)
+                   + (recentBearFVG ? 1 : 0)
+                   + (fibOTE_bear   ? 1 : 0)
+                   + (rsiOverbought ? 1 : 0)
+                   + (volSpike      ? 1 : 0)
+                   + (bearMomentum  ? 1 : 0);
 
-  // ── SL / TP ───────────────────────────────
+  // ════════════════════════════════════════════════
+  // SIGNAL — المندتوري + 4 من 6 اختياري
+  // ════════════════════════════════════════════════
   const price = last.close;
-  let signal = null;
+  let signal  = null;
 
-  if (scoreLong >= 3 && scoreLong > scoreShort && htfBull) {
-    const sl   = bullOB_bot ? bullOB_bot - atr1h * 0.5 : price - atr1h;
+  const mandatoryLong  = htfBullStrong && sessionOk && recentSweepDown;
+  const mandatoryShort = htfBearStrong && sessionOk && recentSweepUp;
+
+  if (mandatoryLong && scoreLong >= 4) {
+    const sl   = swingLowForSL
+      ? swingLowForSL - curATR * 0.3
+      : (bullOB_bot ? bullOB_bot - atr1h * 0.3 : price - atr1h);
     const risk = Math.abs(price - sl);
     signal = {
-      type:  'LONG', score: scoreLong, maxScore: 9, price,
-      sl:    +sl.toFixed(2),
-      tp1:   +(price + risk * 2).toFixed(2),
-      tp2:   +(price + risk * 4).toFixed(2),
-      tp3:   +(price + risk * 6).toFixed(2),
-      rr:    '2:1 / 4:1',
-      atr:   +curATR.toFixed(2),
-      atr1h: +atr1h.toFixed(2),
-      rsi:   +curRSI.toFixed(1),
-      volRatio: +volData.ratio.toFixed(1),
+      type: 'LONG', score: scoreLong, maxScore: 6, price,
+      sl:   +sl.toFixed(2),
+      tp1:  +(price + risk * 2).toFixed(2),
+      tp2:  +(price + risk * 3.5).toFixed(2),
+      tp3:  +(price + risk * 5).toFixed(2),
+      rr: '2:1 / 3.5:1',
+      atr: +curATR.toFixed(2), atr1h: +atr1h.toFixed(2),
+      rsi: +curRSI.toFixed(1),
+      volRatio: volData.noData ? 'N/A' : volData.ratio,
       conditions: {
-        htfBull, sessionOk, recentSweepDown, inBullOB,
-        recentBullFVG, fibOTE_bull, rsiOversold, volSpike, bullMomentum
-      }
+        htfBull: htfBullStrong, sessionOk, recentSweepDown,
+        inBullOB, recentBullFVG, fibOTE_bull,
+        rsiOversold, volSpike, bullMomentum,
+      },
     };
-  } else if (scoreShort >= 3 && scoreShort > scoreLong && htfBear) {
-    const sl   = bearOB_top ? bearOB_top + atr1h * 0.5 : price + atr1h;
+  } else if (mandatoryShort && scoreShort >= 4) {
+    const sl   = swingHighForSL
+      ? swingHighForSL + curATR * 0.3
+      : (bearOB_top ? bearOB_top + atr1h * 0.3 : price + atr1h);
     const risk = Math.abs(sl - price);
     signal = {
-      type:  'SHORT', score: scoreShort, maxScore: 9, price,
-      sl:    +sl.toFixed(2),
-      tp1:   +(price - risk * 2).toFixed(2),
-      tp2:   +(price - risk * 4).toFixed(2),
-      tp3:   +(price - risk * 6).toFixed(2),
-      rr:    '2:1 / 4:1',
-      atr:   +curATR.toFixed(2),
-      atr1h: +atr1h.toFixed(2),
-      rsi:   +curRSI.toFixed(1),
-      volRatio: +volData.ratio.toFixed(1),
+      type: 'SHORT', score: scoreShort, maxScore: 6, price,
+      sl:   +sl.toFixed(2),
+      tp1:  +(price - risk * 2).toFixed(2),
+      tp2:  +(price - risk * 3.5).toFixed(2),
+      tp3:  +(price - risk * 5).toFixed(2),
+      rr: '2:1 / 3.5:1',
+      atr: +curATR.toFixed(2), atr1h: +atr1h.toFixed(2),
+      rsi: +curRSI.toFixed(1),
+      volRatio: volData.noData ? 'N/A' : volData.ratio,
       conditions: {
-        htfBear, sessionOk, recentSweepUp, inBearOB,
-        recentBearFVG, fibOTE_bear, rsiOverbought, volSpike, bearMomentum
-      }
+        htfBear: htfBearStrong, sessionOk, recentSweepUp,
+        inBearOB, recentBearFVG, fibOTE_bear,
+        rsiOverbought, volSpike, bearMomentum,
+      },
     };
   }
 
   return {
-    symbol:    'NQ/MNQ',
-    price:     +price.toFixed(2),
-    time:      new Date(last.time * 1000).toLocaleString('es-ES', { timeZone: 'Europe/Madrid' }),
-    htfTrend:  htfBullStrong ? 'BULL↑' : htfBull ? 'BULL' : htfBearStrong ? 'BEAR↓' : htfBear ? 'BEAR' : 'NEUTRAL',
-    session:   sessionOk,
+    symbol: 'NQ/MNQ',
+    price:  +price.toFixed(2),
+    time:   new Date(last.time * 1000).toLocaleString('es-ES', { timeZone: 'Europe/Madrid' }),
+    htfTrend: htfBullStrong ? 'BULL↑↑' : htfBull ? 'BULL' : htfBearStrong ? 'BEAR↓↓' : htfBear ? 'BEAR' : 'NEUTRAL',
+    session:  sessionOk,
+    mandatory: { htfBullStrong, htfBearStrong, sessionOk, recentSweepDown, recentSweepUp },
     scoreLong, scoreShort,
     signal,
-    atr:       +curATR.toFixed(2),
-    rsi:       +curRSI.toFixed(1),
-    volRatio:  +volData.ratio.toFixed(1),
+    atr:  +curATR.toFixed(2),
+    rsi:  +curRSI.toFixed(1),
   };
 }

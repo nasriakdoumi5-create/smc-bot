@@ -103,15 +103,15 @@ const symbolNames = {
 };
 
 const condLabels = {
-  htfBull:'HTF Trend صاعد',       htfBear:'HTF Trend هابط',
-  sessionOk:'جلسة نشطة',
-  recentSweepDown:'Liquidity Sweep ↓', recentSweepUp:'Liquidity Sweep ↑',
+  htfBull:'HTF قوي ↑↑ (EMA21>50>200)', htfBear:'HTF قوي ↓↓ (EMA21<50<200)',
+  sessionOk:'Killzone (London/NY Open)',
+  recentSweepDown:'Liquidity Sweep ↓ ✓', recentSweepUp:'Liquidity Sweep ↑ ✓',
   inBullOB:'Order Block صاعد',    inBearOB:'Order Block هابط',
   recentBullFVG:'FVG صاعد',       recentBearFVG:'FVG هابط',
-  fibOTE_bull:'Fibonacci OTE',    fibOTE_bear:'Fibonacci OTE',
-  rsiOversold:'RSI ذروة بيع',     rsiOverbought:'RSI ذروة شراء',
-  volSpike:'حجم تداول مرتفع',
-  bullMomentum:'رفض صاعد قوي',    bearMomentum:'رفض هابط قوي',
+  fibOTE_bull:'Fibonacci OTE 61.8-78.6%', fibOTE_bear:'Fibonacci OTE 61.8-78.6%',
+  rsiOversold:'RSI ذروة بيع < 35',  rsiOverbought:'RSI ذروة شراء > 65',
+  volSpike:'حجم تداول حقيقي > 1.3×',
+  bullMomentum:'رفض صاعد قوي > 65%', bearMomentum:'رفض هابط قوي > 65%',
 };
 
 async function checkSymbol(symbol, state) {
@@ -125,11 +125,18 @@ async function checkSymbol(symbol, state) {
   const fibResult = analyzeFib(bars1h);
   if (result.error) { console.log(`[${symbol}]`, result.error); return; }
 
-  const { price, htfTrend, session, scoreLong, scoreShort, rsi } = result;
+  const { price, htfTrend, session, scoreLong, scoreShort, rsi, mandatory } = result;
   const t = new Date().toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' });
 
+  // ── فلتر Mandatory: إذا لم تكتمل الشروط الإلزامية → تجاهل ──
+  const mLong  = mandatory?.htfBullStrong && mandatory?.sessionOk && mandatory?.recentSweepDown;
+  const mShort = mandatory?.htfBearStrong && mandatory?.sessionOk && mandatory?.recentSweepUp;
+  if (!mLong && !mShort && !fibResult?.signal) {
+    console.log(`[${t}] ${symbol} — لا mandatory | HTF:${htfTrend} KZ:${session?'✅':'❌'}`);
+    return;
+  }
+
   // ── الفيبو يأخذ الأولوية إذا أعطى إشارة ──────
-  // (65-80% win rate على MCL، مثبّت على 2 سنة بيانات)
   let signal = fibResult?.signal || result.signal;
   let isFibSignal = !!(fibResult?.signal);
 
@@ -222,13 +229,13 @@ TP2: <b>${signal.tp2}</b>  ← +$${tp2Dollar}
 🕯 1M: ${entry1m.confirmed ? '✅' : '⚠️'} ${entry1m.reason}`;
   } else {
     // إشارة SMC الاعتيادية
-    const isStrong = signal.score >= 6;
-    const scoreBar = '●'.repeat(signal.score) + '○'.repeat(9 - signal.score);
+    const isStrong = signal.score >= 5;
+    const scoreBar = '●'.repeat(signal.score) + '○'.repeat(6 - Math.min(signal.score, 6));
     const tp3Dollar = +(contracts * Math.abs((signal.tp3||signal.tp2) - signal.price) * pointVal).toFixed(0);
     const condList  = Object.entries(signal.conditions || {})
       .map(([k, v]) => `${v ? '✅' : '❌'} ${condLabels[k] || k}`)
       .join('\n');
-    const qualLabel = isStrong ? '🔥 إشارة قوية' : '⚡ إشارة متوسطة — تحقق من الشارت';
+    const qualLabel = isStrong ? '🔥 إشارة عالية الجودة (5-6/6)' : '⚡ إشارة جيدة (4/6) — تحقق من الشارت';
     const slPoints  = risk;
 
     msgBody =
@@ -247,7 +254,8 @@ TP2: <b>${signal.tp2}</b>  ← +$${tp2Dollar}
 TP3: <b>${signal.tp3 || signal.tp2}</b>  ← +$${tp3Dollar}
 
 ━━━━━━━━━━━━━━━━━━━━
-⭐ الجودة: <b>${signal.score}/9</b>  ${scoreBar}
+⭐ الجودة: <b>${signal.score}/6</b>  ${scoreBar}
+🔒 Mandatory: HTF قوي ✅ | Killzone ✅ | Sweep ✅
 📊 RSI: ${signal.rsi}  |  ATR: ${signal.atr}
 🕯 1M: ${entry1m.confirmed ? '✅' : '⚠️'} ${entry1m.reason}
 

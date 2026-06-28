@@ -69,7 +69,7 @@ function waveQuality(bars, fromIdx, toIdx) {
 
 // ══ التحليل الرئيسي ══════════════════════════════
 export function analyzeFib(bars1h) {
-  if (bars1h.length < 230) return { error: 'not enough data' };
+  if (bars1h.length < 200) return { error: 'not enough data' };
 
   const n     = bars1h.length;
   const bars  = bars1h;
