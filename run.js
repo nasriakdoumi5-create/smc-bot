@@ -1,159 +1,177 @@
-import { get5mBars } from './data.js';
-import { analyzeAMD } from './amd.js';
+import { get5mBars, get1hBars } from './data.js';
+import { analyze }             from './smc.js';
+import { getDOMSnapshot, domSummaryText } from './tradovate.js';
 import { analyzeOrderFlow, orderFlowText } from './orderflow.js';
-import { getUpcomingHigh, isNewsTime } from './calendar.js';
+import { getUpcomingHigh, isNewsTime }     from './calendar.js';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 
 const TOKEN   = process.env.TELEGRAM_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-
 if (!TOKEN || !CHAT_ID) { console.error('❌ TOKEN مفقود'); process.exit(1); }
-
-// ── الرموز المراقبة ───────────────────────────
-const SYMBOLS = [
-  { id: 'CNQ', name: 'Canadian Natural Resources', emoji: '🍁' },
-  { id: 'CML', name: 'CML',                        emoji: '📊' },
-  { id: 'CGC', name: 'Canopy Growth',               emoji: '🌿' },
-];
-
-const COND_LABELS = {
-  asiaRangeDefined:    'Asia Range محدد',
-  manipulationUp:      'Stop Hunt فوق Asia High',
-  manipulationDown:    'Stop Hunt تحت Asia Low',
-  nySession:           'جلسة NY نشطة',
-  priceBelowAsiaHigh:  'السعر عاد تحت Asia High',
-  priceAboveAsiaLow:   'السعر عاد فوق Asia Low',
-  sweepReverted:       'السعر انعكس بعد الـ Sweep',
-};
 
 const STATE_FILE = '/tmp/smc_state.json';
 function loadState() {
   try { if (existsSync(STATE_FILE)) return JSON.parse(readFileSync(STATE_FILE, 'utf8')); } catch {}
-  return { signals: {}, lastNewsKey: '', lastHeartbeat: 0 };
+  return { lastSignalKey: '', lastSignalTime: 0, lastHeartbeat: 0, lastNewsKey: '' };
 }
 function saveState(s) { try { writeFileSync(STATE_FILE, JSON.stringify(s)); } catch {} }
 
 async function tg(text) {
   const r = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: CHAT_ID, text, parse_mode: 'HTML' })
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: CHAT_ID, text, parse_mode: 'HTML' }),
   });
   return r.ok;
 }
 
-// ── تحليل رمز واحد ────────────────────────────
-async function checkSymbol(sym, state, newsActive) {
-  const bars = await get5mBars(sym.id).catch(() => null);
-  if (!bars) { console.log(`[${sym.id}] فشل جلب البيانات`); return; }
-
-  const result = analyzeAMD(bars);
-  const of     = analyzeOrderFlow(bars);
-
-  if (result.error) { console.log(`[${sym.id}]`, result.error); return; }
-
-  const { price, session, asiaHigh, asiaLow, asiaSize, manipHigh, manipLow, manipPrice, signal } = result;
-  const manipTxt = manipHigh
-    ? `🔴 Manip↑${manipPrice}`
-    : manipLow ? `🟢 Manip↓${manipPrice}` : '⏳ لا يوجد';
-
-  console.log(`[${sym.id}] @ ${price} | ${session} | Asia[${asiaLow}–${asiaHigh}] | ${manipTxt}`);
-
-  if (!signal) return;
-  if (newsActive) { console.log(`[${sym.id}] خبر جارٍ — تجاهل`); return; }
-
-  // تجنب التكرار 30 دقيقة لكل رمز
-  const sigKey   = `${signal.type}_${Math.round(signal.price / 10)}`;
-  const sigState = state.signals[sym.id] || {};
-  const nowMs    = Date.now();
-
-  if (sigKey === sigState.lastKey && (nowMs - sigState.lastTime) < 30 * 60 * 1000) {
-    console.log(`[${sym.id}] تكرار — تجاهل`); return;
-  }
-
-  state.signals[sym.id] = { lastKey: sigKey, lastTime: nowMs };
-
-  const isBull   = signal.type === 'LONG';
-  const risk     = Math.abs(signal.price - signal.sl);
-  const rr       = risk > 0 ? (Math.abs(signal.tp1 - signal.price) / risk).toFixed(1) : '?';
-  const ofBlock  = orderFlowText(of);
-  const condList = Object.entries(signal.conditions)
-    .map(([k, v]) => `${v ? '✅' : '❌'} ${COND_LABELS[k] || k}`)
-    .join('\n');
-
-  await tg(
-`${isBull ? '📈' : '📉'} <b>AMD — ${signal.type} | ${sym.emoji} ${sym.name}</b>
-
-━━━━━━━━━━━━━━━━
-🎭 <b>المرحلة: ${signal.phase}</b>
-📦 ${signal.manipulation}
-
-━━━━━━━━━━━━━━━━
-💰 الدخول:  <b>${signal.price}</b>
-🛑 SL:      <b>${signal.sl}</b>  (${risk.toFixed(2)} نقطة)
-🎯 TP1:     <b>${signal.tp1}</b>
-🎯 TP2:     <b>${signal.tp2}</b>  ← ${isBull ? 'Asia High' : 'Asia Low'}
-⚖️  R:R:    <b>${rr}:1</b>
-
-━━━━━━━━━━━━━━━━
-📊 Asia Range: ${asiaLow} – ${asiaHigh}  (${asiaSize} نقطة)
-
-${condList}${ofBlock ? '\n\n' + ofBlock : ''}
-
-<i>⚠️ القرار النهائي لك</i>
-🕐 ${new Date().toLocaleString('ar-DZ')}`
-  );
-
-  console.log(`✅ [${sym.id}] إشارة AMD ${signal.type} @ ${signal.price}`);
+// ── ساعات التداول: 06:00 → 20:00 UTC فقط ───
+function isTradingHours() {
+  const h = new Date().getUTCHours();
+  return h >= 6 && h < 20;
 }
 
-// ══ الدالة الرئيسية ═══════════════════════════
+// ── نسبة النجاح من الـ score (10 شروط) ───────
+function winRate(score) {
+  // 5/10 = 50%، 7/10 = 70%، 10/10 = 95%
+  return Math.min(95, Math.round(50 + (score - 5) * 9));
+}
+
+// ── تسمية الجلسة ─────────────────────────────
+function sessionName() {
+  const h = new Date().getUTCHours();
+  if (h >= 6  && h < 8)  return 'Asia Close / London Pre';
+  if (h >= 8  && h < 13) return 'London';
+  if (h >= 13 && h < 17) return 'New York';
+  if (h >= 17 && h < 20) return 'NY Late';
+  return 'Off Hours';
+}
+
 async function check() {
   const state = loadState();
+  const now   = Date.now();
 
-  // ── أخبار ─────────────────────────────────
+  // ── أخبار مهمة ───────────────────────────────
   const upcoming = await getUpcomingHigh(15).catch(() => []);
   for (const e of upcoming) {
     const key = e.date + e.title;
     if (key !== state.lastNewsKey) {
       state.lastNewsKey = key;
-      const mins = Math.max(1, Math.round((new Date(e.date) - Date.now()) / 60000));
-      await tg(
-        `⚠️ <b>خبر مهم — ${e.title}</b>\n🕐 خلال <b>${mins} دقيقة</b> | 🔴 High Impact\n⛔ <b>لا تدخل الصفقة</b>`
-      ).catch(() => {});
+      const mins = Math.max(1, Math.round((new Date(e.date) - now) / 60000));
+      await tg(`⚠️ <b>خبر مهم — ${e.title}</b>\n🕐 خلال <b>${mins} دقيقة</b>\n⛔ لا تدخل الصفقة`).catch(() => {});
     }
   }
 
-  const newsActive = await isNewsTime().catch(() => false);
+  // ── خارج ساعات التداول ───────────────────────
+  if (!isTradingHours()) {
+    console.log('[MNQ] خارج ساعات التداول (06:00-20:00 UTC)');
+    saveState(state);
+    return;
+  }
 
-  // ── Heartbeat كل ساعة ──────────────────────
-  const nowMs = Date.now();
-  if (nowMs - (state.lastHeartbeat || 0) > 60 * 60 * 1000) {
-    state.lastHeartbeat = nowMs;
+  // ── جلب البيانات ─────────────────────────────
+  const [bars5m, bars1h] = await Promise.all([
+    get5mBars('MNQ').catch(() => null),
+    get1hBars('MNQ').catch(() => null),
+  ]);
 
-    const statuses = await Promise.all(SYMBOLS.map(async sym => {
-      const bars = await get5mBars(sym.id).catch(() => null);
-      if (!bars) return `${sym.emoji} ${sym.id}: ❌ لا بيانات`;
-      const r = analyzeAMD(bars);
-      if (r.error) return `${sym.emoji} ${sym.id}: ⚠️ ${r.error}`;
-      const manip = r.manipHigh
-        ? `🔴 Hunt↑${r.manipPrice}`
-        : r.manipLow ? `🟢 Hunt↓${r.manipPrice}` : '⏳ لا يوجد';
-      return `${sym.emoji} <b>${sym.id}</b> @ ${r.price}\n   ${r.session} | ${manip}\n   Asia: ${r.asiaLow}–${r.asiaHigh}`;
-    }));
+  if (!bars5m || !bars1h) {
+    console.log('[MNQ] فشل جلب البيانات');
+    saveState(state);
+    return;
+  }
 
+  // ── Order Flow & DOM ─────────────────────────
+  const of  = analyzeOrderFlow(bars5m);
+  const dom = await getDOMSnapshot(process.env.TRADOVATE_SYMBOL || 'NQM6').catch(() => null);
+
+  // ── تحليل SMC / ICT ──────────────────────────
+  const result = analyze(bars5m, bars1h, dom, of);
+  if (result.error) { console.log('[MNQ]', result.error); saveState(state); return; }
+
+  const { price, htfTrend, scoreLong, scoreShort, signal, atr, rsi } = result;
+  console.log(`[MNQ] @ ${price} | ${htfTrend} | Long:${scoreLong}/10 Short:${scoreShort}/10 | RSI:${rsi}`);
+
+  // ── Heartbeat كل ساعة ────────────────────────
+  if (now - (state.lastHeartbeat || 0) > 60 * 60 * 1000) {
+    state.lastHeartbeat = now;
+    const domTxt = domSummaryText(dom);
+    const ofTxt  = orderFlowText(of);
     await tg(
-`🤖 <b>AMD Bot — تقرير الساعة</b>
+`🤖 <b>MNQ Council — تقرير ${sessionName()}</b>
 
-${statuses.join('\n\n')}
+💹 السعر: <b>${price}</b>
+📈 HTF: <b>${htfTrend}</b>
+📊 Long Score: ${scoreLong}/10 | Short Score: ${scoreShort}/10
+⚡ ATR: ${atr} | RSI: ${rsi}
+${domTxt ? '\n' + domTxt : ''}${ofTxt ? '\n' + ofTxt : ''}
 
-${newsActive ? '⛔ خبر جارٍ الآن' : '✅ لا أخبار نشطة'}
-🕐 ${new Date().toLocaleString('ar-DZ')}`
+🕐 ${new Date().toUTCString()}`
     ).catch(() => {});
   }
 
-  // ── تحليل الرموز الثلاثة موازياً ───────────
-  await Promise.all(SYMBOLS.map(sym => checkSymbol(sym, state, newsActive)));
+  // ── إشارة فقط ≥ 70% ─────────────────────────
+  if (!signal) { console.log('[MNQ] لا إشارة كافية'); saveState(state); return; }
 
+  const newsActive = await isNewsTime().catch(() => false);
+  if (newsActive) { console.log('[MNQ] خبر جارٍ — تجاهل'); saveState(state); return; }
+
+  const wr  = winRate(signal.score);
+  if (wr < 70) { console.log(`[MNQ] نسبة نجاح ${wr}% — دون 70%`); saveState(state); return; }
+
+  // ── تجنب التكرار (30 دقيقة) ──────────────────
+  const sigKey = `${signal.type}_${Math.round(signal.price / 5)}`;
+  if (sigKey === state.lastSignalKey && (now - state.lastSignalTime) < 30 * 60 * 1000) {
+    console.log('[MNQ] تكرار — تجاهل');
+    saveState(state);
+    return;
+  }
+  state.lastSignalKey  = sigKey;
+  state.lastSignalTime = now;
+
+  const isBull  = signal.type === 'LONG';
+  const risk    = Math.abs(signal.price - signal.sl);
+  const domText = domSummaryText(dom);
+  const ofText  = orderFlowText(of);
+
+  // ── قائمة الشروط المحققة ──────────────────────
+  const condNames = {
+    htfBull: 'HTF صاعد', htfBear: 'HTF هابط',
+    sessionOk: 'الجلسة نشطة',
+    recentSweepDown: 'سحب سيولة ↓', recentSweepUp: 'سحب سيولة ↑',
+    inBullOB: 'Order Block صاعد', inBearOB: 'Order Block هابط',
+    recentBullFVG: 'FVG صاعد', recentBearFVG: 'FVG هابط',
+    fibOTE_bull: 'Fibonacci OTE ↑', fibOTE_bear: 'Fibonacci OTE ↓',
+    rsiOversold: 'RSI مبالغ هبوطه', rsiOverbought: 'RSI مبالغ صعوده',
+    positiveDelta: 'Delta إيجابي', negativeDelta: 'Delta سلبي',
+    ofBuyImbalance: 'Stacked Buy', ofSellImbalance: 'Stacked Sell',
+    bullDivergence: 'Divergence صاعد', bearDivergence: 'Divergence هابط',
+  };
+  const condList = Object.entries(signal.conditions)
+    .map(([k, v]) => `${v ? '✅' : '❌'} ${condNames[k] || k}`)
+    .join('\n');
+
+  await tg(
+`${isBull ? '🟢' : '🔴'} <b>${signal.type} — MNQ</b>  |  ${sessionName()}
+
+━━━━━━━━━━━━━━━━
+💰 الدخول:  <b>${signal.price}</b>
+🛑 SL:      <b>${signal.sl}</b>
+🎯 TP1:     <b>${signal.tp1}</b>  (+$${Math.round(risk * 2 * 2)})
+🎯 TP2:     <b>${signal.tp2}</b>  (+$${Math.round(risk * 4 * 2)})
+⚖️  RR:     <b>2:1</b>
+📊 نجاح:    <b>${wr}%</b>  (${signal.score}/10 شروط)
+
+━━━━━━━━━━━━━━━━
+${condList}
+${domText ? '\n' + domText : ''}${ofText ? '\n' + ofText : ''}
+
+⚡ ATR: ${atr} | RSI: ${rsi}
+<i>⚠️ القرار النهائي لك — المجلس يقترح فقط</i>
+🕐 ${new Date().toUTCString()}`
+  );
+
+  console.log(`✅ [MNQ] إشارة ${signal.type} @ ${signal.price} | ${wr}% | ${signal.score}/10`);
   saveState(state);
 }
 

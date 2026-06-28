@@ -86,13 +86,9 @@ export function swingLows(bars, len = 10) {
 
 // ══ Session Filter ════════════════════════════
 function inSession(bar) {
-  const d = new Date(bar.time * 1000);
-  const h = d.getUTCHours();
-  const m = d.getUTCMinutes();
-  const mins = h * 60 + m;
-  const london = mins >= 8 * 60  && mins < 13 * 60;            // 08:00–13:00 GMT
-  const ny     = mins >= 13 * 60 && mins < 17 * 60;            // 13:00–17:00 GMT
-  return london || ny;
+  const h = new Date(bar.time * 1000).getUTCHours();
+  // 06:00–20:00 UTC (London pre + London + NY + NY late) — لا جلسة آسيا
+  return h >= 6 && h < 20;
 }
 
 // ══ Main Analysis ════════════════════════════

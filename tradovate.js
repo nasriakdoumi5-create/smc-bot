@@ -161,6 +161,107 @@ function parseDOM(dom, symbol) {
   };
 }
 
+// ══ سعر فوري عبر subscribeQuote ══════════════
+export async function getRealtimePrice(symbol = 'NQM6') {
+  const token = await getAccessToken();
+  if (!token) return null;
+
+  return new Promise((resolve) => {
+    const ws  = new WebSocket(MD_WS_URL);
+    let msgId = 0;
+
+    const done = (result) => {
+      clearTimeout(timer);
+      try { ws.close(); } catch {}
+      resolve(result);
+    };
+
+    const timer = setTimeout(() => done(null), 10000);
+    ws.on('error', () => done(null));
+
+    ws.on('message', (raw) => {
+      const text = raw.toString();
+      if (text === 'o') {
+        ws.send(`authorize\n${++msgId}\n\n${JSON.stringify({ token })}`);
+        return;
+      }
+      if (text === 'h' || text === '[]') return;
+
+      let msgs;
+      try { msgs = JSON.parse(text); } catch { return; }
+
+      for (const msg of msgs) {
+        if (msg.e === 'authorized' || (msg.i === 1 && msg.s === 200)) {
+          ws.send(`md/subscribeQuote\n${++msgId}\n\n${JSON.stringify({ symbol })}`);
+        }
+        if (msg.e === 'quote' && msg.d) {
+          const price = msg.d.trade?.price ?? msg.d.bid ?? null;
+          if (price) done({ price, time: Math.floor(Date.now() / 1000) });
+        }
+      }
+    });
+  });
+}
+
+// ══ بيانات تاريخية عبر WebSocket ════════════
+export async function getHistoricalBars(symbol = 'NQM6', intervalMinutes = 5, count = 500) {
+  const token = await getAccessToken();
+  if (!token) return null;
+
+  return new Promise((resolve) => {
+    const ws  = new WebSocket(MD_WS_URL);
+    let msgId = 0;
+
+    const done = (result) => {
+      clearTimeout(timer);
+      try { ws.close(); } catch {}
+      resolve(result);
+    };
+
+    const timer = setTimeout(() => done(null), 20000);
+    ws.on('error', () => done(null));
+
+    ws.on('message', (raw) => {
+      const text = raw.toString();
+      if (text === 'o') {
+        ws.send(`authorize\n${++msgId}\n\n${JSON.stringify({ token })}`);
+        return;
+      }
+      if (text === 'h' || text === '[]') return;
+
+      let msgs;
+      try { msgs = JSON.parse(text); } catch { return; }
+
+      for (const msg of msgs) {
+        if (msg.e === 'authorized' || (msg.i === 1 && msg.s === 200)) {
+          ws.send(`md/getChart\n${++msgId}\n\n${JSON.stringify({
+            symbol,
+            chartDescription: {
+              underlyingType:  'MinuteBar',
+              elementSize:     intervalMinutes,
+              elementSizeUnit: 'UnderlyingUnits',
+              withHistogram:   false,
+            },
+            timeRange: { asMuchAsElements: count },
+          })}`);
+        }
+
+        if (msg.e === 'chart' && msg.d?.bars?.length) {
+          const bars = msg.d.bars.map(b => ({
+            time:   Math.floor(new Date(b.timestamp).getTime() / 1000),
+            open:   b.open,
+            high:   b.high,
+            low:    b.low,
+            close:  b.close,
+            volume: (b.upVolume || 0) + (b.downVolume || 0),
+          }));
+          done(bars);
+        }
+      }
+    });
+  });
+}
+
 // ══ نص Telegram للـ DOM ══════════════════════
 export function domSummaryText(dom) {
   if (!dom) return '';
