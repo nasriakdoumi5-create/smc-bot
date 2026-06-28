@@ -149,16 +149,16 @@ export function analyze(bars5m, bars1h, dom = null, of = null) {
     const next = bars5m[i + 1];
     const body = Math.abs(b.close - b.open);
 
-    // Bull displacement: شمعة صاعدة قوية
-    const bullDisp = next.close > bars5m[i].high && (next.close - next.open) > curATR * 1.5;
-    if (bullDisp && b.open > b.close) {  // شمعة هبوطية قبله = OB
+    // Bull displacement: شمعة صاعدة قوية > 2× ATR
+    const bullDisp = next.close > bars5m[i].high && (next.close - next.open) > curATR * 2;
+    if (bullDisp && b.open > b.close) {  // شمعة هبوطية قبله = OB حقيقي
       bullOB_top = b.open;
       bullOB_bot = b.close;
     }
 
-    // Bear displacement: شمعة هابطة قوية
-    const bearDisp = next.close < bars5m[i].low && (next.open - next.close) > curATR * 1.5;
-    if (bearDisp && b.close > b.open) {  // شمعة صاعدة قبله = OB
+    // Bear displacement: شمعة هابطة قوية > 2× ATR
+    const bearDisp = next.close < bars5m[i].low && (next.open - next.close) > curATR * 2;
+    if (bearDisp && b.close > b.open) {  // شمعة صاعدة قبله = OB حقيقي
       bearOB_top = b.close;
       bearOB_bot = b.open;
     }
@@ -171,8 +171,10 @@ export function analyze(bars5m, bars1h, dom = null, of = null) {
   let recentBullFVG = false;
   let recentBearFVG = false;
   for (let i = Math.max(2, n - 15); i < n; i++) {
-    if (bars5m[i].low  > bars5m[i - 2].high) recentBullFVG = true;
-    if (bars5m[i].high < bars5m[i - 2].low)  recentBearFVG = true;
+    const fvgBullSize = bars5m[i].low  - bars5m[i - 2].high;
+    const fvgBearSize = bars5m[i - 2].low  - bars5m[i].high;
+    if (fvgBullSize > curATR * 0.5) recentBullFVG = true;
+    if (fvgBearSize > curATR * 0.5) recentBearFVG = true;
   }
 
   // ── ⑥ Fibonacci OTE (61.8–78.6%) ─────────
@@ -186,8 +188,8 @@ export function analyze(bars5m, bars1h, dom = null, of = null) {
   }
 
   // ── ⑦ RSI ─────────────────────────────────
-  const rsiOversold   = curRSI < 50;
-  const rsiOverbought = curRSI > 50;
+  const rsiOversold   = curRSI < 40;
+  const rsiOverbought = curRSI > 60;
 
   // ── ⑧ Order Flow — Delta ──────────────────
   const positiveDelta = of?.positiveDelta ?? false;
