@@ -1,0 +1,333 @@
+//@version=5
+// =============================================================================
+//  MNQ Wave Reversal Strategy 16:05
+//  استراتيجية عكس الموجة على MNQ - دخول الساعة 16:05 توقيت نيويورك
+//  Best Timeframe: 1m or 5m
+// =============================================================================
+strategy("MNQ Wave Reversal 16:05", shorttitle="MNQ WR", overlay=true,
+     initial_capital    = 100000,
+     default_qty_type   = strategy.fixed,
+     default_qty_value  = 1,
+     pyramiding         = 0,
+     commission_type    = strategy.commission.cash_per_contract,
+     commission_value   = 1.24)
+
+// =============================================
+//   SETTINGS / الاعدادات
+// =============================================
+
+gTime     = "Time / الوقت"
+iEntryH   = input.int(16,   "Entry Hour (NY) / ساعة الدخول",    minval=0, maxval=23, group=gTime)
+iEntryM   = input.int(5,    "Entry Minute / دقيقة الدخول",      minval=0, maxval=59, group=gTime)
+iCutH     = input.int(16,   "Wave Lock Hour (NY) / ساعة القفل", minval=0, maxval=23, group=gTime)
+iCutM     = input.int(0,    "Wave Lock Minute / دقيقة القفل",   minval=0, maxval=59, group=gTime)
+iTZ       = input.string("America/New_York", "Timezone / المنطقة الزمنية",
+     options=["America/New_York", "America/Chicago", "UTC", "Asia/Riyadh"], group=gTime)
+
+gTrade    = "Trading / التداول"
+iTPMode   = input.string("Fixed", "TP/SL Mode / وضع الحساب",
+     options=["Fixed", "Wave Based", "ATR Based"], group=gTrade)
+iTPFixed  = input.float(200.0, "Fixed TP (points)",  step=10,  group=gTrade)
+iSLFixed  = input.float(100.0, "Fixed SL (points)",  step=10,  group=gTrade)
+iTPMult   = input.float(1.5,   "TP Multiplier",      step=0.1, group=gTrade)
+iSLMult   = input.float(1.0,   "SL Multiplier",      step=0.1, group=gTrade)
+iATRLen   = input.int(14,      "ATR Period",         group=gTrade)
+iTPATR    = input.float(2.0,   "TP ATR Multiplier",  step=0.1, group=gTrade)
+iSLATR    = input.float(1.0,   "SL ATR Multiplier",  step=0.1, group=gTrade)
+
+gWave     = "Wave / الموجات"
+iSwingLen = input.int(5,      "Swing Length (bars)", minval=2, maxval=20, group=gWave)
+iMinWave  = input.float(20.0, "Min Valid Wave (points)", step=5, group=gWave)
+
+gFibo     = "Fibonacci / فيبوناتشي"
+iShowFibo = input.bool(true,  "Show Fibonacci", group=gFibo)
+iFiboW    = input.int(1,      "Line Width", minval=1, maxval=4, group=gFibo)
+iFiboClr  = input.color(color.new(#42A5F5, 50), "Fib Color", group=gFibo)
+iFiboLbl  = input.bool(true,  "Show Labels", group=gFibo)
+iFiboExt  = input.int(20,     "Extension Bars", minval=5, maxval=100, group=gFibo)
+
+gVol      = "Volume / الفوليوم"
+iUseVol   = input.bool(true,  "Enable Volume Filter", group=gVol)
+iVolMult  = input.float(1.0,  "Min Volume (x Avg)",   step=0.1, group=gVol)
+iVolLen   = input.int(20,     "Volume Avg Period",     group=gVol)
+iShowVol  = input.bool(true,  "Show Volume Highlight", group=gVol)
+
+gDisp      = "Display / العرض"
+iClrCandle = input.bool(true,  "Color Entry Candle",        group=gDisp)
+iShowStats = input.bool(true,  "Stats Panel",               group=gDisp)
+iShowBG    = input.bool(false, "Entry Background",          group=gDisp)
+iShowLabels= input.bool(true,  "Entry/Exit Labels",         group=gDisp)
+iBullClr   = input.color(#00C853, "Bull Color",             group=gDisp)
+iBearClr   = input.color(#FF1744, "Bear Color",             group=gDisp)
+
+// =============================================
+//   TIME LOGIC
+// =============================================
+
+f_sess(h, m) =>
+    hm = str.tostring(h) + (m < 10 ? "0" : "") + str.tostring(m)
+    hm + "-" + hm
+
+isEntryBar = not na(time(timeframe.period, f_sess(iEntryH, iEntryM), iTZ))
+isCutBar   = not na(time(timeframe.period, f_sess(iCutH,   iCutM),   iTZ))
+isNewDay   = dayofmonth != dayofmonth[1]
+
+// =============================================
+//   WAVE DETECTION
+// =============================================
+
+pHi = ta.pivothigh(high, iSwingLen, iSwingLen)
+pLo = ta.pivotlow(low,  iSwingLen, iSwingLen)
+
+var float shPrice    = na
+var float slPrice    = na
+var int   shBar      = na
+var int   slBar      = na
+var int   lastSwing  = 0
+var bool  waveLocked = false
+var float waveSz     = 0.0
+
+if not na(pHi)
+    shPrice := pHi
+    shBar   := bar_index - iSwingLen
+
+if not na(pLo)
+    slPrice := pLo
+    slBar   := bar_index - iSwingLen
+
+if not na(shBar) and not na(slBar)
+    lastSwing := shBar >= slBar ? 1 : -1
+
+if isCutBar and lastSwing != 0
+    waveLocked := true
+    waveSz     := math.abs(shPrice - slPrice)
+
+if isNewDay
+    waveLocked := false
+    lastSwing  := 0
+    waveSz     := 0.0
+
+isWaveValid = waveLocked and lastSwing != 0 and waveSz >= iMinWave
+
+// =============================================
+//   VOLUME FILTER
+// =============================================
+
+avgVol = ta.sma(volume, iVolLen)
+volOK  = not iUseVol or (nz(volume) >= nz(avgVol) * iVolMult)
+
+plot(iShowVol and volume >= nz(avgVol) * iVolMult ? volume : na, "High Vol",
+     color=color.new(color.green, 70), style=plot.style_columns, display=display.pane)
+
+// =============================================
+//   ATR
+// =============================================
+
+atrVal = ta.atr(iATRLen)
+
+// =============================================
+//   TP/SL CALCULATION
+// =============================================
+
+calcTP() =>
+    tp = iTPFixed * iTPMult
+    if iTPMode == "Wave Based"
+        tp := math.max(nz(waveSz) * iTPMult, iTPFixed * 0.5)
+    else if iTPMode == "ATR Based"
+        tp := math.max(atrVal * iTPATR, iTPFixed * 0.5)
+    tp
+
+calcSL() =>
+    sl = iSLFixed * iSLMult
+    if iTPMode == "Wave Based"
+        sl := math.max(nz(waveSz) * iSLMult, iSLFixed * 0.3)
+    else if iTPMode == "ATR Based"
+        sl := math.max(atrVal * iSLATR, iSLFixed * 0.3)
+    sl
+
+// =============================================
+//   ENTRY
+// =============================================
+
+var int   tDir = 0
+var float ePx  = na
+var float tTP  = na
+var float tSL  = na
+
+if isEntryBar and strategy.position_size == 0 and waveLocked and volOK
+    tDir := lastSwing == 1 ? -1 : 1
+    ePx  := close
+    tTP  := calcTP()
+    tSL  := calcSL()
+
+    if tDir == 1
+        strategy.entry("Long", strategy.long)
+        strategy.exit("XL", "Long", limit=ePx + tTP, stop=ePx - tSL)
+    else
+        strategy.entry("Short", strategy.short)
+        strategy.exit("XS", "Short", limit=ePx - tTP, stop=ePx + tSL)
+
+// =============================================
+//   EXIT DETECTION
+// =============================================
+
+prevPos    = strategy.position_size[1]
+currPos    = strategy.position_size
+justClosed = prevPos != 0 and currPos == 0
+inPos      = currPos != 0
+
+// =============================================
+//   VISUALIZATION
+// =============================================
+
+plot(inPos ? ePx : na, "Entry Level", color=color.new(color.yellow, 30), style=plot.style_linebr, linewidth=1)
+
+tpLvl = inPos ? (tDir == 1 ? ePx + tTP : ePx - tTP) : na
+plot(tpLvl, "Take Profit", color=color.new(color.green, 20), style=plot.style_linebr, linewidth=2)
+
+slLvl = inPos ? (tDir == 1 ? ePx - tSL : ePx + tSL) : na
+plot(slLvl, "Stop Loss", color=color.new(color.red, 20), style=plot.style_linebr, linewidth=2)
+
+pnlClr = inPos ? (tDir == 1 ? (close >= ePx ? color.green : color.red) : (close <= ePx ? color.green : color.red)) : na
+plot(inPos ? close : na, "Trade Path", color=pnlClr, style=plot.style_linebr, linewidth=2)
+
+barcolor(isEntryBar and iClrCandle and inPos ? (tDir == 1 ? iBullClr : iBearClr) : na)
+bgcolor(isEntryBar and iShowBG ? color.new(color.blue, 92) : na)
+
+if isEntryBar and inPos and iShowLabels
+    lblY     = tDir == 1 ? low  * 0.9995 : high * 1.0005
+    lblStyle = tDir == 1 ? label.style_label_up : label.style_label_down
+    lblTxt   = tDir == 1 ? "BUY "  + str.tostring(ePx, "#.##") : "SELL " + str.tostring(ePx, "#.##")
+    label.new(bar_index, lblY, lblTxt, style=lblStyle, color=tDir == 1 ? iBullClr : iBearClr, textcolor=color.white, size=size.small)
+
+if justClosed and iShowLabels
+    exitPx = close
+    pnl    = tDir == 1 ? (exitPx - ePx) : (ePx - exitPx)
+    isWin  = pnl > 0
+    lblY2  = isWin ? low  * 0.9995 : high * 1.0005
+    lblS2  = isWin ? label.style_label_up : label.style_label_down
+    lblT2  = isWin ? "WIN +"  + str.tostring(pnl, "#.##") : "LOSS " + str.tostring(pnl, "#.##")
+    label.new(bar_index, lblY2, lblT2, style=lblS2, color=isWin ? color.green : color.red, textcolor=color.white, size=size.small)
+
+// =============================================
+//   FIBONACCI
+// =============================================
+
+var array<line>  fibLns  = array.new<line>()
+var array<label> fibLbls = array.new<label>()
+
+clearFibo() =>
+    for i = 0 to array.size(fibLns) - 1
+        line.delete(array.get(fibLns, i))
+    array.clear(fibLns)
+    for i = 0 to array.size(fibLbls) - 1
+        label.delete(array.get(fibLbls, i))
+    array.clear(fibLbls)
+
+drawFibo(lo, hi, x1, x2) =>
+    diff = hi - lo
+    xEnd = x2 + iFiboExt
+    lvls  = array.new_float(7)
+    array.set(lvls, 0, 0.0)
+    array.set(lvls, 1, 0.236)
+    array.set(lvls, 2, 0.382)
+    array.set(lvls, 3, 0.500)
+    array.set(lvls, 4, 0.618)
+    array.set(lvls, 5, 0.786)
+    array.set(lvls, 6, 1.0)
+    names = array.new_string(7)
+    array.set(names, 0, "0%")
+    array.set(names, 1, "23.6%")
+    array.set(names, 2, "38.2%")
+    array.set(names, 3, "50%")
+    array.set(names, 4, "61.8%")
+    array.set(names, 5, "78.6%")
+    array.set(names, 6, "100%")
+    clrs  = array.new_color(7)
+    array.set(clrs, 0, color.new(iFiboClr, 20))
+    array.set(clrs, 1, color.new(iFiboClr, 30))
+    array.set(clrs, 2, color.new(iFiboClr, 10))
+    array.set(clrs, 3, iFiboClr)
+    array.set(clrs, 4, color.new(iFiboClr, 10))
+    array.set(clrs, 5, color.new(iFiboClr, 30))
+    array.set(clrs, 6, color.new(iFiboClr, 20))
+    widths = array.new_int(7)
+    array.set(widths, 0, 1)
+    array.set(widths, 1, 1)
+    array.set(widths, 2, 1)
+    array.set(widths, 3, 2)
+    array.set(widths, 4, 1)
+    array.set(widths, 5, 1)
+    array.set(widths, 6, 1)
+    for i = 0 to 6
+        lvlPrice = lo + diff * array.get(lvls, i)
+        ln = line.new(x1, lvlPrice, xEnd, lvlPrice, color=array.get(clrs, i), width=array.get(widths, i))
+        array.push(fibLns, ln)
+        if iFiboLbl
+            lb = label.new(xEnd + 2, lvlPrice, array.get(names, i), style=label.style_label_left, textcolor=iFiboClr, size=size.tiny)
+            array.push(fibLbls, lb)
+
+if isCutBar and iShowFibo and waveLocked and lastSwing != 0
+    clearFibo()
+    if isWaveValid
+        wLo = math.min(shPrice, slPrice)
+        wHi = math.max(shPrice, slPrice)
+        xS  = math.min(nz(shBar), nz(slBar))
+        xE  = math.max(nz(shBar), nz(slBar))
+        drawFibo(wLo, wHi, xS, xE)
+
+if isNewDay
+    clearFibo()
+
+// =============================================
+//   STATISTICS TABLE
+// =============================================
+
+if iShowStats and barstate.islast
+    total = strategy.closedtrades
+    wins  = strategy.wintrades
+    losses= strategy.losstrades
+
+    // FIX: استخدام float() لتجنب قسمة الأعداد الصحيحة
+    winRate    = total > 0 ? float(wins)   / total * 100 : 0.0
+    lossRate   = total > 0 ? float(losses) / total * 100 : 0.0
+    netProfit  = strategy.netprofit
+    grossProfit= strategy.grossprofit
+    grossLoss  = math.abs(strategy.grossloss)
+    profitFact = grossLoss > 0 ? grossProfit / grossLoss : 0.0
+
+    var table st = table.new(position.top_right, 2, 9, bgcolor=color.new(color.black, 20), border_color=color.gray, border_width=1)
+
+    table.cell(st, 0, 0, "MNQ Wave Reversal Stats", text_color=color.white, text_size=size.normal, bgcolor=color.new(#1565C0, 20))
+    table.merge_cells(st, 0, 0, 1, 0)
+
+    table.cell(st, 0, 1, "Total / إجمالي",    text_color=color.white,  text_size=size.small)
+    table.cell(st, 1, 1, str.tostring(total),  text_color=color.yellow, text_size=size.small)
+
+    table.cell(st, 0, 2, "Wins / رابحة",      text_color=color.white, text_size=size.small)
+    table.cell(st, 1, 2, str.tostring(wins),   text_color=color.green, text_size=size.small)
+
+    table.cell(st, 0, 3, "Losses / خاسرة",    text_color=color.white, text_size=size.small)
+    table.cell(st, 1, 3, str.tostring(losses), text_color=color.red,   text_size=size.small)
+
+    table.cell(st, 0, 4, "Win Rate / نسبة ربح",           text_color=color.white, text_size=size.small)
+    table.cell(st, 1, 4, str.tostring(winRate, "#.#") + "%", text_color=winRate >= 50 ? color.green : color.red, text_size=size.small)
+
+    table.cell(st, 0, 5, "Loss Rate / نسبة خسارة",           text_color=color.white,  text_size=size.small)
+    table.cell(st, 1, 5, str.tostring(lossRate, "#.#") + "%", text_color=color.orange, text_size=size.small)
+
+    table.cell(st, 0, 6, "Profit Factor",                   text_color=color.white, text_size=size.small)
+    table.cell(st, 1, 6, str.tostring(profitFact, "#.##"),  text_color=profitFact >= 1.5 ? color.green : profitFact >= 1.0 ? color.yellow : color.red, text_size=size.small)
+
+    table.cell(st, 0, 7, "Net P&L / صافي",                      text_color=color.white, text_size=size.small)
+    table.cell(st, 1, 7, "$" + str.tostring(netProfit, "#,##0.##"), text_color=netProfit >= 0 ? color.green : color.red, text_size=size.small)
+
+    table.cell(st, 0, 8, "Success / نجاح",                        text_color=color.white, text_size=size.small)
+    table.cell(st, 1, 8, str.tostring(winRate, "#.#") + "%",      text_color=winRate >= 60 ? color.green : winRate >= 50 ? color.yellow : color.red, text_size=size.small, text_weight=text.weight_bold)
+
+// =============================================
+//   ALERTS
+// =============================================
+
+alertcondition(isEntryBar and waveLocked and volOK, title="Entry Signal", message="MNQ WR: Entry Signal at {{close}}")
+alertcondition(justClosed,                           title="Trade Closed", message="MNQ WR: Trade closed at {{close}}")
