@@ -39,7 +39,7 @@ jobs:
           TRADOVATE_CID:        ${{ secrets.TRADOVATE_CID }}
           TRADOVATE_SECRET:     ${{ secrets.TRADOVATE_SECRET }}
           TRADOVATE_DEMO:       ${{ secrets.TRADOVATE_DEMO }}
-          TRADOVATE_SYMBOL:     NQM6
+          TRADOVATE_SYMBOL:     ${{ secrets.TRADOVATE_SYMBOL }}
         run: |
           for i in 1 2 3 4 5; do
             echo "فحص رقم $i من 5"
