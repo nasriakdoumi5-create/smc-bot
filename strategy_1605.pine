@@ -217,11 +217,13 @@ var array<line>  fibLns  = array.new<line>()
 var array<label> fibLbls = array.new<label>()
 
 clearFibo() =>
-    for i = 0 to array.size(fibLns) - 1
-        line.delete(array.get(fibLns, i))
+    if array.size(fibLns) > 0
+        for i = 0 to array.size(fibLns) - 1
+            line.delete(array.get(fibLns, i))
     array.clear(fibLns)
-    for i = 0 to array.size(fibLbls) - 1
-        label.delete(array.get(fibLbls, i))
+    if array.size(fibLbls) > 0
+        for i = 0 to array.size(fibLbls) - 1
+            label.delete(array.get(fibLbls, i))
     array.clear(fibLbls)
 
 drawFibo(lo, hi, x1, x2) =>
