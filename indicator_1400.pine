@@ -1,0 +1,68 @@
+//@version=5
+indicator("14:00 Last Wave — Indicator",
+          overlay         = true,
+          max_boxes_count = 500)
+
+// ─────────────────────────────────────────────
+i_lookback = input.int(11,   "Bars before 14:00 for wave", minval=3, maxval=30)
+i_rr       = input.float(1.5, "RR Ratio", minval=1.0, maxval=5.0, step=0.5)
+i_box_bars = input.int(20,   "Box width (bars)",           minval=5, maxval=200)
+
+// ─────────────────────────────────────────────
+is_entry = hour(time, "UTC") == 14 and minute(time, "UTC") == 0
+
+wave_now  = close[1]
+wave_ref  = close[i_lookback + 1]
+wave_size = math.abs(wave_now - wave_ref)
+wave_up   = wave_now > wave_ref
+wave_down = wave_now < wave_ref
+
+go_short = is_entry and wave_up   and wave_size > 5
+go_long  = is_entry and wave_down and wave_size > 5
+
+// ─────────────────────────────────────────────
+// رسم الصناديق مباشرة عند الإشارة
+// ─────────────────────────────────────────────
+if go_short or go_long
+    float ep = close
+    float td = wave_size
+    float sd = wave_size / i_rr
+    float tp = go_short ? ep - td : ep + td
+    float sl = go_short ? ep + sd : ep - sd
+    int   be = bar_index + i_box_bars
+
+    float tt = go_short ? ep : tp
+    float tb = go_short ? tp : ep
+    box.new(bar_index, tt, be, tb, bgcolor=color.new(color.green, 70), border_color=color.green, border_width=2, text="TP  " + str.tostring(math.abs(tp - ep), "#.#"), text_color=color.white, text_size=size.small, text_halign=text.align_left)
+
+    float st = go_short ? sl : ep
+    float sb = go_short ? ep : sl
+    box.new(bar_index, st, be, sb, bgcolor=color.new(color.red, 70), border_color=color.red, border_width=2, text="SL  " + str.tostring(math.abs(sl - ep), "#.#"), text_color=color.white, text_size=size.small, text_halign=text.align_left)
+
+// ─────────────────────────────────────────────
+plotshape(go_short, "SHORT", shape.triangledown, location.abovebar, color.red,  size=size.normal)
+plotshape(go_long,  "LONG",  shape.triangleup,   location.belowbar, color.lime, size=size.normal)
+bgcolor(is_entry ? color.new(color.yellow, 88) : na)
+
+// ─────────────────────────────────────────────
+// خط الدخول للشمعة الحالية فقط
+// ─────────────────────────────────────────────
+var float live_ep = na
+var float live_tp = na
+var float live_sl = na
+
+if go_short
+    live_ep := close
+    live_tp := close - wave_size
+    live_sl := close + wave_size / i_rr
+
+if go_long
+    live_ep := close
+    live_tp := close + wave_size
+    live_sl := close - wave_size / i_rr
+
+p_ep = plot(live_ep, "Entry", color.gray, 1, plot.style_linebr)
+p_tp = plot(live_tp, "TP",    color.lime, 1, plot.style_linebr)
+p_sl = plot(live_sl, "SL",    color.red,  1, plot.style_linebr)
+fill(p_ep, p_tp, color.new(color.green, 80))
+fill(p_ep, p_sl, color.new(color.red,   80))
