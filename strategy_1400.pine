@@ -24,7 +24,8 @@ wave_up   = wave_now > wave_ref
 wave_down = wave_now < wave_ref
 
 var int day_trades = 0
-if is_new_d
+// FIX: لا نصفّر العداد إذا كانت هناك صفقة مفتوحة من اليوم السابق
+if is_new_d and strategy.position_size == 0
     day_trades := 0
 can_trade = day_trades < 1 and strategy.position_size == 0
 
@@ -84,9 +85,12 @@ if go_long
 
 // ─────────────────────────────────────────────
 // تسجيل شمعة الخروج
+// FIX: push مرة لكل صفقة مغلقة حتى لو أُغلقت صفقتان بنفس الشمعة
 // ─────────────────────────────────────────────
 if strategy.closedtrades > last_n
-    array.push(a_exit, bar_index)
+    int new_closes = strategy.closedtrades - last_n
+    for k = 0 to new_closes - 1
+        array.push(a_exit, bar_index)
     last_n := strategy.closedtrades
 
 if strategy.position_size == 0 and not (go_short or go_long)
@@ -111,16 +115,15 @@ bgcolor(is_entry ? color.new(color.yellow, 88) : na)
 // رسم الصناديق — حذف + إعادة رسم مرة واحدة فقط
 // ─────────────────────────────────────────────
 if barstate.islast
-    // حذف كل الصناديق القديمة أولاً
     for i = 0 to array.size(all_bx) - 1
         box.delete(array.get(all_bx, i))
     array.clear(all_bx)
 
     int n_closed = strategy.closedtrades
     int n_stored = array.size(a_entry)
-    int draw_n   = math.min(n_stored, n_closed)
+    // FIX: نحدد الحد الأدنى بحجم a_exit أيضاً لتجنب OOB crash
+    int draw_n   = math.min(n_stored, n_closed, array.size(a_exit))
 
-    // صناديق الصفقات المغلقة
     if draw_n > 0
         for i = 0 to draw_n - 1
             int   bs  = array.get(a_entry, i)
@@ -131,17 +134,14 @@ if barstate.islast
             bool  iss = array.get(a_short, i)
             bool  won = strategy.closedtrades.profit(i) > 0
 
-            // TP box
             float tt = iss ? e   : tpv
             float tb = iss ? tpv : e
             array.push(all_bx, box.new(bs, tt, be, tb, bgcolor=won ? color.new(color.green, 30) : color.new(color.green, 78), border_color=won ? color.green : color.new(color.green, 50), border_width=2, text="TP", text_color=color.white, text_size=size.small, text_halign=text.align_left))
 
-            // SL box
             float st = iss ? slv : e
             float sb = iss ? e   : slv
             array.push(all_bx, box.new(bs, st, be, sb, bgcolor=won ? color.new(color.red, 78) : color.new(color.red, 30), border_color=won ? color.new(color.red, 50) : color.red, border_width=2, text="SL", text_color=color.white, text_size=size.small, text_halign=text.align_left))
 
-    // صندوق الصفقة المفتوحة الحالية
     if strategy.position_size != 0 and n_stored > n_closed and not na(ep)
         int   bs  = array.get(a_entry, n_stored - 1)
         bool  iss = array.get(a_short, n_stored - 1)
@@ -164,24 +164,17 @@ var table t = na
 
 if barstate.islast
     if na(t)
-        t := table.new(position.top_right, 2, 7,
-                       frame_color=color.gray, frame_width=1,
-                       border_color=color.new(color.gray, 50), border_width=1)
+        t := table.new(position.top_right, 2, 7, frame_color=color.gray, frame_width=1, border_color=color.new(color.gray, 50), border_width=1)
 
     int   n      = strategy.closedtrades
-    int   wins   = 0
-    int   losses = 0
-    if n > 0
-        for i = 0 to n - 1
-            if strategy.closedtrades.profit(i) > 0
-                wins += 1
-            else
-                losses += 1
-
-    int   total = n + (strategy.position_size != 0 ? 1 : 0)
-    float wr    = n > 0 ? wins / n * 100 : 0.0
-    float net   = strategy.netprofit
-    float avg_l = losses > 0 ? math.abs(strategy.grossloss) / losses : 0.0
+    // FIX: استخدام المتغيرات الجاهزة بدل loop يدوي
+    int   wins   = strategy.wintrades
+    int   losses = strategy.losstrades
+    int   total  = n + (strategy.position_size != 0 ? 1 : 0)
+    // FIX: قسمة عشرية بدل قسمة أعداد صحيحة
+    float wr     = n > 0 ? float(wins) / n * 100 : 0.0
+    float net    = strategy.netprofit
+    float avg_l  = losses > 0 ? math.abs(strategy.grossloss) / losses : 0.0
 
     color H = color.new(#1a237e, 0)
     color A = color.new(#0d1b2a, 20)
