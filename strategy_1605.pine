@@ -323,7 +323,7 @@ if iShowStats and barstate.islast
     table.cell(st, 1, 7, "$" + str.tostring(netProfit, "#,##0.##"), text_color=netProfit >= 0 ? color.green : color.red, text_size=size.small)
 
     table.cell(st, 0, 8, "Success / نجاح",                        text_color=color.white, text_size=size.small)
-    table.cell(st, 1, 8, str.tostring(winRate, "#.#") + "%",      text_color=winRate >= 60 ? color.green : winRate >= 50 ? color.yellow : color.red, text_size=size.small, text_weight=text.weight_bold)
+    table.cell(st, 1, 8, str.tostring(winRate, "#.#") + "%",      text_color=winRate >= 60 ? color.green : winRate >= 50 ? color.yellow : color.red, text_size=size.small)
 
 // =============================================
 //   ALERTS
