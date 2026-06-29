@@ -87,7 +87,7 @@ var table t = na
 
 if barstate.islast
     if na(t)
-        t := table.new(position.top_left, 2, 8, frame_color=color.gray, frame_width=1, border_color=color.new(color.gray, 60), border_width=1)
+        t := table.new(position.top_right, 2, 8, frame_color=color.gray, frame_width=1, border_color=color.new(color.gray, 60), border_width=1)
 
     color H = color.new(#1a237e, 0)
     color A = color.new(#0d1b2a, 15)
