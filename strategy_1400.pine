@@ -134,26 +134,12 @@ if barstate.islast
             // TP box
             float tt = iss ? e   : tpv
             float tb = iss ? tpv : e
-            array.push(all_bx, box.new(bs, tt, be, tb,
-                bgcolor      = won ? color.new(color.green, 30) : color.new(color.green, 78),
-                border_color = won ? color.green : color.new(color.green, 50),
-                border_width = 2,
-                text         = "TP",
-                text_color   = color.white,
-                text_size    = size.small,
-                text_halign  = text.align_left))
+            array.push(all_bx, box.new(bs, tt, be, tb, bgcolor=won ? color.new(color.green, 30) : color.new(color.green, 78), border_color=won ? color.green : color.new(color.green, 50), border_width=2, text="TP", text_color=color.white, text_size=size.small, text_halign=text.align_left))
 
             // SL box
             float st = iss ? slv : e
             float sb = iss ? e   : slv
-            array.push(all_bx, box.new(bs, st, be, sb,
-                bgcolor      = won ? color.new(color.red, 78) : color.new(color.red, 30),
-                border_color = won ? color.new(color.red, 50) : color.red,
-                border_width = 2,
-                text         = "SL",
-                text_color   = color.white,
-                text_size    = size.small,
-                text_halign  = text.align_left))
+            array.push(all_bx, box.new(bs, st, be, sb, bgcolor=won ? color.new(color.red, 78) : color.new(color.red, 30), border_color=won ? color.new(color.red, 50) : color.red, border_width=2, text="SL", text_color=color.white, text_size=size.small, text_halign=text.align_left))
 
     // صندوق الصفقة المفتوحة الحالية
     if strategy.position_size != 0 and n_stored > n_closed and not na(ep)
