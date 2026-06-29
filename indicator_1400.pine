@@ -1,12 +1,11 @@
 //@version=5
-indicator("14:00 Last Wave — Indicator",
-          overlay         = true,
-          max_boxes_count = 500)
+indicator("14:00 Last Wave — Confirm", overlay=true, max_bars_back=500)
 
 // ─────────────────────────────────────────────
-i_lookback = input.int(11,   "Bars before 14:00 for wave", minval=3, maxval=30)
-i_rr       = input.float(1.5, "RR Ratio", minval=1.0, maxval=5.0, step=0.5)
-i_box_bars = input.int(20,   "Box width (bars)",           minval=5, maxval=200)
+i_lookback  = input.int(11,    "Bars before 14:00 for wave", minval=3,  maxval=30)
+i_rsi_len   = input.int(14,    "RSI Period",                 minval=5,  maxval=30)
+i_avg_n     = input.int(20,    "Historical waves (sessions)", minval=5,  maxval=100)
+i_show_vwap = input.bool(true, "Show VWAP")
 
 // ─────────────────────────────────────────────
 is_entry = hour(time, "UTC") == 14 and minute(time, "UTC") == 0
@@ -20,49 +19,127 @@ wave_down = wave_now < wave_ref
 go_short = is_entry and wave_up   and wave_size > 5
 go_long  = is_entry and wave_down and wave_size > 5
 
-// ─────────────────────────────────────────────
-// رسم الصناديق مباشرة عند الإشارة
-// ─────────────────────────────────────────────
-if go_short or go_long
-    float ep = close
-    float td = wave_size
-    float sd = wave_size / i_rr
-    float tp = go_short ? ep - td : ep + td
-    float sl = go_short ? ep + sd : ep - sd
-    int   be = bar_index + i_box_bars
+// ─── مؤشرات التأكيد ───────────────────────────
+rsi  = ta.rsi(close, i_rsi_len)
+vwap = ta.vwap
 
-    float tt = go_short ? ep : tp
-    float tb = go_short ? tp : ep
-    box.new(bar_index, tt, be, tb, bgcolor=color.new(color.green, 70), border_color=color.green, border_width=2, text="TP  " + str.tostring(math.abs(tp - ep), "#.#"), text_color=color.white, text_size=size.small, text_halign=text.align_left)
+// ─── تاريخ أحجام الموجات ──────────────────────
+var array<float> wave_hist = array.new_float()
+if is_entry and wave_size > 5
+    array.push(wave_hist, wave_size)
+    if array.size(wave_hist) > i_avg_n
+        array.shift(wave_hist)
 
-    float st = go_short ? sl : ep
-    float sb = go_short ? ep : sl
-    box.new(bar_index, st, be, sb, bgcolor=color.new(color.red, 70), border_color=color.red, border_width=2, text="SL  " + str.tostring(math.abs(sl - ep), "#.#"), text_color=color.white, text_size=size.small, text_halign=text.align_left)
+avg_wave = array.size(wave_hist) >= 3 ? array.avg(wave_hist) : wave_size
+wave_pct = wave_size / avg_wave * 100   // 100% = متوسط، >100% = أقوى
 
-// ─────────────────────────────────────────────
-plotshape(go_short, "SHORT", shape.triangledown, location.abovebar, color.red,  size=size.normal)
-plotshape(go_long,  "LONG",  shape.triangleup,   location.belowbar, color.lime, size=size.normal)
-bgcolor(is_entry ? color.new(color.yellow, 88) : na)
+// ─── حساب النقاط عند الإشارة ─────────────────
+// كل عامل = نقطة واحدة (من 4)
+//   1. RSI: فوق 60 للبيع / تحت 40 للشراء
+//   2. VWAP: السعر فوق VWAP للبيع / تحته للشراء
+//   3. الموجة > متوسط الموجات السابقة
+//   4. الموجة > 150% من المتوسط (قوية جداً)
 
-// ─────────────────────────────────────────────
-// خط الدخول للشمعة الحالية فقط
-// ─────────────────────────────────────────────
-var float live_ep = na
-var float live_tp = na
-var float live_sl = na
+var float e_wave_pct = na
+var float e_rsi      = na
+var bool  e_vwap_ok  = na
+var int   e_score    = na
+var bool  e_short    = na
 
 if go_short
-    live_ep := close
-    live_tp := close - wave_size
-    live_sl := close + wave_size / i_rr
+    e_short    := true
+    e_wave_pct := wave_pct
+    e_rsi      := rsi
+    e_vwap_ok  := close > vwap
+    e_score    := (rsi > 60 ? 1 : 0) + (close > vwap ? 1 : 0) + (wave_pct > 100 ? 1 : 0) + (wave_pct > 150 ? 1 : 0)
 
 if go_long
-    live_ep := close
-    live_tp := close + wave_size
-    live_sl := close - wave_size / i_rr
+    e_short    := false
+    e_wave_pct := wave_pct
+    e_rsi      := rsi
+    e_vwap_ok  := close < vwap
+    e_score    := (rsi < 40 ? 1 : 0) + (close < vwap ? 1 : 0) + (wave_pct > 100 ? 1 : 0) + (wave_pct > 150 ? 1 : 0)
 
-p_ep = plot(live_ep, "Entry", color.gray, 1, plot.style_linebr)
-p_tp = plot(live_tp, "TP",    color.lime, 1, plot.style_linebr)
-p_sl = plot(live_sl, "SL",    color.red,  1, plot.style_linebr)
-fill(p_ep, p_tp, color.new(color.green, 80))
-fill(p_ep, p_sl, color.new(color.red,   80))
+// ─── العد التنازلي حتى 14:00 UTC ─────────────
+curr_total = hour(time, "UTC") * 60 + minute(time, "UTC")
+diff_mins  = 14 * 60 - curr_total
+mins_left  = diff_mins >= 0 ? diff_mins : diff_mins + 1440
+h_left     = mins_left / 60
+m_left     = mins_left % 60
+countdown  = str.tostring(h_left) + "h " + (m_left < 10 ? "0" : "") + str.tostring(m_left) + "m"
+
+// ─── رسم ─────────────────────────────────────
+plot(i_show_vwap ? vwap : na, "VWAP", color.new(color.orange, 20), 2)
+
+plotshape(go_short, "SHORT ▼", shape.triangledown, location.abovebar, color.red,  size=size.normal)
+plotshape(go_long,  "LONG ▲",  shape.triangleup,   location.belowbar, color.lime, size=size.normal)
+bgcolor(is_entry ? color.new(color.yellow, 88) : na)
+
+// ─── دوال مساعدة ─────────────────────────────
+score_col(s) =>
+    s >= 3 ? color.lime : s == 2 ? color.yellow : color.red
+
+stars(s) =>
+    s >= 4 ? "★★★★" : s == 3 ? "★★★☆" : s == 2 ? "★★☆☆" : s == 1 ? "★☆☆☆" : "☆☆☆☆"
+
+// ─── جدول التأكيد ────────────────────────────
+var table t = na
+
+if barstate.islast
+    if na(t)
+        t := table.new(position.top_left, 2, 8,
+            frame_color  = color.gray, frame_width  = 1,
+            border_color = color.new(color.gray, 60), border_width = 1)
+
+    color H = color.new(#1a237e, 0)
+    color A = color.new(#0d1b2a, 15)
+    color B = color.new(#1b2838, 15)
+
+    // ─ رأس الجدول ─
+    table.cell(t, 0, 0, "14:00 — Confirm", bgcolor=H, text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 0, "",                bgcolor=H, text_color=color.white, text_size=size.small)
+
+    // ─ العد التنازلي ─
+    table.cell(t, 0, 1, "⏱ Countdown",    bgcolor=A, text_color=color.white,  text_size=size.small)
+    table.cell(t, 1, 1, countdown,         bgcolor=A, text_color=color.yellow, text_size=size.small)
+
+    // ─ الإشارة ─
+    sig_s = na(e_score) ? "انتظر 14:00" : e_short ? "SHORT ▼" : "LONG ▲"
+    sig_c = na(e_score) ? color.gray     : e_short ? color.red : color.lime
+    table.cell(t, 0, 2, "إشارة",          bgcolor=B, text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 2, sig_s,            bgcolor=B, text_color=sig_c,       text_size=size.small)
+
+    // ─ قوة الموجة ─
+    wv_s = na(e_wave_pct) ? "—" : str.tostring(e_wave_pct, "#") + "% avg"
+    wv_c = na(e_wave_pct) ? color.gray : e_wave_pct >= 150 ? color.lime : e_wave_pct >= 100 ? color.yellow : color.orange
+    table.cell(t, 0, 3, "قوة الموجة",    bgcolor=A, text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 3, wv_s,            bgcolor=A, text_color=wv_c,        text_size=size.small)
+
+    // ─ RSI ─
+    rsi_s  = na(e_rsi) ? "—" : str.tostring(e_rsi, "#.#")
+    rsi_ok = not na(e_score) and (e_short ? e_rsi > 60 : e_rsi < 40)
+    table.cell(t, 0, 4, "RSI",            bgcolor=B, text_color=color.white,                        text_size=size.small)
+    table.cell(t, 1, 4, rsi_s,            bgcolor=B, text_color=rsi_ok ? color.lime : color.orange, text_size=size.small)
+
+    // ─ VWAP ─
+    vwap_s = na(e_vwap_ok) ? "—" : e_vwap_ok ? "✓ مؤكد" : "✗ ضعيف"
+    vwap_c = na(e_vwap_ok) ? color.gray : e_vwap_ok ? color.lime : color.orange
+    table.cell(t, 0, 5, "VWAP",           bgcolor=A, text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 5, vwap_s,           bgcolor=A, text_color=vwap_c,      text_size=size.small)
+
+    // ─ التقييم ─
+    sc_s = na(e_score) ? "—" : stars(e_score) + "  " + str.tostring(e_score) + "/4"
+    sc_c = na(e_score) ? color.gray : score_col(e_score)
+    table.cell(t, 0, 6, "التقييم",        bgcolor=H, text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 6, sc_s,             bgcolor=H, text_color=sc_c,        text_size=size.small)
+
+    // ─ التوصية ─
+    rec_s = na(e_score) ? "انتظر 14:00" : e_score >= 3 ? "إشارة قوية ✓" : e_score == 2 ? "متوسطة — احذر" : "ضعيفة — تجنب"
+    rec_c = na(e_score) ? color.gray : score_col(e_score)
+    table.cell(t, 0, 7, "التوصية",        bgcolor=B, text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 7, rec_s,            bgcolor=B, text_color=rec_c,       text_size=size.small)
+
+// ─── تنبيهات ─────────────────────────────────
+alertcondition(go_short and e_score >= 3, "14:00 SHORT قوي ★★★+", "SHORT قوي عند 14:00 UTC")
+alertcondition(go_long  and e_score >= 3, "14:00 LONG قوي ★★★+",  "LONG قوي عند 14:00 UTC")
+alertcondition(go_short or go_long,       "14:00 إشارة",           "إشارة 14:00 UTC")
