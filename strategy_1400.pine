@@ -151,15 +151,11 @@ if barstate.islast
 
         float tt = iss ? ep  : tpv
         float tb = iss ? tpv : ep
-        array.push(all_bx, box.new(bs, tt, be, tb,
-            bgcolor=color.new(color.green, 60), border_color=color.green, border_width=2,
-            text="TP", text_color=color.white, text_size=size.small, text_halign=text.align_left))
+        array.push(all_bx, box.new(bs, tt, be, tb, bgcolor=color.new(color.green, 60), border_color=color.green, border_width=2, text="TP", text_color=color.white, text_size=size.small, text_halign=text.align_left))
 
         float st = iss ? slv : ep
         float sb = iss ? ep  : slv
-        array.push(all_bx, box.new(bs, st, be, sb,
-            bgcolor=color.new(color.red, 60), border_color=color.red, border_width=2,
-            text="SL", text_color=color.white, text_size=size.small, text_halign=text.align_left))
+        array.push(all_bx, box.new(bs, st, be, sb, bgcolor=color.new(color.red, 60), border_color=color.red, border_width=2, text="SL", text_color=color.white, text_size=size.small, text_halign=text.align_left))
 
 // ─────────────────────────────────────────────
 // STATS TABLE
