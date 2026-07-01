@@ -1,0 +1,109 @@
+//@version=5
+indicator("VWAP Bounce Pro — by Nasri", overlay=true, max_bars_back=500)
+
+// ── إعدادات ─────────────────────────────────────
+bandMult = input.float(1.5,  "Band Multiplier (ATR)", step=0.25)
+rsiOB    = input.int(58,     "RSI Short threshold")
+rsiOS    = input.int(42,     "RSI Long  threshold")
+cooldown = input.int(10,     "Cooldown bars")
+showBand = input.bool(true,  "Show Bands")
+symName  = input.string("MNQ", "Symbol Name (for webhook)")
+
+// ── مؤشرات ──────────────────────────────────────
+vwap_val = ta.vwap(hlc3)
+atr14    = ta.atr(14)
+rsi14    = ta.rsi(close, 14)
+
+// ── نطاقات ──────────────────────────────────────
+upperBand = vwap_val + atr14 * bandMult
+lowerBand = vwap_val - atr14 * bandMult
+
+// ── الجلسة ──────────────────────────────────────
+inSession = not na(time("5", "0700-2000", "UTC"))
+
+// ── ذيول الشمعة ──────────────────────────────────
+wUp = high - math.max(open, close)
+wDn = math.min(open, close) - low
+
+// ── شروط الإشارة ─────────────────────────────────
+cond_short = inSession and high >= upperBand and close < upperBand
+           and close < open and wUp >= atr14 * 0.15 and rsi14 >= rsiOB
+
+cond_long  = inSession and low <= lowerBand and close > lowerBand
+           and close > open and wDn >= atr14 * 0.15 and rsi14 <= rsiOS
+
+// ── Cooldown ─────────────────────────────────────
+var int lastL = -999
+var int lastS = -999
+
+sig_long  = cond_long  and (bar_index - lastL) >= cooldown
+sig_short = cond_short and (bar_index - lastS) >= cooldown
+
+if sig_long
+    lastL := bar_index
+if sig_short
+    lastS := bar_index
+
+// ── SL / TP ───────────────────────────────────────
+sl_long_v  = low  - atr14 * 0.1
+sl_short_v = high + atr14 * 0.1
+tp_long_v  = close + (close - sl_long_v)  * 2
+tp_short_v = close - (sl_short_v - close) * 2
+tp2_long_v  = close + (close - sl_long_v)  * 3
+tp2_short_v = close - (sl_short_v - close) * 3
+
+sl_long  = sig_long  ? sl_long_v  : na
+sl_short = sig_short ? sl_short_v : na
+tp_long  = sig_long  ? tp_long_v  : na
+tp_short = sig_short ? tp_short_v : na
+
+// ── رسم ──────────────────────────────────────────
+plot(vwap_val,                           "VWAP",  color.new(color.yellow, 0),  2)
+plot(showBand ? upperBand : na, "Upper", color.new(color.red,    25), 1, plot.style_stepline)
+plot(showBand ? lowerBand : na, "Lower", color.new(color.green,  25), 1, plot.style_stepline)
+
+bgcolor(inSession ? color.new(color.blue, 97) : na, title="Session")
+
+plotshape(sig_long,  style=shape.labelup,   location=location.belowbar, color=color.new(color.green, 0), text="▲ LONG",  textcolor=color.white, size=size.normal)
+plotshape(sig_short, style=shape.labeldown, location=location.abovebar, color=color.new(color.red,   0), text="▼ SHORT", textcolor=color.white, size=size.normal)
+
+plot(sl_long,  "SL L", color.new(color.red,   10), 1, plot.style_linebr)
+plot(tp_long,  "TP L", color.new(color.green, 10), 1, plot.style_linebr)
+plot(sl_short, "SL S", color.new(color.red,   10), 1, plot.style_linebr)
+plot(tp_short, "TP S", color.new(color.green, 10), 1, plot.style_linebr)
+
+// ── جدول ─────────────────────────────────────────
+var table t = table.new(position.top_right, 2, 4, bgcolor=color.new(color.black, 55), border_width=1)
+if barstate.islast
+    table.cell(t, 0, 0, "VWAP",  text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 0, str.tostring(math.round(vwap_val, 2)), text_color=color.yellow, text_size=size.small)
+    table.cell(t, 0, 1, "Upper", text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 1, str.tostring(math.round(upperBand, 2)), text_color=color.red, text_size=size.small)
+    table.cell(t, 0, 2, "Lower", text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 2, str.tostring(math.round(lowerBand, 2)), text_color=color.lime, text_size=size.small)
+    table.cell(t, 0, 3, "RSI",   text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 3, str.tostring(math.round(rsi14, 1)), text_color=rsi14 >= rsiOB ? color.red : rsi14 <= rsiOS ? color.lime : color.gray, text_size=size.small)
+
+// ── Webhook Alerts (JSON ديناميكي) ───────────────
+// يُرسَل عند إغلاق الشمعة فقط
+if sig_long
+    alert('{"s":"' + symName + '","t":"LONG","p":' + str.tostring(math.round(close, 2))
+         + ',"sl":'  + str.tostring(math.round(sl_long_v, 2))
+         + ',"tp1":' + str.tostring(math.round(tp_long_v, 2))
+         + ',"tp2":' + str.tostring(math.round(tp2_long_v, 2))
+         + ',"r":'   + str.tostring(math.round(rsi14, 1))
+         + ',"a":'   + str.tostring(math.round(atr14, 2))
+         + ',"v":'   + str.tostring(math.round(vwap_val, 2))
+         + ',"src":"vwap_lower"}',
+         alert.freq_once_per_bar_close)
+
+if sig_short
+    alert('{"s":"' + symName + '","t":"SHORT","p":' + str.tostring(math.round(close, 2))
+         + ',"sl":'  + str.tostring(math.round(sl_short_v, 2))
+         + ',"tp1":' + str.tostring(math.round(tp_short_v, 2))
+         + ',"tp2":' + str.tostring(math.round(tp2_short_v, 2))
+         + ',"r":'   + str.tostring(math.round(rsi14, 1))
+         + ',"a":'   + str.tostring(math.round(atr14, 2))
+         + ',"v":'   + str.tostring(math.round(vwap_val, 2))
+         + ',"src":"vwap_upper"}',
+         alert.freq_once_per_bar_close)

@@ -1,428 +1,367 @@
 /**
- * MNQ Bot — 14:00 UTC Reversal
- * صفقة واحدة يومياً | RR 1.5 | 5M
+ * ═══════════════════════════════════════════════════
+ *   SMC Trading Bot v3.0 — Channel Business Edition
+ *   TradingView Pine Script → JSON webhook → Telegram
+ *   ─────────────────────────────────────────────────
+ *   Indicators: VWAP Bounce Pro + Kill Zone Sweep Pro
+ *   Broadcast:  Owner DM  +  Telegram Channel
+ *   Commands:   /start  /status  /help
+ * ═══════════════════════════════════════════════════
  */
 
-import { get5mBars }        from './data_tradovate.js';
-import { analyze1400 }      from './strategy_1400.js';
-import { fetchCalendar }    from './calendar.js';
-import { createServer }     from 'http';
+import { createServer }   from 'http';
+import { currentSession } from './strategy_simple.js';
 
-// ══ إعدادات ══════════════════════════════════════
-const TOKEN    = process.env.TELEGRAM_TOKEN   || '8986679008:AAHmT44SZeoUzdkiaKg-OlnA3NHOonHZ2cw';
-const CHAT_ID  = process.env.TELEGRAM_CHAT_ID || '6526134897';
-const SYMBOL   = process.env.SYMBOL           || 'MNQ';
-const LOOKBACK = parseInt(process.env.LOOKBACK   || '11');
-const RR_RATIO = parseFloat(process.env.RR_RATIO || '1.5');
-const MAX_DAILY_LOSSES = 2;
-const TIMEOUT_HOURS    = 4;
+const TOKEN      = process.env.TELEGRAM_TOKEN   || '8986679008:AAHmT44SZeoUzdkiaKg-OlnA3NHOonHZ2cw';
+const OWNER_ID   = process.env.TELEGRAM_CHAT_ID || '6526134897';
+const CHANNEL_ID = process.env.CHANNEL_ID       || '';   // -100xxxx or @channame
+const PORT       = process.env.PORT             || 3000;
 
-// ══ الحالة ════════════════════════════════════════
-let lastUpdateId = 0;
-let running      = false;
-let activeTrade  = null;
+// ── Daily stats ─────────────────────────────────────
+let stats = { date: '', total: 0, long: 0, short: 0, bySource: {} };
 
-const daily  = { traded: false, losses: 0, wins: 0, halted: false, date: '' };
-const weekly = { wins: 0, losses: 0, timeouts: 0, week: '' };
+// ── Cooldown — prevent duplicate signals (15 min) ───
+const lastSig  = {};
+const COOLDOWN = 15 * 60 * 1000;
 
-function currentWeek() {
-  const d = new Date();
-  const jan1 = new Date(d.getUTCFullYear(), 0, 1);
-  return `${d.getUTCFullYear()}-W${Math.ceil(((d - jan1) / 86400000 + jan1.getUTCDay() + 1) / 7)}`;
+// ── Telegram ─────────────────────────────────────────
+async function tgSend(chatId, text) {
+  if (!TOKEN) { console.log(`[TG → ${chatId}]`, text); return true; }
+  const r = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({
+      chat_id:                  chatId,
+      text,
+      parse_mode:               'HTML',
+      disable_web_page_preview: true,
+    }),
+  }).catch(() => null);
+  if (r && !r.ok) {
+    const err = await r.text().catch(() => '');
+    console.error(`[TG → ${chatId}] FAILED:`, err.slice(0, 150));
+  }
+  return r?.ok ?? false;
 }
 
-function resetWeeklyIfNeeded() {
-  const w = currentWeek();
-  if (weekly.week !== w) Object.assign(weekly, { wins: 0, losses: 0, timeouts: 0, week: w });
+async function broadcast(text) {
+  await tgSend(OWNER_ID, text);
+  if (CHANNEL_ID) await tgSend(CHANNEL_ID, text).catch(() => {});
 }
 
-// ══ Telegram ══════════════════════════════════════
-async function tg(text) {
-  try {
-    await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ chat_id: CHAT_ID, text, parse_mode: 'HTML' }),
-    });
-  } catch (_) {}
+// ── Source labels ────────────────────────────────────
+function srcLabel(src) {
+  if (!src) return '📡 TradingView';
+  if (src === 'vwap_lower')  return '📊 VWAP Lower Band';
+  if (src === 'vwap_upper')  return '📊 VWAP Upper Band';
+  if (src.startsWith('kz_')) return `⚡ Kill Zone — ${src.slice(3)}`;
+  return `📡 ${src}`;
 }
 
-// ══ أوامر Telegram ════════════════════════════════
-async function pollCommands() {
+// ── Quality stars (q = "1"|"2"|"3" from Pine Script) ─
+function stars(q) {
+  return '⭐'.repeat(Math.min(3, Math.max(1, parseInt(q) || 2)));
+}
+
+// ── Format one signal into a Telegram message ────────
+function formatSignal(d) {
+  const isBull = d.t === 'LONG';
+  const sym    = d.s  || '?';
+  const price  = parseFloat(d.p);
+  const sl     = parseFloat(d.sl);
+  const tp1    = parseFloat(d.tp1);
+  const tp2    = parseFloat(d.tp2);
+
+  const risk = Math.abs(price - sl);
+  const rr1  = risk > 0 ? (Math.abs(tp1 - price) / risk).toFixed(1) : '?';
+  const rr2  = risk > 0 ? (Math.abs(tp2 - price) / risk).toFixed(1) : '?';
+
+  const slPts = risk > 0 ? risk.toFixed(0) : '?';
+  const slDir = isBull ? `−${slPts}` : `+${slPts}`;
+
+  const session  = currentSession();
+  const timeCEST = new Date().toLocaleTimeString('es-ES', {
+    timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit',
+  });
+
+  const src = d.src || '';
+  const q   = d.q   != null ? d.q : (src.startsWith('kz_') ? 3 : 2);
+
+  const lines = [
+    `${isBull ? '📈' : '📉'} <b>${d.t} — ${sym}</b>   ${stars(q)}`,
+    ``,
+    `💰 <b>الدخول:  ${price.toFixed(2)}</b>`,
+    `🛑 SL:      ${sl.toFixed(2)}   (${slDir} pts)`,
+    `🎯 TP1:     ${tp1.toFixed(2)}   (R:R 1:${rr1})`,
+    `🎯 TP2:     ${tp2.toFixed(2)}   (R:R 1:${rr2})`,
+    ``,
+  ];
+
+  if (d.r  != null) lines.push(`📊 RSI: ${parseFloat(d.r).toFixed(1)}${d.a != null ? `   |   ATR: ${parseFloat(d.a).toFixed(2)}` : ''}`);
+  if (d.v  != null) lines.push(`📈 VWAP: ${parseFloat(d.v).toFixed(2)}`);
+  if (d.pts != null) lines.push(`🏆 النقاط: ${d.pts}/6`);
+
+  lines.push(`🕐 ${session}   |   ${timeCEST} CEST`);
+  lines.push(`📡 ${srcLabel(src)}`);
+  lines.push(``);
+  lines.push(`<i>⚠️ لا تخاطر بأكثر من 1-2% من رأس المال في صفقة واحدة</i>`);
+
+  return lines.join('\n');
+}
+
+// ── Handle TradingView webhook ────────────────────────
+async function handleWebhook(rawBody) {
+  let d;
+  try { d = JSON.parse(rawBody); } catch {
+    console.error('[Webhook] JSON parse error:', rawBody.slice(0, 200));
+    return false;
+  }
+
+  console.log('[Webhook]', JSON.stringify(d));
+
+  // Support legacy field names {symbol,type,price} alongside {s,t,p}
+  d.s = d.s || d.symbol;
+  d.t = d.t || d.type;
+  d.p = d.p || d.price;
+
+  if (!d.t || !d.p) {
+    console.log('[Webhook] Missing required fields (t, p)');
+    return false;
+  }
+
+  const sym = d.s || 'UNK';
+  const key = `${sym}_${d.t}`;
+  const now = Date.now();
+
+  if (lastSig[key] && now - lastSig[key] < COOLDOWN) {
+    const rem = Math.round((COOLDOWN - (now - lastSig[key])) / 60000);
+    console.log(`[Webhook] ⏳ Cooldown ${key} — ${rem} min remaining`);
+    return true;
+  }
+  lastSig[key] = now;
+
+  // Update daily stats
+  const today = new Date().toISOString().slice(0, 10);
+  if (stats.date !== today) stats = { date: today, total: 0, long: 0, short: 0, bySource: {} };
+  stats.total++;
+  d.t === 'LONG' ? stats.long++ : stats.short++;
+  const sk = d.src || 'other';
+  stats.bySource[sk] = (stats.bySource[sk] || 0) + 1;
+
+  const msg = formatSignal(d);
+  await broadcast(msg);
+  console.log(`[Webhook] ✅ Signal #${stats.total} — ${sym} ${d.t} @ ${d.p}  src:${d.src}`);
+  return true;
+}
+
+// ── Telegram long-polling ─────────────────────────────
+let tgOffset = 0;
+
+async function pollTelegram() {
   try {
     const r = await fetch(
-      `https://api.telegram.org/bot${TOKEN}/getUpdates?offset=${lastUpdateId + 1}&timeout=0`
+      `https://api.telegram.org/bot${TOKEN}/getUpdates?offset=${tgOffset + 1}&timeout=30&limit=20`,
+      { signal: AbortSignal.timeout(35_000) }
     );
-    const j = await r.json();
-    for (const u of j.result || []) {
-      lastUpdateId = u.update_id;
-      const cmd = (u.message?.text || '').trim().toLowerCase();
+    if (r.ok) {
+      const data = await r.json();
+      for (const upd of (data.result || [])) {
+        tgOffset = upd.update_id;
+        handleTgUpdate(upd).catch(e => console.error('[TG]', e.message));
+      }
+    }
+  } catch (e) {
+    if (!e.message?.includes('timeout') && !e.message?.includes('abort')) {
+      console.error('[Poll]', e.message);
+    }
+  }
+  setTimeout(pollTelegram, 3_000);
+}
 
-      if (cmd === '/status') {
-        const tradeInfo = activeTrade
-          ? `\n📊 صفقة مفتوحة: ${activeTrade.type} @ ${activeTrade.price}\n🛑 SL: ${activeTrade.sl} | 🎯 TP: ${activeTrade.tp}`
-          : '\n📭 لا توجد صفقات مفتوحة';
-        await tg(
+// ── Telegram command handler ──────────────────────────
+async function handleTgUpdate(upd) {
+  const msg = upd.message || upd.channel_post;
+  if (!msg?.text) return;
+
+  const chat    = String(msg.chat.id);
+  const text    = msg.text.trim().split(' ')[0].split('@')[0];  // strip bot name + args
+  const isOwner = chat === String(OWNER_ID);
+
+  if (text === '/start') {
+    await tgSend(chat,
+`🤖 <b>SMC Trading Bot — مرحباً!</b>
+
+أنا بوت يستقبل إشارات من TradingView تلقائياً ويرسلها إليك.
+
+<b>📊 المؤشرات المتصلة:</b>
+• VWAP Bounce Pro — ارتداد من نطاقات VWAP
+• Kill Zone Sweep Pro — كسح السيولة في جلسات لندن ونيويورك
+
+<b>الأوامر:</b>
+/status — إحصائيات اليوم وحالة البوت
+/help   — دليل قراءة الإشارات
+${isOwner ? '\n🔐 <b>أنت المالك — صلاحيات كاملة</b>' : ''}`
+    );
+    return;
+  }
+
+  if (text === '/status') {
+    const session  = currentSession();
+    const today    = new Date().toISOString().slice(0, 10);
+    const srcLines = Object.entries(stats.bySource)
+      .map(([k, v]) => `   ${srcLabel(k)}: ${v}`)
+      .join('\n') || '   لا يوجد بعد';
+
+    await tgSend(chat,
 `📊 <b>حالة البوت</b>
-${daily.halted ? '🛑 موقوف' : '✅ يعمل'}
-✅ أرباح اليوم: ${daily.wins}
-❌ خسائر اليوم: ${daily.losses}/${MAX_DAILY_LOSSES}
-📋 صفقة اليوم: ${daily.traded ? 'تم' : 'لم تُنفَّذ بعد'}
-⏰ الإشارة: 14:00 UTC${tradeInfo}`);
 
-      } else if (cmd === '/win') {
-        daily.wins++;
-        await tg(`✅ ربح مسجّل — الإجمالي: ${daily.wins} ربح`);
+🟢 يعمل بشكل طبيعي
+🕐 ${session}
+📅 ${stats.date || today}
 
-      } else if (cmd === '/loss') {
-        daily.losses++;
-        if (daily.losses >= MAX_DAILY_LOSSES) {
-          daily.halted = true;
-          await tg(`🛑 خسارة #${daily.losses} — إيقاف البوت حتى الغد`);
-        } else {
-          await tg(`⚠️ خسارة #${daily.losses} — تبقّى ${MAX_DAILY_LOSSES - daily.losses} قبل الإيقاف`);
-        }
+<b>إشارات اليوم:</b>
+🔢 الإجمالي: ${stats.total}
+📈 LONG:  ${stats.long}   |   📉 SHORT: ${stats.short}
 
-      } else if (cmd === '/reset') {
-        Object.assign(daily, { traded: false, losses: 0, wins: 0, halted: false });
-        activeTrade = null;
-        await tg('🔄 تم إعادة تعيين البوت');
+<b>حسب المصدر:</b>
+${srcLines}
 
-      } else if (cmd === '/help') {
-        await tg(
-`📋 <b>الأوامر:</b>
-/status — الحالة
-/win    — تسجيل ربح
-/loss   — تسجيل خسارة
-/reset  — إعادة تعيين`);
+⏱ Uptime: ${Math.round(process.uptime() / 60)} دقيقة
+📡 Webhook: <code>POST /webhook</code>
+📺 Channel: ${CHANNEL_ID ? '✅ مفعّل' : '❌ غير مفعّل'}`
+    );
+    return;
+  }
+
+  if (text === '/help') {
+    await tgSend(chat,
+`❓ <b>دليل قراءة الإشارات</b>
+
+<b>مثال إشارة LONG:</b>
+📈 <b>LONG — MNQ</b>   ⭐⭐⭐
+💰 الدخول:  21,055.00
+🛑 SL:      21,020.00   (−35 pts)
+🎯 TP1:     21,125.00   (R:R 1:2)
+🎯 TP2:     21,160.00   (R:R 1:3)
+
+<b>شرح الحقول:</b>
+• 💰 الدخول — سعر الدخول (فتح الشمعة التالية)
+• 🛑 SL — وقف الخسارة (تحت/فوق شمعة الإشارة)
+• 🎯 TP1 — هدف أول بعائد 2× المخاطرة
+• 🎯 TP2 — هدف ثاني بعائد 3× المخاطرة
+• ⭐ النجوم — جودة الإشارة (1-3 نجوم)
+
+<b>المصادر:</b>
+📊 VWAP Bounce — ارتداد من نطاق VWAP ± 1.5 ATR
+⚡ Kill Zone — كسح PDH/PDL في مناطق الجلسات
+
+<b>أوقات أفضل الإشارات (UTC):</b>
+⭐ 07:00–11:00 — جلسة لندن
+⭐ 13:30–17:00 — جلسة نيويورك
+
+⚠️ <i>لا تخاطر بأكثر من 1-2% من رأس المال في صفقة واحدة</i>`
+    );
+    return;
+  }
+}
+
+// ── Morning briefing (07:00 UTC daily) ───────────────
+async function morningBriefing() {
+  const dayAr = new Date().toLocaleDateString('ar-EG', {
+    timeZone: 'UTC', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+  await broadcast(
+`🌅 <b>صباح الخير — جلسة جديدة</b>
+📅 ${dayAr}
+
+<b>🕐 جلسات اليوم (UTC):</b>
+🇬🇧 لندن:      07:00 – 11:00
+🔀 لندن/NY:   11:00 – 13:30
+🇺🇸 نيويورك:  13:30 – 17:00
+
+<b>⭐ أوقات أفضل الإشارات:</b>
+• 07:00–09:00 UTC  (فتح لندن — Kill Zone)
+• 13:30–15:30 UTC  (فتح نيويورك — Kill Zone)
+• طوال اليوم  07:00–20:00  (VWAP Bounce)
+
+🤖 البوت يعمل — ينتظر إشارات TradingView
+<i>تأكد أن تنبيهات TradingView مفعّلة على المؤشرَين</i>`
+  );
+}
+
+// ── Daily scheduler ───────────────────────────────────
+function scheduleAt(utcH, utcM, fn) {
+  const now  = new Date();
+  const fire = new Date();
+  fire.setUTCHours(utcH, utcM, 0, 0);
+  if (fire <= now) fire.setUTCDate(fire.getUTCDate() + 1);
+  setTimeout(() => { fn(); setInterval(fn, 86_400_000); }, fire - now);
+}
+
+// ── HTTP Server ───────────────────────────────────────
+createServer(async (req, res) => {
+  const url = new URL(req.url, 'http://x');
+
+  // TradingView alert webhook
+  if (req.method === 'POST' && url.pathname === '/webhook') {
+    const tok = req.headers['x-webhook-token'] || url.searchParams.get('token');
+    if (process.env.WEBHOOK_TOKEN && tok !== process.env.WEBHOOK_TOKEN) {
+      res.writeHead(401); res.end('Unauthorized'); return;
+    }
+
+    let body = '';
+    req.on('data', c => { body += c; });
+    req.on('end', async () => {
+      try {
+        const ok = await handleWebhook(body);
+        res.writeHead(ok !== false ? 200 : 400);
+        res.end(ok !== false ? 'OK' : 'Bad Request');
+      } catch (e) {
+        console.error('[Webhook] ❌', e.message);
+        res.writeHead(500); res.end('Server Error');
       }
-    }
-  } catch (_) {}
-}
-
-// ══ إعادة تعيين يومي ══════════════════════════════
-function resetDailyIfNeeded() {
-  const today = new Date().toISOString().slice(0, 10);
-  if (daily.date !== today) {
-    Object.assign(daily, { traded: false, losses: 0, wins: 0, halted: false, date: today });
-    activeTrade = null;
-    console.log(`[Reset] يوم جديد — ${today}`);
+    });
+    return;
   }
-}
 
-// ══ متابعة الصفقة المفتوحة ════════════════════════
-async function checkActiveTrade() {
-  if (!activeTrade) return;
-
-  try {
-    const bars = await get5mBars(SYMBOL);
-    if (!bars?.length) return;
-
-    const openSec = activeTrade.openTime / 1000;
-    const newBars = bars.filter(b => b.time > openSec);
-    if (!newBars.length) return;
-
-    let result = null;
-    let resultPrice = null;
-
-    if (Date.now() - activeTrade.openTime > TIMEOUT_HOURS * 60 * 60 * 1000) {
-      result      = 'TIMEOUT';
-      resultPrice = bars.at(-1).close;
-    } else {
-      for (const bar of newBars) {
-        if (activeTrade.type === 'LONG') {
-          if (bar.low  <= activeTrade.sl) { result = 'LOSS'; resultPrice = activeTrade.sl; break; }
-          if (bar.high >= activeTrade.tp) { result = 'WIN';  resultPrice = activeTrade.tp; break; }
-        } else {
-          if (bar.high >= activeTrade.sl) { result = 'LOSS'; resultPrice = activeTrade.sl; break; }
-          if (bar.low  <= activeTrade.tp) { result = 'WIN';  resultPrice = activeTrade.tp; break; }
-        }
-      }
-    }
-
-    if (!result) return;
-
-    const mins  = Math.round((Date.now() - activeTrade.openTime) / 60000);
-    const trade = activeTrade;
-    activeTrade = null;
-
-    if (result === 'WIN') {
-      daily.wins++;
-      weekly.wins++;
-      await tg(
-`✅ <b>ربح — MNQ</b>
-🎯 TP: <b>${resultPrice}</b>
-📈 ${trade.type} من ${trade.price} (+${Math.abs(resultPrice - trade.price).toFixed(0)} نقطة)
-⏱ المدة: ${mins} دقيقة
-─────
-✅ أرباح اليوم: ${daily.wins} | ❌ خسائر: ${daily.losses}`);
-
-    } else if (result === 'LOSS') {
-      daily.losses++;
-      weekly.losses++;
-      if (daily.losses >= MAX_DAILY_LOSSES) {
-        daily.halted = true;
-        await tg(
-`❌ <b>خسارة — MNQ</b>
-🛑 SL: <b>${resultPrice}</b>
-⏱ ${mins} دقيقة
-─────
-🛑 <b>${daily.losses} خسائر اليوم — البوت موقوف حتى الغد</b>`);
-      } else {
-        await tg(
-`❌ <b>خسارة — MNQ</b>
-🛑 SL: <b>${resultPrice}</b>
-⏱ ${mins} دقيقة
-⚠️ خسارة #${daily.losses} — تبقّى ${MAX_DAILY_LOSSES - daily.losses} قبل الإيقاف`);
-      }
-    } else {
-      weekly.timeouts++;
-      await tg(
-`⏳ <b>Timeout — MNQ</b>
-لم يصل TP أو SL خلال ${TIMEOUT_HOURS} ساعات
-السعر: ${resultPrice} | الدخول: ${trade.price}
-أغلق الصفقة يدوياً إذا كانت مفتوحة`);
-    }
-
-    console.log(`[Trade] ${SYMBOL} → ${result} @ ${resultPrice} (${mins}m)`);
-  } catch (e) {
-    console.error('[Trade]', e.message);
-  }
-}
-
-// ══ إشارة 14:00 UTC ═══════════════════════════════
-async function signal1400() {
-  resetDailyIfNeeded();
-
-  if (daily.halted)  { console.log('[14:00] 🛑 موقوف'); return; }
-  if (daily.traded)  { console.log('[14:00] ✅ صفقة اليوم منفذة'); return; }
-  if (activeTrade)   { console.log('[14:00] صفقة مفتوحة'); return; }
-
-  console.log('[14:00] 🔍 تحليل MNQ...');
-  try {
-    const bars   = await get5mBars(SYMBOL);
-    const result = analyze1400(bars, LOOKBACK, RR_RATIO);
-
-    if (!result.signal) {
-      const why = result.error || result.reason || 'لا إشارة';
-      console.log(`[14:00] ⏭ ${why}`);
-      await tg(`⏭ <b>14:00 UTC — لا إشارة</b>\n${why}`);
-      return;
-    }
-
-    const sig  = result.signal;
-    const risk = Math.abs(sig.price - sig.sl).toFixed(0);
-    const pts  = Math.abs(sig.tp - sig.price).toFixed(0);
-
-    daily.traded = true;
-    activeTrade  = {
-      type:     sig.type,
-      price:    sig.price,
-      sl:       sig.sl,
-      tp:       sig.tp,
-      openTime: Date.now(),
-    };
-
-    await tg(
-`${sig.type === 'LONG' ? '📈' : '📉'} <b>${sig.type} — MNQ</b>
-
-💰 الدخول:  <b>${sig.price}</b>
-🛑 SL:      <b>${sig.sl}</b>   (${risk} نقطة)
-🎯 TP:      <b>${sig.tp}</b>   (+${pts} نقطة)
-📊 RR:      1:${sig.rr}
-🌊 الموجة:  ${sig.waveSize} نقطة
-
-⏰ 14:00 UTC | البوت يتابع تلقائياً`);
-
-    console.log(`[14:00] ✅ ${sig.type} @ ${sig.price} | SL:${sig.sl} TP:${sig.tp}`);
-  } catch (e) {
-    console.error('[14:00] ❌', e.message);
-    await tg(`⚠️ <b>14:00 — خطأ</b>\n${e.message}`);
-  }
-}
-
-// ══ الفحص الدوري (كل دقيقة) ════════════════════════
-async function tick() {
-  if (running) return;
-  running = true;
-  try {
-    await pollCommands();
-    resetDailyIfNeeded();
-    resetWeeklyIfNeeded();
-    await checkActiveTrade();
-  } catch (e) {
-    console.error('[tick]', e.message);
-  } finally {
-    running = false;
-  }
-}
-
-// ══ جدولة 14:00 UTC ═══════════════════════════════
-function schedule1400() {
-  function msUntil1400() {
-    const now  = new Date();
-    const next = new Date();
-    next.setUTCHours(14, 0, 0, 0);
-    if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
-    return next - now;
-  }
-  setTimeout(function fire() {
-    signal1400();
-    setTimeout(fire, msUntil1400());
-  }, msUntil1400());
-
-  const mins = Math.round(msUntil1400() / 60000);
-  console.log(`  ⏰ إشارة 14:00 UTC خلال ${mins} دقيقة`);
-}
-
-// ══ أخبار اليوم المهمة ════════════════════════════
-async function sendDailyNews() {
-  try {
-    const events = await fetchCalendar();
-    const now    = new Date();
-    const today  = now.toISOString().slice(0, 10);
-
-    const usd = events
-      .filter(e => {
-        const d = new Date(e.date);
-        return e.country === 'USD'
-          && (e.impact === 'High' || e.impact === 'Medium')
-          && d.toISOString().slice(0, 10) === today;
-      })
-      .sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    if (!usd.length) {
-      await tg(`📰 <b>أخبار USD اليوم</b>\n✅ لا توجد أخبار مهمة اليوم`);
-      return;
-    }
-
-    const lines = usd.map(e => {
-      const t       = new Date(e.date).toISOString().slice(11, 16); // HH:MM UTC
-      const impact  = e.impact === 'High' ? '🔴' : '🟡';
-      const fore    = e.forecast ? ` | توقع: <b>${e.forecast}</b>` : '';
-      const prev    = e.previous ? ` | سابق: ${e.previous}` : '';
-      return `${impact} <b>${t} UTC</b> — ${e.title}${fore}${prev}`;
-    }).join('\n');
-
-    await tg(`📰 <b>أخبار USD المهمة — ${today}</b>\n\n${lines}\n\n⏰ الإشارة: 14:00 UTC`);
-  } catch (e) {
-    console.error('[News]', e.message);
-  }
-}
-
-// ══ تقرير أسبوعي (الجمعة 21:00 UTC) ══════════════
-async function sendWeeklyReport() {
-  resetWeeklyIfNeeded();
-  const total = weekly.wins + weekly.losses + weekly.timeouts;
-  const wr    = total > 0 ? Math.round(weekly.wins / total * 100) : 0;
-  const bar   = '█'.repeat(Math.round(wr / 10)) + '░'.repeat(10 - Math.round(wr / 10));
-  const status = wr >= 60 ? '✅ أسبوع ممتاز' : wr >= 50 ? '⚖️ أسبوع متعادل' : '⚠️ أسبوع صعب';
-
-  await tg(
-`📊 <b>التقرير الأسبوعي — MNQ Bot</b>
-📅 ${weekly.week}
-─────────────────
-✅ أرباح:  ${weekly.wins}
-❌ خسائر:  ${weekly.losses}
-⏳ Timeout: ${weekly.timeouts}
-📈 الإجمالي: ${total} صفقة
-─────────────────
-🎯 نسبة النجاح: <b>${wr}%</b>
-${bar}
-${status}
-─────────────────
-🤖 MNQ | 14:00 UTC | RR 1:${RR_RATIO}`
-  ).catch(() => {});
-}
-
-// ══ ملخص صباحي + أخبار اليوم ═════════════════════
-function scheduleDailySummary() {
-  function msUntil8() {
-    const now = new Date(), next = new Date();
-    next.setUTCHours(8, 0, 0, 0);
-    if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
-    return next - now;
-  }
-  setTimeout(async function fire() {
-    await tg(
-`🌅 <b>صباح الخير — MNQ Bot</b>
-📅 ${new Date().toISOString().slice(0, 10)}
-✅ أرباح أمس: ${daily.wins}
-❌ خسائر أمس: ${daily.losses}
-⏰ إشارة اليوم: 14:00 UTC`
-    ).catch(() => {});
-    await sendDailyNews();
-    setTimeout(fire, msUntil8());
-  }, msUntil8());
-}
-
-// ══ تقرير أسبوعي كل جمعة 21:00 UTC ══════════════
-function scheduleWeeklyReport() {
-  function msUntilFriday21() {
-    const now  = new Date();
-    const next = new Date();
-    // الجمعة = 5
-    const daysUntil = (5 - now.getUTCDay() + 7) % 7 || 7;
-    next.setUTCDate(now.getUTCDate() + daysUntil);
-    next.setUTCHours(21, 0, 0, 0);
-    if (next <= now) next.setUTCDate(next.getUTCDate() + 7);
-    return next - now;
-  }
-  setTimeout(function fire() {
-    sendWeeklyReport();
-    setTimeout(fire, msUntilFriday21());
-  }, msUntilFriday21());
-
-  const mins = Math.round(msUntilFriday21() / 60000 / 60);
-  console.log(`  📊 تقرير أسبوعي خلال ${mins} ساعة`);
-}
-
-// ══ بدء التشغيل ══════════════════════════════════
-console.log('═'.repeat(48));
-console.log('  🤖  MNQ Bot — 14:00 UTC Reversal');
-console.log('═'.repeat(48));
-console.log(`  📊 Symbol   : ${SYMBOL}`);
-console.log(`  ⏰ Signal   : 14:00 UTC يومياً`);
-console.log(`  🌊 Lookback : ${LOOKBACK} bars (${LOOKBACK * 5} دقيقة)`);
-console.log(`  🎯 RR Ratio : 1:${RR_RATIO}`);
-console.log(`  🛑 Max Loss : ${MAX_DAILY_LOSSES} / يوم`);
-console.log('═'.repeat(48));
-
-tg(
-`🚀 <b>MNQ Bot — 14:00 UTC Reversal</b>
-
-📊 <b>الأداة:</b> MNQ (Micro NQ)
-⏰ <b>الإشارة:</b> 14:00 UTC يومياً (صفقة واحدة)
-🌊 <b>Lookback:</b> ${LOOKBACK} bars (${LOOKBACK * 5} دقيقة)
-🎯 <b>RR:</b> 1:${RR_RATIO}
-🛑 <b>حد الخسارة:</b> ${MAX_DAILY_LOSSES} / يوم
-
-<b>الأوامر:</b> /status /win /loss /reset /help`
-).catch(() => {});
-
-schedule1400();
-scheduleDailySummary();
-scheduleWeeklyReport();
-setInterval(tick, 60 * 1000);
-tick();
-
-// ══ Health check ════════════════════════════════
-createServer((req, res) => {
+  // Health check / status page
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({
-    status:      daily.halted ? 'halted' : 'running',
-    symbol:      SYMBOL,
-    daily,
-    activeTrade,
-    uptime:      Math.round(process.uptime()),
-    time:        new Date().toISOString(),
-    next1400:    (() => {
-      const next = new Date();
-      next.setUTCHours(14, 0, 0, 0);
-      if (next <= new Date()) next.setUTCDate(next.getUTCDate() + 1);
-      return next.toISOString();
-    })(),
-  }));
-}).listen(process.env.PORT || 3000, () => {
-  console.log(`  🌐 Health check: port ${process.env.PORT || 3000}`);
+    bot:      'SMC Trading Bot v3.0',
+    status:   'running',
+    session:  currentSession(),
+    signals:  stats,
+    channel:  !!CHANNEL_ID,
+    uptime:   Math.round(process.uptime()),
+    time:     new Date().toISOString(),
+  }, null, 2));
+
+}).listen(PORT, () => {
+  console.log('═'.repeat(54));
+  console.log('  🤖  SMC Trading Bot v3.0 — Channel Edition');
+  console.log('═'.repeat(54));
+  console.log(`  📡 Webhook  : POST /webhook`);
+  console.log(`  📺 Channel  : ${CHANNEL_ID || '(none — owner DM only)'}`);
+  console.log(`  📱 Owner    : ${OWNER_ID}`);
+  console.log(`  🌐 Port     : ${PORT}`);
+  console.log('═'.repeat(54));
 });
+
+// ── Start ─────────────────────────────────────────────
+scheduleAt(7, 0, morningBriefing);
+pollTelegram();
+
+broadcast(
+`🚀 <b>SMC Trading Bot v3.0 — يعمل الآن</b>
+
+📡 جاهز لاستقبال إشارات TradingView على:
+<code>/webhook</code>
+
+<b>📊 المؤشرات:</b>
+• VWAP Bounce Pro (07:00–20:00 UTC)
+• Kill Zone Sweep Pro (لندن + نيويورك)
+
+📺 Channel: ${CHANNEL_ID ? '✅ مفعّل' : '⚠️ غير مفعّل — أضف CHANNEL_ID في Railway'}
+🌅 تقرير صباحي يومياً الساعة 07:00 UTC
+/help للمساعدة`
+).catch(() => {});
