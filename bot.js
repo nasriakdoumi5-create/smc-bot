@@ -11,6 +11,7 @@
 
 import { createServer }   from 'http';
 import { currentSession } from './strategy_simple.js';
+import { getGEX, formatGEX } from './gex.js';
 
 const TOKEN      = process.env.TELEGRAM_TOKEN   || '8986679008:AAHmT44SZeoUzdkiaKg-OlnA3NHOonHZ2cw';
 const OWNER_ID   = process.env.TELEGRAM_CHAT_ID || '6526134897';
@@ -64,7 +65,7 @@ function stars(q) {
 }
 
 // ── Format one signal into a Telegram message ────────
-function formatSignal(d) {
+function formatSignal(d, gex = null) {
   const isBull = d.t === 'LONG';
   const sym    = d.s  || '?';
   const price  = parseFloat(d.p);
@@ -101,12 +102,20 @@ function formatSignal(d) {
   if (d.v  != null) lines.push(`📈 VWAP: ${parseFloat(d.v).toFixed(2)}`);
   if (d.pts != null) lines.push(`🏆 النقاط: ${d.pts}/6`);
 
+  if (gex) lines.push(gexLine(gex));
   lines.push(`🕐 ${session}   |   ${timeCEST} CEST`);
   lines.push(`📡 ${srcLabel(src)}`);
   lines.push(``);
   lines.push(`<i>⚠️ لا تخاطر بأكثر من 1-2% من رأس المال في صفقة واحدة</i>`);
 
   return lines.join('\n');
+}
+
+// ── GEX regime label ─────────────────────────────────
+function gexLine(gex) {
+  if (!gex) return '';
+  const icon = gex.positive ? '🟢' : '🔴';
+  return `${icon} GEX: ${gex.positive ? 'نطاق' : 'اتجاه'}  |  Wall: ${gex.gammaWall}`;
 }
 
 // ── Handle TradingView webhook ────────────────────────
@@ -148,7 +157,8 @@ async function handleWebhook(rawBody) {
   const sk = d.src || 'other';
   stats.bySource[sk] = (stats.bySource[sk] || 0) + 1;
 
-  const msg = formatSignal(d);
+  const gex = await getGEX().catch(() => null);
+  const msg = formatSignal(d, gex);
   await broadcast(msg);
   console.log(`[Webhook] ✅ Signal #${stats.total} — ${sym} ${d.t} @ ${d.p}  src:${d.src}`);
   return true;
@@ -201,6 +211,7 @@ async function handleTgUpdate(upd) {
 /status  — إحصائيات اليوم وحالة البوت
 /help    — دليل قراءة الإشارات
 ${isOwner ? `/test    — إرسال إشارة تجريبية ✅
+/gex     — تقرير Gamma Exposure الآن
 /setup   — خطوات إعداد TradingView Alerts
 /channel — معلومات القناة
 \n🔐 <b>أنت المالك</b>` : ''}`
@@ -313,6 +324,19 @@ Alert name: Kill Zone MNQ
     return;
   }
 
+  if (text === '/gex') {
+    await tgSend(chat, '⏳ جاري جلب بيانات GEX...');
+    try {
+      // Force refresh
+      const { calcGEX } = await import('./gex.js');
+      const gex = await calcGEX('QQQ');
+      await tgSend(chat, formatGEX(gex));
+    } catch (e) {
+      await tgSend(chat, `❌ خطأ في جلب GEX: ${e.message}`);
+    }
+    return;
+  }
+
   if (text === '/channel') {
     const info = CHANNEL_ID
       ? `✅ مفعّل\nID: <code>${CHANNEL_ID}</code>`
@@ -337,10 +361,15 @@ async function morningBriefing() {
   const dayAr = new Date().toLocaleDateString('ar-EG', {
     timeZone: 'UTC', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
+
+  // Fetch fresh GEX for the day
+  const gex = await getGEX().catch(() => null);
+  const gexBlock = gex ? `\n${formatGEX(gex)}\n` : '';
+
   await broadcast(
 `🌅 <b>صباح الخير — جلسة جديدة</b>
 📅 ${dayAr}
-
+${gexBlock}
 <b>🕐 جلسات اليوم (UTC):</b>
 🇬🇧 لندن:      07:00 – 11:00
 🔀 لندن/NY:   11:00 – 13:30
@@ -351,8 +380,7 @@ async function morningBriefing() {
 • 13:30–15:30 UTC  (فتح نيويورك — Kill Zone)
 • طوال اليوم  07:00–20:00  (VWAP Bounce)
 
-🤖 البوت يعمل — ينتظر إشارات TradingView
-<i>تأكد أن تنبيهات TradingView مفعّلة على المؤشرَين</i>`
+🤖 البوت يعمل — ينتظر إشارات TradingView`
   );
 }
 
