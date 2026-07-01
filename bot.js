@@ -1,345 +1,367 @@
 /**
  * ═══════════════════════════════════════════════════
- *   Multi-Symbol Bot — EMA21 Bounce | 3 Timeframes
- *   1H Bias + 15M Structure + 5M Entry
- *   يعمل 24/7 على Railway
+ *   SMC Trading Bot v3.0 — Channel Business Edition
+ *   TradingView Pine Script → JSON webhook → Telegram
+ *   ─────────────────────────────────────────────────
+ *   Indicators: VWAP Bounce Pro + Kill Zone Sweep Pro
+ *   Broadcast:  Owner DM  +  Telegram Channel
+ *   Commands:   /start  /status  /help
  * ═══════════════════════════════════════════════════
  */
 
-import { get5mBars, get15mBars, get1hBars }          from './data.js';
-import { analyzeSimple, currentSession }              from './strategy_simple.js';
-import { getUpcomingHigh, isNewsTime, todaySummary }  from './calendar.js';
-import { validateSignal }                             from './gemini.js';
-import { createServer }                               from 'http';
+import { createServer }   from 'http';
+import { currentSession } from './strategy_simple.js';
 
-// ══ إعدادات ══════════════════════════════════════
-const TOKEN    = process.env.TELEGRAM_TOKEN   || '8986679008:AAHmT44SZeoUzdkiaKg-OlnA3NHOonHZ2cw';
-const CHAT_ID  = process.env.TELEGRAM_CHAT_ID || '6526134897';
-const CHECK_MS = 5 * 60 * 1000;   // كل 5 دقائق
-const COOLDOWN = 30 * 60 * 1000;  // 30 دقيقة بين الإشارات
+const TOKEN      = process.env.TELEGRAM_TOKEN   || '8986679008:AAHmT44SZeoUzdkiaKg-OlnA3NHOonHZ2cw';
+const OWNER_ID   = process.env.TELEGRAM_CHAT_ID || '6526134897';
+const CHANNEL_ID = process.env.CHANNEL_ID       || '';   // -100xxxx or @channame
+const PORT       = process.env.PORT             || 3000;
 
-// الرموز المراقَبة (يمكن تغييرها عبر env: SYMBOLS=MNQ,MCL,MGC)
-const SYMBOLS = (process.env.SYMBOLS || 'MNQ,MCL').split(',').map(s => s.trim());
+// ── Daily stats ─────────────────────────────────────
+let stats = { date: '', total: 0, long: 0, short: 0, bySource: {} };
 
-// أسماء العرض
-const SYMBOL_NAMES = {
-  MNQ: 'Micro Nasdaq (MNQ)',
-  MGC: 'Micro Gold (MGC)',
-  MCL: 'Micro Crude Oil (MCL)',
-  MES: 'Micro S&P 500 (MES)',
-};
+// ── Cooldown — prevent duplicate signals (15 min) ───
+const lastSig  = {};
+const COOLDOWN = 15 * 60 * 1000;
 
-// ══ الحالة (لكل رمز) ══════════════════════════════
-const state = {};
-for (const sym of SYMBOLS) {
-  state[sym] = { lastSignalTime: 0, lastSignalKey: '' };
-}
-
-let lastNewsKey = '';
-let running     = false;
-let stats = { total: 0, long: 0, short: 0, bySymbol: {}, date: '' };
-
-// ══ Telegram ══════════════════════════════════════
-async function tg(text) {
+// ── Telegram ─────────────────────────────────────────
+async function tgSend(chatId, text) {
+  if (!TOKEN) { console.log(`[TG → ${chatId}]`, text); return true; }
   const r = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ chat_id: CHAT_ID, text, parse_mode: 'HTML' }),
+    body:    JSON.stringify({
+      chat_id:                  chatId,
+      text,
+      parse_mode:               'HTML',
+      disable_web_page_preview: true,
+    }),
   }).catch(() => null);
-  return r?.ok;
+  if (r && !r.ok) {
+    const err = await r.text().catch(() => '');
+    console.error(`[TG → ${chatId}] FAILED:`, err.slice(0, 150));
+  }
+  return r?.ok ?? false;
 }
 
-// ══ تسميات الشروط ════════════════════════════════
-const LABELS = {
-  htfBull:       '1H اتجاه صاعد (EMA50>EMA200)',
-  htfBear:       '1H اتجاه هابط (EMA50<EMA200)',
-  mtfNear:       '15M السعر قرب EMA21',
-  touchedEma21:  '5M لمس خط EMA21',
-  bouncedUp:     '5M ارتداد صاعد من EMA21',
-  bouncedDown:   '5M ارتداد هابط من EMA21',
-  rsiOk:         'RSI مناسب للدخول',
-  pdlSweep:      '⚡ كسح PDL + انعكاس (بونص)',
-  pdhSweep:      '⚡ كسح PDH + انعكاس (بونص)',
-};
-const condLine = (k, v) => `${v ? '✅' : '❌'} ${LABELS[k] || k}`;
-
-// ══ جودة الإشارة ══════════════════════════════════
-function quality(score) {
-  if (score >= 5) return { stars: '⭐⭐⭐', label: 'ممتازة' };
-  if (score >= 4) return { stars: '⭐⭐',   label: 'قوية'   };
-  return             { stars: '⭐',     label: 'جيدة'   };
+async function broadcast(text) {
+  await tgSend(OWNER_ID, text);
+  if (CHANNEL_ID) await tgSend(CHANNEL_ID, text).catch(() => {});
 }
 
-// ══ تحذيرات الأخبار ══════════════════════════════
-async function checkNews() {
-  const events = await getUpcomingHigh(15);
-  for (const e of events) {
-    const key = e.date + e.title;
-    if (key === lastNewsKey) continue;
-    lastNewsKey = key;
-    const mins = Math.max(1, Math.round((new Date(e.date) - Date.now()) / 60000));
-    await tg(
-`⚠️ <b>خبر مهم — ${e.title}</b>
-🕐 خلال <b>${mins} دقيقة</b>  |  🔴 High Impact
-${e.forecast ? `📊 التوقع: ${e.forecast}` : ''}
-⛔ <b>لا تدخل — انتظر انتهاء الخبر</b>`
-    ).catch(() => {});
-  }
+// ── Source labels ────────────────────────────────────
+function srcLabel(src) {
+  if (!src) return '📡 TradingView';
+  if (src === 'vwap_lower')  return '📊 VWAP Lower Band';
+  if (src === 'vwap_upper')  return '📊 VWAP Upper Band';
+  if (src.startsWith('kz_')) return `⚡ Kill Zone — ${src.slice(3)}`;
+  return `📡 ${src}`;
 }
 
-// ══ فحص رمز واحد ══════════════════════════════════
-async function checkSymbol(symbol, t) {
-  const [bars5m, bars15m, bars1h] = await Promise.all([
-    get5mBars(symbol),
-    get15mBars(symbol),
-    get1hBars(symbol),
-  ]);
+// ── Quality stars (q = "1"|"2"|"3" from Pine Script) ─
+function stars(q) {
+  return '⭐'.repeat(Math.min(3, Math.max(1, parseInt(q) || 2)));
+}
 
-  const r = analyzeSimple(bars5m, bars15m, bars1h);
+// ── Format one signal into a Telegram message ────────
+function formatSignal(d) {
+  const isBull = d.t === 'LONG';
+  const sym    = d.s  || '?';
+  const price  = parseFloat(d.p);
+  const sl     = parseFloat(d.sl);
+  const tp1    = parseFloat(d.tp1);
+  const tp2    = parseFloat(d.tp2);
 
-  if (r.error) {
-    console.log(`[${t}] ${symbol} ⚠️  ${r.error}`);
-    return;
+  const risk = Math.abs(price - sl);
+  const rr1  = risk > 0 ? (Math.abs(tp1 - price) / risk).toFixed(1) : '?';
+  const rr2  = risk > 0 ? (Math.abs(tp2 - price) / risk).toFixed(1) : '?';
+
+  const slPts = risk > 0 ? risk.toFixed(0) : '?';
+  const slDir = isBull ? `−${slPts}` : `+${slPts}`;
+
+  const session  = currentSession();
+  const timeCEST = new Date().toLocaleTimeString('es-ES', {
+    timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit',
+  });
+
+  const src = d.src || '';
+  const q   = d.q   != null ? d.q : (src.startsWith('kz_') ? 3 : 2);
+
+  const lines = [
+    `${isBull ? '📈' : '📉'} <b>${d.t} — ${sym}</b>   ${stars(q)}`,
+    ``,
+    `💰 <b>الدخول:  ${price.toFixed(2)}</b>`,
+    `🛑 SL:      ${sl.toFixed(2)}   (${slDir} pts)`,
+    `🎯 TP1:     ${tp1.toFixed(2)}   (R:R 1:${rr1})`,
+    `🎯 TP2:     ${tp2.toFixed(2)}   (R:R 1:${rr2})`,
+    ``,
+  ];
+
+  if (d.r  != null) lines.push(`📊 RSI: ${parseFloat(d.r).toFixed(1)}${d.a != null ? `   |   ATR: ${parseFloat(d.a).toFixed(2)}` : ''}`);
+  if (d.v  != null) lines.push(`📈 VWAP: ${parseFloat(d.v).toFixed(2)}`);
+  if (d.pts != null) lines.push(`🏆 النقاط: ${d.pts}/6`);
+
+  lines.push(`🕐 ${session}   |   ${timeCEST} CEST`);
+  lines.push(`📡 ${srcLabel(src)}`);
+  lines.push(``);
+  lines.push(`<i>⚠️ لا تخاطر بأكثر من 1-2% من رأس المال في صفقة واحدة</i>`);
+
+  return lines.join('\n');
+}
+
+// ── Handle TradingView webhook ────────────────────────
+async function handleWebhook(rawBody) {
+  let d;
+  try { d = JSON.parse(rawBody); } catch {
+    console.error('[Webhook] JSON parse error:', rawBody.slice(0, 200));
+    return false;
   }
 
-  const session = currentSession();
-  console.log(
-    `[${t}] ${symbol} @ ${r.price} | ${r.htfTrend} | ${session} | ` +
-    `L:${r.scoreLong}/5 S:${r.scoreShort}/5 | RSI:${r.rsi} | ` +
-    (r.debug?.reason ? r.debug.reason : '') +
-    (r.signal ? ` → 🚨 ${r.signal.type} ${r.signal.score}/5` : '')
-  );
+  console.log('[Webhook]', JSON.stringify(d));
 
-  if (!r.signal) return;
+  // Support legacy field names {symbol,type,price} alongside {s,t,p}
+  d.s = d.s || d.symbol;
+  d.t = d.t || d.type;
+  d.p = d.p || d.price;
 
-  // Cooldown لكل رمز على حدة
-  const now    = Date.now();
-  const sym    = state[symbol];
-  const sigKey = `${r.signal.type}_${Math.round(r.signal.price / 20)}`;
-  if (sigKey === sym.lastSignalKey && now - sym.lastSignalTime < COOLDOWN) {
-    console.log(`[${t}] ${symbol} ⏳ Cooldown (${Math.round((COOLDOWN - (now - sym.lastSignalTime)) / 60000)} دقيقة باقية)`);
-    return;
+  if (!d.t || !d.p) {
+    console.log('[Webhook] Missing required fields (t, p)');
+    return false;
   }
 
-  if (await isNewsTime()) {
-    console.log(`[${t}] ${symbol} 🚫 خبر جارٍ — تجاهل الإشارة`);
-    return;
-  }
+  const sym = d.s || 'UNK';
+  const key = `${sym}_${d.t}`;
+  const now = Date.now();
 
-  // ══ Gemini فلتر للإشارات الضعيفة (3/5) ═════
-  const sig  = r.signal;
-  const name = SYMBOL_NAMES[symbol] || symbol;
-  if (sig.score <= 3) {
-    const ai = await validateSignal(sig, name).catch(() => ({ confirm: true, reason: '' }));
-    if (!ai.confirm) {
-      console.log(`[${t}] ${symbol} 🤖 Gemini رفض الإشارة: ${ai.reason}`);
-      return;
-    }
-    sig._aiReason = ai.reason;
+  if (lastSig[key] && now - lastSig[key] < COOLDOWN) {
+    const rem = Math.round((COOLDOWN - (now - lastSig[key])) / 60000);
+    console.log(`[Webhook] ⏳ Cooldown ${key} — ${rem} min remaining`);
+    return true;
   }
+  lastSig[key] = now;
 
-  sym.lastSignalKey  = sigKey;
-  sym.lastSignalTime = now;
+  // Update daily stats
+  const today = new Date().toISOString().slice(0, 10);
+  if (stats.date !== today) stats = { date: today, total: 0, long: 0, short: 0, bySource: {} };
   stats.total++;
-  sig.type === 'LONG' ? stats.long++ : stats.short++;
-  stats.bySymbol[symbol] = (stats.bySymbol[symbol] || 0) + 1;
+  d.t === 'LONG' ? stats.long++ : stats.short++;
+  const sk = d.src || 'other';
+  stats.bySource[sk] = (stats.bySource[sk] || 0) + 1;
 
-  // ══ رسالة Telegram ══════════════════════════
-  const isBull  = sig.type === 'LONG';
-  const q       = quality(sig.score);
-  const risk    = Math.abs(sig.price - sig.sl);
-  const rr      = risk > 0 ? (Math.abs(sig.tp1 - sig.price) / risk).toFixed(1) : '?';
-  const conds   = Object.entries(sig.conditions).map(([k, v]) => condLine(k, v)).join('\n');
-
-  const pdhLine = sig.pdh ? `📌 PDH: <b>${sig.pdh}</b>  |  PDL: <b>${sig.pdl}</b>` : '';
-  const e21Line = sig.e21_15m
-    ? `📉 EMA21 → 5M: ${sig.e21_5m}  |  15M: ${sig.e21_15m}`
-    : `📉 EMA21 (5M): ${sig.e21_5m}`;
-  const aiLine  = sig._aiReason ? `\n🤖 <i>Gemini: ${sig._aiReason}</i>` : '';
-
-  await tg(
-`${isBull ? '📈' : '📉'} <b>${sig.type} — ${name}</b>   ${q.stars} ${q.label}
-
-💰 الدخول:  <b>${sig.price}</b>
-🛑 SL:      <b>${sig.sl}</b>   (−${risk.toFixed(0)} نقطة)
-🎯 TP1:     <b>${sig.tp1}</b>   (R:R ${rr}:1)
-🎯 TP2:     <b>${sig.tp2}</b>   (R:R ${(risk > 0 ? Math.abs(sig.tp2 - sig.price)/risk : 0).toFixed(1)}:1)
-
-${e21Line}
-${pdhLine}
-📊 RSI: ${sig.rsi}   |   ATR: ${sig.atr}
-🕐 ${session}   |   ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}
-
-${conds}
-${aiLine}
-<i>⚠️ إدارة المخاطر: لا تخاطر بأكثر من 1-2% من رأس المال</i>`
-  );
-
-  console.log(`[${t}] ✅ إشارة #${stats.total} — ${symbol} ${sig.type} @ ${sig.price} | ${q.label} (${sig.score}/5)`);
+  const msg = formatSignal(d);
+  await broadcast(msg);
+  console.log(`[Webhook] ✅ Signal #${stats.total} — ${sym} ${d.t} @ ${d.p}  src:${d.src}`);
+  return true;
 }
 
-// ══ الفحص الرئيسي (كل الرموز) ════════════════════
-async function check() {
-  if (running) return;
-  running = true;
-  const t = new Date().toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid' });
+// ── Telegram long-polling ─────────────────────────────
+let tgOffset = 0;
 
+async function pollTelegram() {
   try {
-    await checkNews();
-    // فحص جميع الرموز بالتتابع (لتجنب حظر Yahoo Finance)
-    for (const symbol of SYMBOLS) {
-      await checkSymbol(symbol, t).catch(err =>
-        console.error(`[${t}] ${symbol} ❌ Error:`, err.message)
-      );
+    const r = await fetch(
+      `https://api.telegram.org/bot${TOKEN}/getUpdates?offset=${tgOffset + 1}&timeout=30&limit=20`,
+      { signal: AbortSignal.timeout(35_000) }
+    );
+    if (r.ok) {
+      const data = await r.json();
+      for (const upd of (data.result || [])) {
+        tgOffset = upd.update_id;
+        handleTgUpdate(upd).catch(e => console.error('[TG]', e.message));
+      }
     }
-  } finally {
-    running = false;
+  } catch (e) {
+    if (!e.message?.includes('timeout') && !e.message?.includes('abort')) {
+      console.error('[Poll]', e.message);
+    }
   }
+  setTimeout(pollTelegram, 3_000);
 }
 
-// ══ ملخص يومي الساعة 8:00 صباحاً (توقيت مدريد) ══
-async function dailySummary() {
-  try {
-    const today = new Date().toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid' });
-    if (stats.date !== today) { stats = { total: 0, long: 0, short: 0, bySymbol: {}, date: today }; }
+// ── Telegram command handler ──────────────────────────
+async function handleTgUpdate(upd) {
+  const msg = upd.message || upd.channel_post;
+  if (!msg?.text) return;
 
-    const calSummary = await todaySummary();
-    const bySymLine  = Object.entries(stats.bySymbol)
-      .map(([s, n]) => `   ${s}: ${n}`).join('\n') || '   لا يوجد';
+  const chat    = String(msg.chat.id);
+  const text    = msg.text.trim().split(' ')[0].split('@')[0];  // strip bot name + args
+  const isOwner = chat === String(OWNER_ID);
 
-    await tg(
-`🌅 <b>صباح الخير — ملخص اليوم</b>
-📅 ${today}
+  if (text === '/start') {
+    await tgSend(chat,
+`🤖 <b>SMC Trading Bot — مرحباً!</b>
 
-<b>📰 أخبار USD اليوم:</b>
-${calSummary}
+أنا بوت يستقبل إشارات من TradingView تلقائياً ويرسلها إليك.
 
-─────────────────
-<b>📊 إشارات أمس:</b>
+<b>📊 المؤشرات المتصلة:</b>
+• VWAP Bounce Pro — ارتداد من نطاقات VWAP
+• Kill Zone Sweep Pro — كسح السيولة في جلسات لندن ونيويورك
+
+<b>الأوامر:</b>
+/status — إحصائيات اليوم وحالة البوت
+/help   — دليل قراءة الإشارات
+${isOwner ? '\n🔐 <b>أنت المالك — صلاحيات كاملة</b>' : ''}`
+    );
+    return;
+  }
+
+  if (text === '/status') {
+    const session  = currentSession();
+    const today    = new Date().toISOString().slice(0, 10);
+    const srcLines = Object.entries(stats.bySource)
+      .map(([k, v]) => `   ${srcLabel(k)}: ${v}`)
+      .join('\n') || '   لا يوجد بعد';
+
+    await tgSend(chat,
+`📊 <b>حالة البوت</b>
+
+🟢 يعمل بشكل طبيعي
+🕐 ${session}
+📅 ${stats.date || today}
+
+<b>إشارات اليوم:</b>
 🔢 الإجمالي: ${stats.total}
 📈 LONG:  ${stats.long}   |   📉 SHORT: ${stats.short}
-${bySymLine}
 
-🤖 البوت يعمل — فحص كل 5 دقائق
-📊 الرموز: ${SYMBOLS.join(', ')}
-⏰ 1H Bias + 15M Structure + 5M Entry`
+<b>حسب المصدر:</b>
+${srcLines}
+
+⏱ Uptime: ${Math.round(process.uptime() / 60)} دقيقة
+📡 Webhook: <code>POST /webhook</code>
+📺 Channel: ${CHANNEL_ID ? '✅ مفعّل' : '❌ غير مفعّل'}`
     );
-    stats = { total: 0, long: 0, short: 0, bySymbol: {}, date: today };
-  } catch (e) { console.error('[Daily]', e.message); }
-}
-
-function scheduleDailySummary() {
-  const now  = new Date();
-  const next = new Date();
-  next.setHours(8, 0, 0, 0);
-  if (next <= now) next.setDate(next.getDate() + 1);
-  setTimeout(() => {
-    dailySummary();
-    setInterval(dailySummary, 86400000);
-  }, next - now);
-}
-
-// ══ بدء التشغيل ══════════════════════════════════
-console.log('═'.repeat(52));
-console.log('  🤖  Multi-Symbol Bot — EMA21 Bounce 3TF');
-console.log('═'.repeat(52));
-console.log(`  📊 Symbols : ${SYMBOLS.join(', ')}`);
-console.log(`  ⏱️  Check   : every 5 minutes`);
-console.log(`  ⏸️  Cooldown : 30 minutes per symbol`);
-console.log(`  📐 Strategy : 1H Bias + 15M + 5M Entry`);
-console.log(`  📱 Chat ID  : ${CHAT_ID}`);
-console.log('═'.repeat(52));
-
-tg(`🚀 <b>Trading Bot يعمل الآن</b>
-
-📊 <b>الرموز:</b> ${SYMBOLS.map(s => SYMBOL_NAMES[s] || s).join('\n         ')}
-📐 <b>الاستراتيجية:</b> EMA21 Bounce
-⏱ <b>3 Timeframes:</b> 1H + 15M + 5M
-🔍 <b>فحص:</b> كل 5 دقائق لكل رمز
-⏸ <b>Cooldown:</b> 30 دقيقة بين إشارات كل رمز
-📰 تقويم اقتصادي مدمج (تجنب الأخبار تلقائياً)
-
-<i>الإشارات تصل هنا مع تقييم الجودة ⭐</i>`).catch(() => {});
-
-dailySummary();
-scheduleDailySummary();
-check();
-setInterval(check, CHECK_MS);
-
-// ══ TradingView Webhook Handler ══════════════════
-async function handleTVWebhook(data) {
-  console.log('[TV Webhook]', JSON.stringify(data));
-
-  const { symbol, type, price, sl, tp1, tp2, rsi, atr } = data;
-  if (!symbol || !type || !price) {
-    console.log('[TV Webhook] ⚠️ بيانات ناقصة');
     return;
   }
 
-  const name    = SYMBOL_NAMES[symbol] || symbol;
-  const isBull  = type === 'LONG';
-  const risk    = sl ? Math.abs(price - sl) : 0;
-  const rr      = (risk > 0 && tp1) ? (Math.abs(tp1 - price) / risk).toFixed(1) : '?';
-  const session = currentSession();
+  if (text === '/help') {
+    await tgSend(chat,
+`❓ <b>دليل قراءة الإشارات</b>
 
-  await tg(
-`${isBull ? '📈' : '📉'} <b>${type} — ${name}</b>   📡 TradingView
+<b>مثال إشارة LONG:</b>
+📈 <b>LONG — MNQ</b>   ⭐⭐⭐
+💰 الدخول:  21,055.00
+🛑 SL:      21,020.00   (−35 pts)
+🎯 TP1:     21,125.00   (R:R 1:2)
+🎯 TP2:     21,160.00   (R:R 1:3)
 
-💰 الدخول:  <b>${price}</b>
-${sl  ? `🛑 SL:      <b>${sl}</b>   (−${risk.toFixed(0)} نقطة)` : ''}
-${tp1 ? `🎯 TP1:     <b>${tp1}</b>   (R:R ${rr}:1)` : ''}
-${tp2 ? `🎯 TP2:     <b>${tp2}</b>` : ''}
-${rsi ? `📊 RSI: ${rsi}${atr ? `   |   ATR: ${atr}` : ''}` : ''}
-🕐 ${session}   |   ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}
+<b>شرح الحقول:</b>
+• 💰 الدخول — سعر الدخول (فتح الشمعة التالية)
+• 🛑 SL — وقف الخسارة (تحت/فوق شمعة الإشارة)
+• 🎯 TP1 — هدف أول بعائد 2× المخاطرة
+• 🎯 TP2 — هدف ثاني بعائد 3× المخاطرة
+• ⭐ النجوم — جودة الإشارة (1-3 نجوم)
 
-<i>⚠️ إدارة المخاطر: لا تخاطر بأكثر من 1-2% من رأس المال</i>`
-  );
+<b>المصادر:</b>
+📊 VWAP Bounce — ارتداد من نطاق VWAP ± 1.5 ATR
+⚡ Kill Zone — كسح PDH/PDL في مناطق الجلسات
 
-  stats.total++;
-  type === 'LONG' ? stats.long++ : stats.short++;
-  stats.bySymbol[symbol] = (stats.bySymbol[symbol] || 0) + 1;
-  console.log(`[TV Webhook] ✅ إشارة أُرسلت — ${symbol} ${type} @ ${price}`);
+<b>أوقات أفضل الإشارات (UTC):</b>
+⭐ 07:00–11:00 — جلسة لندن
+⭐ 13:30–17:00 — جلسة نيويورك
+
+⚠️ <i>لا تخاطر بأكثر من 1-2% من رأس المال في صفقة واحدة</i>`
+    );
+    return;
+  }
 }
 
-// ══ HTTP Server (Health check + Webhook) ═════════
-createServer(async (req, res) => {
-  const url = new URL(req.url, `http://localhost`);
+// ── Morning briefing (07:00 UTC daily) ───────────────
+async function morningBriefing() {
+  const dayAr = new Date().toLocaleDateString('ar-EG', {
+    timeZone: 'UTC', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+  await broadcast(
+`🌅 <b>صباح الخير — جلسة جديدة</b>
+📅 ${dayAr}
 
-  // ── TradingView Webhook ──
+<b>🕐 جلسات اليوم (UTC):</b>
+🇬🇧 لندن:      07:00 – 11:00
+🔀 لندن/NY:   11:00 – 13:30
+🇺🇸 نيويورك:  13:30 – 17:00
+
+<b>⭐ أوقات أفضل الإشارات:</b>
+• 07:00–09:00 UTC  (فتح لندن — Kill Zone)
+• 13:30–15:30 UTC  (فتح نيويورك — Kill Zone)
+• طوال اليوم  07:00–20:00  (VWAP Bounce)
+
+🤖 البوت يعمل — ينتظر إشارات TradingView
+<i>تأكد أن تنبيهات TradingView مفعّلة على المؤشرَين</i>`
+  );
+}
+
+// ── Daily scheduler ───────────────────────────────────
+function scheduleAt(utcH, utcM, fn) {
+  const now  = new Date();
+  const fire = new Date();
+  fire.setUTCHours(utcH, utcM, 0, 0);
+  if (fire <= now) fire.setUTCDate(fire.getUTCDate() + 1);
+  setTimeout(() => { fn(); setInterval(fn, 86_400_000); }, fire - now);
+}
+
+// ── HTTP Server ───────────────────────────────────────
+createServer(async (req, res) => {
+  const url = new URL(req.url, 'http://x');
+
+  // TradingView alert webhook
   if (req.method === 'POST' && url.pathname === '/webhook') {
-    const token = req.headers['x-webhook-token'] || url.searchParams.get('token');
-    if (process.env.WEBHOOK_TOKEN && token !== process.env.WEBHOOK_TOKEN) {
-      res.writeHead(401);
-      return res.end('Unauthorized');
+    const tok = req.headers['x-webhook-token'] || url.searchParams.get('token');
+    if (process.env.WEBHOOK_TOKEN && tok !== process.env.WEBHOOK_TOKEN) {
+      res.writeHead(401); res.end('Unauthorized'); return;
     }
 
     let body = '';
-    req.on('data', chunk => { body += chunk; });
+    req.on('data', c => { body += c; });
     req.on('end', async () => {
       try {
-        const data = JSON.parse(body);
-        await handleTVWebhook(data);
-        res.writeHead(200);
-        res.end('OK');
+        const ok = await handleWebhook(body);
+        res.writeHead(ok !== false ? 200 : 400);
+        res.end(ok !== false ? 'OK' : 'Bad Request');
       } catch (e) {
-        console.error('[TV Webhook] ❌', e.message);
-        res.writeHead(400);
-        res.end('Bad Request');
+        console.error('[Webhook] ❌', e.message);
+        res.writeHead(500); res.end('Server Error');
       }
     });
     return;
   }
 
-  // ── Health check ──
+  // Health check / status page
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({
+    bot:      'SMC Trading Bot v3.0',
     status:   'running',
-    symbols:  SYMBOLS,
     session:  currentSession(),
     signals:  stats,
+    channel:  !!CHANNEL_ID,
     uptime:   Math.round(process.uptime()),
     time:     new Date().toISOString(),
-  }));
-}).listen(process.env.PORT || 3000, () => {
-  console.log(`  🌐 Health check + Webhook: port ${process.env.PORT || 3000}`);
+  }, null, 2));
+
+}).listen(PORT, () => {
+  console.log('═'.repeat(54));
+  console.log('  🤖  SMC Trading Bot v3.0 — Channel Edition');
+  console.log('═'.repeat(54));
+  console.log(`  📡 Webhook  : POST /webhook`);
+  console.log(`  📺 Channel  : ${CHANNEL_ID || '(none — owner DM only)'}`);
+  console.log(`  📱 Owner    : ${OWNER_ID}`);
+  console.log(`  🌐 Port     : ${PORT}`);
+  console.log('═'.repeat(54));
 });
+
+// ── Start ─────────────────────────────────────────────
+scheduleAt(7, 0, morningBriefing);
+pollTelegram();
+
+broadcast(
+`🚀 <b>SMC Trading Bot v3.0 — يعمل الآن</b>
+
+📡 جاهز لاستقبال إشارات TradingView على:
+<code>/webhook</code>
+
+<b>📊 المؤشرات:</b>
+• VWAP Bounce Pro (07:00–20:00 UTC)
+• Kill Zone Sweep Pro (لندن + نيويورك)
+
+📺 Channel: ${CHANNEL_ID ? '✅ مفعّل' : '⚠️ غير مفعّل — أضف CHANNEL_ID في Railway'}
+🌅 تقرير صباحي يومياً الساعة 07:00 UTC
+/help للمساعدة`
+).catch(() => {});

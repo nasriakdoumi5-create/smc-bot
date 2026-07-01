@@ -1,5 +1,5 @@
 //@version=5
-indicator("Kill Zone Sweep", overlay=true, max_bars_back=1000)
+indicator("Kill Zone Sweep Pro — by Nasri", overlay=true, max_bars_back=1000)
 
 rsiOB    = input.int(58,    "RSI Short")
 rsiOS    = input.int(42,    "RSI Long")
@@ -7,6 +7,7 @@ minWick  = input.float(0.25,"Min Wick/ATR", step=0.05)
 swingLen = input.int(8,     "Swing Length")
 coolBars = input.int(20,    "Cooldown bars")
 showKZ   = input.bool(true, "Show Kill Zones")
+symName  = input.string("MNQ", "Symbol Name (for webhook)")
 
 atr14 = ta.atr(14)
 rsi14 = ta.rsi(close, 14)
@@ -66,23 +67,22 @@ if sig_long
 if sig_short
     lastS := bar_index
 
-txt_long  = pts_long  >= 5 ? "▲ LONG 3" : pts_long  >= 3 ? "▲ LONG 2" : "▲ LONG 1"
-txt_short = pts_short >= 5 ? "▼ SHORT 3" : pts_short >= 3 ? "▼ SHORT 2" : "▼ SHORT 1"
+sl_long_v   = low  - atr14 * 0.1
+sl_short_v  = high + atr14 * 0.1
+tp_long_v   = close + (close - sl_long_v)  * 2
+tp_short_v  = close - (sl_short_v - close) * 2
+tp2_long_v  = close + (close - sl_long_v)  * 3
+tp2_short_v = close - (sl_short_v - close) * 3
 
-col_long  = pts_long  >= 5 ? color.new(#00c853,0) : pts_long  >= 3 ? color.new(#43a047,0) : color.new(#81c784,0)
-col_short = pts_short >= 5 ? color.new(#d50000,0) : pts_short >= 3 ? color.new(#e53935,0) : color.new(#ef9a9a,0)
-
-sl_long  = sig_long  ? low  - atr14 * 0.1 : na
-sl_short = sig_short ? high + atr14 * 0.1 : na
-tp_long  = sig_long  ? close + (close - sl_long)  * 2 : na
-tp_short = sig_short ? close - (sl_short - close) * 2 : na
+sl_long  = sig_long  ? sl_long_v  : na
+sl_short = sig_short ? sl_short_v : na
+tp_long  = sig_long  ? tp_long_v  : na
+tp_short = sig_short ? tp_short_v : na
 
 plot(pdh,       "PDH",    color.new(color.red,    35), 1, plot.style_stepline)
 plot(pdl,       "PDL",    color.new(color.green,  35), 1, plot.style_stepline)
 plot(prevAsiaH, "Asia H", color.new(color.orange, 40), 1, plot.style_stepline)
 plot(prevAsiaL, "Asia L", color.new(color.blue,   40), 1, plot.style_stepline)
-plot(lastSwH,   "Sw H",   color.new(color.red,    65), 1, plot.style_cross)
-plot(lastSwL,   "Sw L",   color.new(color.green,  65), 1, plot.style_cross)
 
 bgcolor(showKZ and inLonKZ ? color.new(color.orange, 90) : showKZ and inNYKZ ? color.new(color.teal, 90) : na, title="KZ")
 
@@ -98,23 +98,31 @@ plot(tp_long,  "TP L", color.new(color.green, 10), 1, plot.style_linebr)
 plot(sl_short, "SL S", color.new(color.red,   10), 1, plot.style_linebr)
 plot(tp_short, "TP S", color.new(color.green, 10), 1, plot.style_linebr)
 
-var table t = table.new(position.top_right, 2, 5, bgcolor=color.new(color.black,55), border_width=1)
-if barstate.islast
-    table.cell(t, 0, 0, "Zone", text_color=color.white, text_size=size.small)
-    table.cell(t, 1, 0, inLonKZ ? "London KZ" : inNYKZ ? "NY KZ" : "-", text_color=color.yellow, text_size=size.small)
-    table.cell(t, 0, 1, "PDH",  text_color=color.white, text_size=size.small)
-    table.cell(t, 1, 1, str.tostring(math.round(pdh, 2)), text_color=color.red, text_size=size.small)
-    table.cell(t, 0, 2, "PDL",  text_color=color.white, text_size=size.small)
-    table.cell(t, 1, 2, str.tostring(math.round(pdl, 2)), text_color=color.lime, text_size=size.small)
-    table.cell(t, 0, 3, "RSI",  text_color=color.white, text_size=size.small)
-    table.cell(t, 1, 3, str.tostring(math.round(rsi14, 1)), text_color=rsi14 >= rsiOB ? color.red : rsi14 <= rsiOS ? color.lime : color.gray, text_size=size.small)
-    table.cell(t, 0, 4, "S/L",  text_color=color.white, text_size=size.small)
-    table.cell(t, 1, 4, str.tostring(pts_short) + "/" + str.tostring(pts_long), text_color=color.yellow, text_size=size.small)
+// ── Webhook JSON Alerts ───────────────────────────
+kzName = inLonKZ ? "London KZ" : "NY KZ"
+starsL = pts_long  >= 5 ? "3" : pts_long  >= 3 ? "2" : "1"
+starsS = pts_short >= 5 ? "3" : pts_short >= 3 ? "2" : "1"
 
-alertcondition(sig_long  and pts_long  >= 5,                    "LONG 3",  "LONG_HQ")
-alertcondition(sig_long  and pts_long  >= 3 and pts_long  < 5, "LONG 2",  "LONG_MQ")
-alertcondition(sig_long  and pts_long  < 3,                     "LONG 1",  "LONG_LQ")
-alertcondition(sig_short and pts_short >= 5,                    "SHORT 3", "SHORT_HQ")
-alertcondition(sig_short and pts_short >= 3 and pts_short < 5, "SHORT 2", "SHORT_MQ")
-alertcondition(sig_short and pts_short < 3,                     "SHORT 1", "SHORT_LQ")
-alertcondition(sig_long or sig_short,                           "Signal",  "SIGNAL")
+if sig_long
+    alert('{"s":"' + symName + '","t":"LONG","p":' + str.tostring(math.round(close,2))
+         + ',"sl":'  + str.tostring(math.round(sl_long_v,2))
+         + ',"tp1":' + str.tostring(math.round(tp_long_v,2))
+         + ',"tp2":' + str.tostring(math.round(tp2_long_v,2))
+         + ',"r":'   + str.tostring(math.round(rsi14,1))
+         + ',"a":'   + str.tostring(math.round(atr14,2))
+         + ',"pts":' + str.tostring(pts_long)
+         + ',"q":'   + starsL
+         + ',"src":"kz_' + kzName + '"}',
+         alert.freq_once_per_bar_close)
+
+if sig_short
+    alert('{"s":"' + symName + '","t":"SHORT","p":' + str.tostring(math.round(close,2))
+         + ',"sl":'  + str.tostring(math.round(sl_short_v,2))
+         + ',"tp1":' + str.tostring(math.round(tp_short_v,2))
+         + ',"tp2":' + str.tostring(math.round(tp2_short_v,2))
+         + ',"r":'   + str.tostring(math.round(rsi14,1))
+         + ',"a":'   + str.tostring(math.round(atr14,2))
+         + ',"pts":' + str.tostring(pts_short)
+         + ',"q":'   + starsS
+         + ',"src":"kz_' + kzName + '"}',
+         alert.freq_once_per_bar_close)
