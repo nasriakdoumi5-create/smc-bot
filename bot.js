@@ -189,18 +189,21 @@ async function handleTgUpdate(upd) {
 
   if (text === '/start') {
     await tgSend(chat,
-`🤖 <b>SMC Trading Bot — مرحباً!</b>
+`🤖 <b>SMC Trading Bot v3.0</b>
 
-أنا بوت يستقبل إشارات من TradingView تلقائياً ويرسلها إليك.
+أستقبل إشارات من TradingView تلقائياً ويرسلها للقناة.
 
-<b>📊 المؤشرات المتصلة:</b>
+<b>📊 المؤشرات:</b>
 • VWAP Bounce Pro — ارتداد من نطاقات VWAP
-• Kill Zone Sweep Pro — كسح السيولة في جلسات لندن ونيويورك
+• Kill Zone Sweep Pro — كسح السيولة (لندن + NY)
 
 <b>الأوامر:</b>
-/status — إحصائيات اليوم وحالة البوت
-/help   — دليل قراءة الإشارات
-${isOwner ? '\n🔐 <b>أنت المالك — صلاحيات كاملة</b>' : ''}`
+/status  — إحصائيات اليوم وحالة البوت
+/help    — دليل قراءة الإشارات
+${isOwner ? `/test    — إرسال إشارة تجريبية ✅
+/setup   — خطوات إعداد TradingView Alerts
+/channel — معلومات القناة
+\n🔐 <b>أنت المالك</b>` : ''}`
     );
     return;
   }
@@ -260,6 +263,70 @@ ${srcLines}
 ⭐ 13:30–17:00 — جلسة نيويورك
 
 ⚠️ <i>لا تخاطر بأكثر من 1-2% من رأس المال في صفقة واحدة</i>`
+    );
+    return;
+  }
+
+  // Owner-only commands
+  if (!isOwner) return;
+
+  if (text === '/test') {
+    // Fire a test signal to verify owner DM + channel both receive it
+    const price = 21055;
+    const testPayload = JSON.stringify({
+      s: 'MNQ', t: 'LONG', p: price,
+      sl: price - 35, tp1: price + 70, tp2: price + 105,
+      r: 41.5, a: 25.0, v: 21040.00,
+      src: 'vwap_lower', q: 2,
+    });
+    // Bypass cooldown for test
+    delete lastSig['MNQ_LONG'];
+    await handleWebhook(testPayload);
+    await tgSend(chat, '✅ إشارة تجريبية أُرسلت — تحقق من القناة أيضاً');
+    return;
+  }
+
+  if (text === '/setup') {
+    await tgSend(chat,
+`⚙️ <b>إعداد TradingView Alerts</b>
+
+<b>الخطوة 1 — فتح المؤشر</b>
+TradingView → شارت MNQ/NQ (5M)
+→ Indicators → ابحث عن المؤشر → أضفه
+
+<b>الخطوة 2 — إنشاء Alert</b>
+اضغط ⏰ (Create Alert)
+Condition: اختر المؤشر
+Expiration: Open-ended
+☑️ Webhook URL:
+<code>https://smc-bot-production-70f3.up.railway.app/webhook</code>
+
+<b>المؤشر الأول — VWAP Bounce Pro</b>
+Alert name: VWAP MNQ
+
+<b>المؤشر الثاني — Kill Zone Sweep Pro</b>
+Alert name: Kill Zone MNQ
+
+<b>الخطوة 3 — اختبار</b>
+أرسل /test للتحقق أن القناة تعمل`
+    );
+    return;
+  }
+
+  if (text === '/channel') {
+    const info = CHANNEL_ID
+      ? `✅ مفعّل\nID: <code>${CHANNEL_ID}</code>`
+      : `❌ غير مفعّل\nأضف CHANNEL_ID في Railway Variables`;
+    await tgSend(chat,
+`📺 <b>معلومات القناة</b>
+
+${info}
+
+<b>إضافة القناة:</b>
+1. أنشئ قناة Telegram (Private)
+2. أضف البوت كـ Administrator
+3. Railway → Variables → أضف:
+   <code>CHANNEL_ID = -100xxxxxxxxxx</code>`
     );
     return;
   }
