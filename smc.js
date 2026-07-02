@@ -230,7 +230,7 @@ export function analyze(bars5m, bars1h, dom = null, of = null) {
   const price = last.close;
   let signal = null;
 
-  if (scoreLong >= 5 && scoreLong > scoreShort) {
+  if (scoreLong >= 4 && scoreLong > scoreShort) {
     const sl  = bullOB_bot ? bullOB_bot - curATR : price - curATR * 2;
     const risk = Math.abs(price - sl);
     signal = {
@@ -245,7 +245,7 @@ export function analyze(bars5m, bars1h, dom = null, of = null) {
       rsi:    +curRSI.toFixed(1),
       conditions: { htfBull, sessionOk, recentSweepDown, inBullOB, recentBullFVG, fibOTE_bull, rsiOversold, positiveDelta, ofBuyImbalance, bullDivergence }
     };
-  } else if (scoreShort >= 5 && scoreShort > scoreLong) {
+  } else if (scoreShort >= 4 && scoreShort > scoreLong) {
     const sl  = bearOB_top ? bearOB_top + curATR : price + curATR * 2;
     const risk = Math.abs(sl - price);
     signal = {

@@ -34,7 +34,7 @@ function isTradingHours() {
 // ── نسبة النجاح من الـ score (10 شروط) ───────
 function winRate(score) {
   // 5/10 = 50%، 7/10 = 70%، 10/10 = 95%
-  return Math.min(95, Math.round(50 + (score - 5) * 9));
+  return Math.min(95, Math.round(50 + (score - 4) * 7));
 }
 
 // ── تسمية الجلسة ─────────────────────────────
