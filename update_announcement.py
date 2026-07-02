@@ -3,7 +3,7 @@ NasriTools - Shop Announcement Updater
 Updates the Etsy shop announcement with current promotions.
 Edit ANNOUNCEMENT below and run: python update_announcement.py
 """
-import json, os, time, requests
+import json, os, time, requests, urllib.parse
 from pathlib import Path
 
 CLIENT_ID  = "pluc0garrgcjzhim0hawxf0k"
@@ -61,10 +61,11 @@ def main():
     print(f"{'='*60}\n")
 
     print("  Updating shop announcement…", end=" ")
-    r = requests.put(
+    r = requests.patch(
         f"https://api.etsy.com/v3/application/shops/{SHOP_ID}",
-        headers={**auth_headers(token), "Content-Type": "application/json"},
-        json={"announcement": ANNOUNCEMENT},
+        headers={**auth_headers(token),
+                 "Content-Type": "application/x-www-form-urlencoded"},
+        data=f"announcement={urllib.parse.quote(ANNOUNCEMENT, safe='')}",
         timeout=30,
     )
 
@@ -73,6 +74,19 @@ def main():
         print(f"\n  Announcement updated successfully!")
     else:
         print(f"✗  {r.status_code}: {r.text[:200]}")
+        # Etsy sometimes needs Content-Type omitted
+        if r.status_code in (400, 404, 405):
+            print("  Retrying with JSON body...")
+            r2 = requests.patch(
+                f"https://api.etsy.com/v3/application/shops/{SHOP_ID}",
+                headers={**auth_headers(token), "Content-Type": "application/json"},
+                json={"announcement": ANNOUNCEMENT},
+                timeout=30,
+            )
+            if r2.ok:
+                print("  ✓ Retry succeeded!")
+            else:
+                print(f"  ✗ Retry also failed ({r2.status_code}): {r2.text[:150]}")
 
     print(f"\n{'='*60}\n")
 

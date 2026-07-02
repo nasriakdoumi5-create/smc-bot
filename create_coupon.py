@@ -3,7 +3,7 @@ create_coupon.py
 Creates a 100% discount coupon on Etsy for sending to friends/family
 to get the first reviews.
 """
-import json, os, time, requests
+import json, os, time, requests, urllib.parse
 from pathlib import Path
 
 CLIENT_ID  = "pluc0garrgcjzhim0hawxf0k"
@@ -41,17 +41,29 @@ def main():
     token = get_token()
     print(f"\nCreating coupon: {COUPON_CODE} ({PCT_DISCOUNT}% off)")
 
+    # Try form-encoded first (required by some Etsy endpoints)
+    payload = (
+        f"coupon_code={urllib.parse.quote(COUPON_CODE, safe='')}"
+        f"&pct_discount={PCT_DISCOUNT}"
+        f"&seller_active=true"
+        f"&free_shipping={'true' if FREE_SHIPPING else 'false'}"
+    )
     r = requests.post(
         f"https://api.etsy.com/v3/application/shops/{SHOP_ID}/discount_codes",
-        headers=auth_headers(token),
-        json={
-            "coupon_code":    COUPON_CODE,
-            "pct_discount":   PCT_DISCOUNT,
-            "seller_active":  True,
-            "free_shipping":  FREE_SHIPPING,
-        },
+        headers={**auth_headers(token),
+                 "Content-Type": "application/x-www-form-urlencoded"},
+        data=payload,
         timeout=30,
     )
+    # Fallback to JSON if form-encoding fails
+    if not r.ok and r.status_code in (400, 415, 422):
+        r = requests.post(
+            f"https://api.etsy.com/v3/application/shops/{SHOP_ID}/discount_codes",
+            headers={**auth_headers(token), "Content-Type": "application/json"},
+            json={"coupon_code": COUPON_CODE, "pct_discount": PCT_DISCOUNT,
+                  "seller_active": True, "free_shipping": FREE_SHIPPING},
+            timeout=30,
+        )
 
     if r.ok:
         data = r.json()

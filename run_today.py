@@ -16,6 +16,18 @@ After this script: run generate_all_missing_images.py to fill image gaps.
 import subprocess, sys, time
 from pathlib import Path
 
+def git_pull():
+    """Pull latest scripts from remote before running anything."""
+    print("\n  Pulling latest scripts from GitHub...", end=" ", flush=True)
+    result = subprocess.run(
+        ["git", "pull", "origin", "claude/digital-products-knowledge-yzpw50"],
+        capture_output=True, text=True)
+    if result.returncode == 0:
+        print("✓")
+    else:
+        print(f"⚠  git pull failed — continuing with local files")
+        print(f"  ({result.stderr.strip()[:120]})")
+
 SCRIPTS = [
     ("Fix Sections + Sale Message",   "fix_setup.py"),
     ("Update Shop Announcement",      "update_announcement.py"),
@@ -34,6 +46,8 @@ def main():
     print("=" * 65)
     print("  NasriTools — Daily Task Runner")
     print("=" * 65)
+
+    git_pull()
 
     results = []
     for label, script in SCRIPTS:

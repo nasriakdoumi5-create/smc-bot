@@ -415,7 +415,7 @@ def get_all_listings(token):
 
 def get_listing_images(token, lid):
     r = requests.get(
-        f"https://api.etsy.com/v3/listings/{lid}/images",
+        f"https://api.etsy.com/v3/application/listings/{lid}/images",
         headers=auth_headers(token), timeout=20)
     return r.json().get("results", []) if r.ok else []
 
