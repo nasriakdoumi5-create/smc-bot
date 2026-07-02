@@ -199,18 +199,21 @@ def save_as_gif(frames, path):
     )
 
 def save_as_mp4(frames, path):
-    """Try to save as MP4 using imageio. Returns True if successful."""
+    """Save as MP4 using imageio+ffmpeg. Returns (path, True) or (gif_path, False)."""
+    mp4_path = Path(str(path).replace(".gif", ".mp4"))
     try:
         import imageio
+        import imageio.plugins.ffmpeg  # noqa — triggers ffmpeg download if needed
         import numpy as np
-        mp4_path = str(path).replace(".gif",".mp4")
-        writer = imageio.get_writer(mp4_path, fps=2, quality=8, macro_block_size=None)
+        writer = imageio.get_writer(str(mp4_path), fps=2, quality=8,
+                                    codec="libx264", macro_block_size=None,
+                                    output_params=["-pix_fmt", "yuv420p"])
         for frame in frames:
             writer.append_data(np.array(frame.convert("RGB")))
         writer.close()
-        return Path(mp4_path), True
+        return mp4_path, True
     except Exception as e:
-        print(f"    MP4 failed ({e}) — using GIF")
+        print(f"    MP4 failed ({e})")
         return path, False
 
 
@@ -241,17 +244,19 @@ def get_all_listings(token):
         offset+=100; time.sleep(0.3)
     return listings
 
-def upload_video(token, lid, path):
-    """Upload MP4 or GIF as listing video."""
-    mime = "video/mp4" if str(path).endswith(".mp4") else "image/gif"
+def upload_video(token, lid, path, name):
+    """Upload MP4 as listing video. GIF not accepted by Etsy video endpoint."""
+    if not str(path).endswith(".mp4"):
+        return False, 0, "GIF not supported — need MP4"
     try:
         with open(path,"rb") as f:
             r = requests.post(
                 f"{API}/shops/{SHOP_ID}/listings/{lid}/videos",
                 headers=auth_headers(token),
-                files={"video":(path.name,f,mime)},
+                files={"video": (path.name, f, "video/mp4")},
+                data={"name": name},
                 timeout=120)
-        return r.ok, r.status_code, r.text[:100]
+        return r.ok, r.status_code, r.text[:150]
     except Exception as e:
         return False, 0, str(e)
 
@@ -300,18 +305,23 @@ def main():
             print(f"    GEN-FAIL: {e}")
             fail += 1; continue
 
-        # Try MP4, fall back to GIF
-        gif_path = OUT_DIR / f"video_{lid}.gif"
+        # Try MP4 (required by Etsy), save GIF as local backup only
+        gif_path  = OUT_DIR / f"video_{lid}.gif"
         video_path, is_mp4 = save_as_mp4(frames, gif_path)
-        if not is_mp4:
-            save_as_gif(frames, gif_path)
-            video_path = gif_path
-        fmt = "MP4" if is_mp4 else "GIF"
-        print(f"→ {fmt}", end=" ")
 
-        # Upload to Etsy
+        if not is_mp4:
+            # Save GIF for manual use, skip upload
+            save_as_gif(frames, gif_path)
+            print(f"→ GIF saved (manual upload needed)")
+            fail += 1
+            continue
+
+        print(f"→ MP4", end=" ")
+
+        # Upload MP4 to Etsy
+        video_name = title.split("|")[0].strip()[:50]
         token = get_token()
-        v_ok, code, txt = upload_video(token, lid, video_path)
+        v_ok, code, txt = upload_video(token, lid, video_path, video_name)
         if v_ok:
             print(f"→ Uploaded ✅")
             ok += 1
