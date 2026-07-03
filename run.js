@@ -70,7 +70,7 @@ function loadState() {
   try {
     if (existsSync(STATE_FILE)) return JSON.parse(readFileSync(STATE_FILE, 'utf8'));
   } catch {}
-  return { signals: {}, lastNewsKey: '', dailyLoss: 0, dailyDate: '', tradesLeft: 12 };
+  return { signals: {}, lastNewsKey: '', dailyLoss: 0, dailyDate: '' };
 }
 
 function checkDailyReset(state) {
@@ -158,13 +158,6 @@ async function checkSymbol(symbol, state) {
     return;
   }
 
-  // عدد الصفقات المتبقية
-  if ((state.tradesLeft ?? 12) <= 0) {
-    console.log(`[${symbol}] ⛔ انتهت الصفقات المتاحة للحساب`);
-    await tg('🚨 <b>تحذير: انتهت الصفقات المتاحة</b>\nالحساب وصل لحد الخسارة الأقصى — لا تفتح صفقات جديدة').catch(() => {});
-    return;
-  }
-
   if (await isNewsTime()) {
     console.log(`[${symbol}] خبر جارٍ — تجاهل`);
     return;
@@ -175,7 +168,6 @@ async function checkSymbol(symbol, state) {
 
   state.signals[symbol] = { key: sigKey, time: now };
   state.dailyLoss  = (state.dailyLoss  || 0) + RISK_PER_TRADE;
-  state.tradesLeft = (state.tradesLeft ?? 12) - 1;
 
   // ── حساب العقود ──────────────────────────
   const calc       = calcContracts(symbol, signal.price, signal.sl);
@@ -263,8 +255,7 @@ ${condList}`;
 نقطة:   <b>$${pointVal} / عقد</b>
 ━━━━━━━━━━━━━━━━━━━━
 📋 <b>حالة الحساب</b>
-صفقات اليوم: خسارة $${state.dailyLoss} / $${DAILY_STOP_LOSS}
-متبقي كلياً: <b>${state.tradesLeft} صفقة</b> قبل الحد الأقصى
+خسارة اليوم: $${state.dailyLoss} / $${DAILY_STOP_LOSS}
 
 ⚠️ <i>القرار النهائي لك — تحقق من الشارت قبل الدخول</i>
 🕐 ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })} (إسبانيا)`
