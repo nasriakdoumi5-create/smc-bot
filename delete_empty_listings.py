@@ -1,6 +1,6 @@
 """
 delete_empty_listings.py
-Deletes the 3 listings that have no download files.
+Deactivates the 3 listings that have no download files.
 """
 import json, os, time, requests
 from pathlib import Path
@@ -34,33 +34,35 @@ def auth_headers(token):
     return {"Authorization": "Bearer " + token["access_token"],
             "x-api-key": CLIENT_ID + ":" + SECRET}
 
-def delete_listing(token, lid):
-    r = requests.delete(
+def deactivate_listing(token, lid):
+    r = requests.patch(
         f"{API}/shops/{SHOP_ID}/listings/{lid}",
-        headers=auth_headers(token),
+        headers={**auth_headers(token),
+                 "Content-Type": "application/x-www-form-urlencoded"},
+        data="state=inactive",
         timeout=30,
     )
     return r.ok, r.status_code
 
 def main():
     print("=" * 55)
-    print("  Deleting 3 listings with no files")
+    print("  Deactivating 3 listings with no files")
     print("=" * 55)
 
     token = get_token()
 
     for lid, title in TO_DELETE:
         print(f"\n  [{lid}] {title[:45]}")
-        print(f"  Deleting...", end=" ", flush=True)
-        ok, code = delete_listing(token, lid)
+        print(f"  Deactivating...", end=" ", flush=True)
+        ok, code = deactivate_listing(token, lid)
         if ok:
-            print(f"DELETED ✓")
+            print(f"DEACTIVATED ✓")
         else:
             print(f"FAILED ({code})")
         time.sleep(1)
 
     print(f"\n{'=' * 55}")
-    print("  Done.")
+    print("  Done — listings hidden from store.")
 
 if __name__ == "__main__":
     main()
