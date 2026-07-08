@@ -1,6 +1,6 @@
 """
 organize_store_sections.py
-Creates 8 professional sections and assigns all 116 listings to the right section.
+Clears old sections, creates 8 professional sections, assigns all 116 listings.
 """
 import json, os, time, requests
 from pathlib import Path
@@ -11,7 +11,6 @@ SHOP_ID    = 66526082
 TOKEN_FILE = Path(os.path.expanduser("~")) / "etsy_token.json"
 API        = "https://api.etsy.com/v3/application"
 
-# 8 professional sections
 SECTIONS = [
     "Budget & Finance",
     "Business & Growth",
@@ -23,7 +22,6 @@ SECTIONS = [
     "Complete Bundles",
 ]
 
-# Map product type → section
 TYPE_TO_SECTION = {
     "budget":      "Budget & Finance",
     "invoice":     "Budget & Finance",
@@ -89,7 +87,7 @@ def detect_type(title):
         return "content"
     if any(x in t for x in ["project", "task", "team", "agile", "sprint", "gantt"]):
         return "project"
-    if any(x in t for x in ["inventory", "stock", "product", "ecommerce", "shop tracker"]):
+    if any(x in t for x in ["inventory", "stock", "product", "ecommerce", "shop tracker", "etsy shop", "etsy seller", "pod"]):
         return "inventory"
     if any(x in t for x in ["real estate", "property", "rental", "lease"]):
         return "realestate"
@@ -107,8 +105,13 @@ def get_existing_sections(token):
     r = requests.get(f"{API}/shops/{SHOP_ID}/sections",
                      headers=auth_headers(token), timeout=15)
     if r.ok:
-        return {s["title"]: s["shop_section_id"] for s in r.json().get("results", [])}
-    return {}
+        return r.json().get("results", [])
+    return []
+
+def delete_section(token, sid):
+    r = requests.delete(f"{API}/shops/{SHOP_ID}/sections/{sid}",
+                        headers=auth_headers(token), timeout=15)
+    return r.ok, r.status_code
 
 def create_section(token, title):
     r = requests.post(f"{API}/shops/{SHOP_ID}/sections",
@@ -116,11 +119,10 @@ def create_section(token, title):
                       json={"title": title}, timeout=15)
     if r.ok:
         return r.json().get("shop_section_id")
-    print(f"    ERROR creating '{title}': {r.status_code}")
+    print(f"    ERROR creating '{title}': {r.status_code} {r.text[:80]}")
     return None
 
 def assign_section(token, lid, section_id):
-    import urllib.parse
     r = requests.patch(
         f"{API}/shops/{SHOP_ID}/listings/{lid}",
         headers={**auth_headers(token), "Content-Type": "application/x-www-form-urlencoded"},
@@ -152,31 +154,55 @@ def main():
 
     token = get_token()
 
-    # Step 1: Get or create sections
-    print("\n[1] Setting up sections...")
-    section_ids = get_existing_sections(token)
-    print(f"    Found {len(section_ids)} existing sections")
+    # Step 1: Get all existing sections
+    print("\n[1] Getting existing sections...")
+    existing = get_existing_sections(token)
+    print(f"    Found {len(existing)} sections:")
+    for s in existing:
+        print(f"      [{s['shop_section_id']}] {s['title']}")
 
-    for title in SECTIONS:
-        if title in section_ids:
-            print(f"    EXISTS: {title} (id={section_ids[title]})")
+    # Step 2: Delete old sections that are NOT in our 8
+    print(f"\n[2] Removing old sections (keeping only our 8)...")
+    keep_titles = set(SECTIONS)
+    section_ids = {}
+
+    for s in existing:
+        if s["title"] in keep_titles:
+            section_ids[s["title"]] = s["shop_section_id"]
+            print(f"    KEEP: {s['title']}")
         else:
-            print(f"    CREATING: {title}...", end=" ", flush=True)
+            print(f"    DELETE: {s['title']}...", end=" ", flush=True)
+            ok, code = delete_section(token, s["shop_section_id"])
+            print("OK" if ok else f"FAIL ({code})")
+            time.sleep(0.4)
+
+    # Step 3: Create missing sections
+    print(f"\n[3] Creating missing sections...")
+    for title in SECTIONS:
+        if title not in section_ids:
+            print(f"    CREATE: {title}...", end=" ", flush=True)
+            token = get_token()
             sid = create_section(token, title)
             if sid:
                 section_ids[title] = sid
                 print(f"OK (id={sid})")
+            else:
+                print("FAILED")
             time.sleep(0.5)
+        else:
+            print(f"    EXISTS: {title} (id={section_ids[title]})")
 
-    # Step 2: Get all listings
-    print(f"\n[2] Fetching all listings...")
+    print(f"\n    Active sections: {list(section_ids.keys())}")
+
+    # Step 4: Get all listings
+    print(f"\n[4] Fetching all listings...")
     token = get_token()
     listings = get_all_listings(token)
     total = len(listings)
     print(f"    {total} listings found\n")
 
-    # Step 3: Assign each listing to the right section
-    print("[3] Assigning listings to sections...\n")
+    # Step 5: Assign each listing
+    print("[5] Assigning listings to sections...\n")
     ok = fail = already = 0
 
     for idx, l in enumerate(listings, 1):
@@ -189,17 +215,16 @@ def main():
         sid     = section_ids.get(section)
 
         if not sid:
-            print(f"  [{idx:3}/{total}] SKIP (no section id): {title[:40]}")
+            print(f"  [{idx:3}/{total}] SKIP (no section): {title[:45]}")
             continue
 
         if current_section == sid:
             already += 1
             print(f"  [{idx:3}/{total}] [{section[:20]:20}] {title[:35]}... already")
-            time.sleep(0.1)
+            time.sleep(0.05)
             continue
 
         print(f"  [{idx:3}/{total}] [{section[:20]:20}] {title[:35]}...", end=" ", flush=True)
-
         token = get_token()
         success, code = assign_section(token, lid, sid)
 
@@ -210,12 +235,12 @@ def main():
             print(f"FAIL ({code})")
             fail += 1
 
-        time.sleep(0.6)
-        if idx % 20 == 0:
+        time.sleep(0.5)
+        if idx % 25 == 0:
             token = get_token()
 
     print(f"\n{'=' * 65}")
-    print(f"  Sections created : {len(section_ids)}")
+    print(f"  Sections ready   : {len(section_ids)}/8")
     print(f"  Assigned OK      : {ok}")
     print(f"  Already correct  : {already}")
     print(f"  Failed           : {fail}")
