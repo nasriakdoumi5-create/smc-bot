@@ -357,6 +357,7 @@ ${info}
 }
 
 // ── Morning briefing (07:00 UTC daily) ───────────────
+// Owner DM only — the channel receives trading signals exclusively
 async function morningBriefing() {
   const dayAr = new Date().toLocaleDateString('ar-EG', {
     timeZone: 'UTC', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -366,7 +367,7 @@ async function morningBriefing() {
   const gex = await getGEX().catch(() => null);
   const gexBlock = gex ? `\n${formatGEX(gex)}\n` : '';
 
-  await broadcast(
+  await tgSend(OWNER_ID,
 `🌅 <b>صباح الخير — جلسة جديدة</b>
 📅 ${dayAr}
 ${gexBlock}
@@ -446,7 +447,7 @@ createServer(async (req, res) => {
 scheduleAt(7, 0, morningBriefing);
 pollTelegram();
 
-broadcast(
+tgSend(OWNER_ID,
 `🚀 <b>SMC Trading Bot v3.0 — يعمل الآن</b>
 
 📡 جاهز لاستقبال إشارات TradingView على:
