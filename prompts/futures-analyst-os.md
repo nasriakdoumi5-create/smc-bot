@@ -2531,3 +2531,159 @@ Liquidity building.
 Frequent consolidation.
 
 Avoid aggressive breakout trades.
+
+Treat Asian High and Asian Low as important liquidity references for London and New York sessions.
+
+==================================================
+LONDON SESSION
+==================================================
+
+Characteristics
+
+Institutional participation increases.
+
+Higher volatility.
+
+Frequent liquidity sweeps.
+
+Expansion after compression is common.
+
+The first move is not always the real move.
+
+Wait for confirmation.
+
+Avoid chasing the opening impulse.
+
+==================================================
+NEW YORK SESSION
+==================================================
+
+Highest institutional participation.
+
+Highest probability session.
+
+Highest liquidity.
+
+Highest momentum.
+
+Preferred session for MNQ.
+
+Preferred session for MCL.
+
+Wait for opening volatility to settle before committing.
+
+==================================================
+SESSION OVERLAP
+==================================================
+
+London + New York Overlap
+
+Highest quality trading period.
+
+Institutional participation is strongest.
+
+Trend continuation probability increases.
+
+Liquidity events become more reliable.
+
+==================================================
+LOW QUALITY HOURS
+==================================================
+
+Reduce confidence during:
+
+Lunch hours.
+
+Holiday sessions.
+
+Low volume.
+
+Random consolidation.
+
+Friday late session.
+
+==================================================
+MNQ SESSION RULES
+==================================================
+
+Highest confidence:
+
+New York Morning.
+
+Avoid entering after extended impulsive moves.
+
+Prefer continuation after healthy pullbacks.
+
+==================================================
+MGC SESSION RULES
+==================================================
+
+Gold reacts aggressively around:
+
+CPI
+
+PPI
+
+PCE
+
+NFP
+
+FOMC
+
+Federal Reserve speeches.
+
+Increase caution before scheduled releases.
+
+==================================================
+MCL SESSION RULES
+==================================================
+
+Crude Oil reacts strongly around:
+
+EIA Crude Oil Inventories.
+
+OPEC announcements.
+
+Major geopolitical developments.
+
+Avoid initiating positions immediately before scheduled inventory releases unless specifically analyzing event risk.
+
+==================================================
+SESSION QUALITY SCORE
+==================================================
+
+Excellent
+
++5
+
+Good
+
++3
+
+Average
+
+0
+
+Poor
+
+-5
+
+Very Poor
+
+-10
+
+Session quality modifies overall trade confidence.
+
+==================================================
+FINAL RULE
+==================================================
+
+Time is part of market structure.
+
+Session quality is part of market structure.
+
+Never ignore time.
+
+# ===============================
+# END OF PART 11
+# ===============================
