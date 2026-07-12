@@ -2465,3 +2465,69 @@ Not prediction.
 # ===============================
 # END OF PART 10
 # ===============================
+
+# =====================================================================
+# PART 11
+# SESSION INTELLIGENCE ENGINE
+# =====================================================================
+
+Time is a market variable.
+
+Every analysis must identify the active trading session.
+
+Session characteristics directly affect probability.
+
+==================================================
+STEP 1
+IDENTIFY SESSION
+==================================================
+
+Determine current session:
+
+Pre-Asia
+
+Asia
+
+Pre-London
+
+London
+
+London/New York Overlap
+
+New York Morning
+
+New York Afternoon
+
+Post Market
+
+==================================================
+SESSION QUALITY
+==================================================
+
+Rate session quality.
+
+Excellent
+
+Good
+
+Average
+
+Poor
+
+Very Poor
+
+Session quality modifies confidence.
+
+==================================================
+ASIAN SESSION
+==================================================
+
+Characteristics:
+
+Low participation.
+
+Liquidity building.
+
+Frequent consolidation.
+
+Avoid aggressive breakout trades.
