@@ -1,6 +1,13 @@
 """
 update_prices.py
-Updates strategic prices per the Premium Positioning plan.
+Reprices all 116 NasriTools listings to market-appropriate tiers.
+
+Tiers:
+  BUNDLE_L  €19.99 — complete systems / large bundles (5+ products)
+  BUNDLE_S   €9.99 — small bundles / kits (2-4 products)
+  PREMIUM    €7.99 — advanced dashboards, CRM, full managers
+  STANDARD   €4.99 — multi-feature planners & trackers
+  BASIC      €2.99 — simple single-feature templates
 """
 import json, os, time, requests, urllib.parse
 from pathlib import Path
@@ -11,20 +18,11 @@ SHOP_ID    = 66526082
 TOKEN_FILE = Path(os.path.expanduser("~")) / "etsy_token.json"
 API        = "https://api.etsy.com/v3/application"
 
-# keyword → (new_price_cents, currency)
-PRICE_MAP = [
-    (["kpi dashboard", "kpi spread"],              2499, "EUR"),
-    (["complete life system", "all 10 templa"],    5499, "EUR"),
-    (["finance bundle", "budget + invoice"],        4999, "EUR"),
-    (["restaurant manager", "restaurant tracker"], 2999, "EUR"),
-    (["real estate deal", "real estate tracker"],  2499, "EUR"),
-    (["startup financial"],                         2499, "EUR"),
-    (["construction"],                              2499, "EUR"),
-    (["law firm"],                                  2499, "EUR"),
-    (["amazon fba"],                                2499, "EUR"),
-    (["budget tracker", "budget & expense",
-      "budget spreadsheet"],                        1999, "EUR"),
-]
+BUNDLE_L = 19.99
+BUNDLE_S =  9.99
+PREMIUM  =  7.99
+STANDARD =  4.99
+BASIC    =  2.99
 
 def get_token():
     t = json.loads(TOKEN_FILE.read_text())
@@ -43,81 +41,125 @@ def auth_headers(token):
     return {"Authorization": "Bearer " + token["access_token"],
             "x-api-key": CLIENT_ID + ":" + SECRET}
 
+def detect_tier(title):
+    t = title.lower()
+    if any(x in t for x in [
+        "complete system", "complete life", "complete finance", "complete business",
+        "all-in-one", "all in one", "mega bundle", "ultimate bundle",
+        "full bundle", "complete kit", "full system", "all 10", "all 5",
+    ]):
+        return BUNDLE_L, "BUNDLE_L"
+    if any(x in t for x in [
+        "bundle", " kit", " pack", "collection", "combo",
+    ]):
+        return BUNDLE_S, "BUNDLE_S"
+    if any(x in t for x in [
+        "dashboard", "crm", "kpi", "business intelligence",
+        "restaurant manager", "hr system", "real estate analyzer",
+        "investment tracker", "pipeline", "sales tracker",
+        "ecommerce tracker", "pod tracker", "financial model",
+        "cash flow forecast", "profit loss", "p&l",
+        "complete", "advanced", "professional", "pro ",
+        "automated", "full suite", "business manager",
+        "freelance business", "startup financial",
+    ]):
+        return PREMIUM, "PREMIUM"
+    if any(x in t for x in [
+        "planner", "manager", "system", "tracker",
+        "organizer", "calendar", "schedule",
+        "invoice", "billing", "client tracker",
+        "meal plan", "workout plan", "training plan",
+        "content calendar", "social media",
+        "budget planner", "expense tracker",
+        "project tracker", "task manager",
+        "inventory", "stock tracker",
+        "travel planner", "event planner",
+        "student planner", "study planner",
+    ]):
+        return STANDARD, "STANDARD"
+    return BASIC, "BASIC"
+
 def get_all_listings(token):
     listings, offset = [], 0
     while True:
         r = requests.get(f"{API}/shops/{SHOP_ID}/listings/active",
                          headers=auth_headers(token),
-                         params={"limit": 100, "offset": offset})
-        if not r.ok: break
+                         params={"limit": 100, "offset": offset}, timeout=30)
+        if not r.ok:
+            print(f"Error: {r.status_code}")
+            break
         results = r.json().get("results", [])
         listings.extend(results)
-        if len(results) < 100: break
+        if len(results) < 100:
+            break
         offset += 100
+        time.sleep(0.3)
     return listings
 
-def get_target_price(title_lower):
-    for keywords, cents, currency in PRICE_MAP:
-        if any(k in title_lower for k in keywords):
-            return cents, currency
-    return None, None
-
-def update_price(token, lid, price_cents, currency):
-    data = urllib.parse.urlencode({
-        "price": str(price_cents / 100),
-    })
+def update_price(token, lid, new_price):
     r = requests.patch(
         f"{API}/shops/{SHOP_ID}/listings/{lid}",
         headers={**auth_headers(token), "Content-Type": "application/x-www-form-urlencoded"},
-        data=data, timeout=30,
+        data=f"price={urllib.parse.quote(str(new_price))}",
+        timeout=30,
     )
     return r.ok, r.status_code
 
 def main():
     print("=" * 65)
-    print("  NasriTools — Strategic Price Update")
+    print("  NasriTools — Price Updater")
+    print("  Repricing all listings to market tiers")
     print("=" * 65)
-    token = get_token()
+
+    token    = get_token()
     listings = get_all_listings(token)
-    print(f"[*] Found {len(listings)} listings\n")
+    total    = len(listings)
+    print(f"[*] {total} listings found\n")
 
-    ok = skip = fail = 0
-    for l in listings:
+    updated = skipped = failed = 0
+    tier_counts = {}
+
+    for idx, l in enumerate(listings, 1):
         lid   = l["listing_id"]
-        title = l["title"]
-        tl    = title.lower()
-
+        title = l.get("title", "")
         price_raw = l.get("price", {})
-        if isinstance(price_raw, dict):
-            current = float(price_raw.get("amount", 0)) / max(price_raw.get("divisor", 100), 1)
-        else:
-            current = float(price_raw or 0)
+        current = float(price_raw.get("amount", 0)) / max(price_raw.get("divisor", 100), 1)
 
-        target_cents, currency = get_target_price(tl)
-        if target_cents is None:
-            skip += 1
+        new_price, tier = detect_tier(title)
+        tier_counts[tier] = tier_counts.get(tier, 0) + 1
+
+        if abs(current - new_price) < 0.02:
+            skipped += 1
+            print(f"  [{idx:3}/{total}] SKIP  €{current:.2f} ({tier}): {title[:45]}")
+            time.sleep(0.05)
             continue
 
-        target = target_cents / 100
-        if abs(current - target) < 0.01:
-            print(f"  [SAME]  €{current:.2f}  {title[:45]}")
-            skip += 1
-            continue
+        print(f"  [{idx:3}/{total}] [{tier:8}] €{current:.2f} → €{new_price:.2f} | {title[:38]}...", end=" ", flush=True)
 
-        print(f"  [FIX]   €{current:.2f} → €{target:.2f}  {title[:40]} ...", end=" ", flush=True)
         token = get_token()
-        r_ok, code = update_price(token, lid, target_cents, currency)
-        if r_ok:
-            print("OK")
-            ok += 1
+        ok, code = update_price(token, lid, new_price)
+        if ok:
+            print("✓")
+            updated += 1
         else:
-            print(f"FAIL ({code})")
-            fail += 1
-        time.sleep(0.8)
+            print(f"✗ ({code})")
+            failed += 1
 
-    print(f"\n{'='*65}")
-    print(f"  Updated: {ok} | Skipped/Same: {skip} | Failed: {fail}")
-    print(f"{'='*65}")
+        time.sleep(0.8)
+        if idx % 20 == 0:
+            token = get_token()
+
+    tier_prices = {"BASIC": BASIC, "STANDARD": STANDARD, "PREMIUM": PREMIUM,
+                   "BUNDLE_S": BUNDLE_S, "BUNDLE_L": BUNDLE_L}
+
+    print(f"\n{'=' * 65}")
+    print(f"  Updated : {updated}")
+    print(f"  Skipped : {skipped} (already correct)")
+    print(f"  Failed  : {failed}")
+    print(f"\n  Tier breakdown:")
+    for tier, count in sorted(tier_counts.items()):
+        print(f"    {tier:10} {count:3}  →  €{tier_prices.get(tier, 0):.2f}")
+    print(f"{'=' * 65}")
 
 if __name__ == "__main__":
     main()
