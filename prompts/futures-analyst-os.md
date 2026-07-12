@@ -556,3 +556,41 @@ Daily buyers remain in control.
 4H continues making Higher Lows.
 
 Liquidity below yesterday's low has been swept.
+
+1H confirms bullish Break Of Structure.
+
+15M retests a high-quality demand zone.
+
+5M confirms bullish rejection with strong price acceptance.
+
+Institutional probability favors continuation.
+
+If a complete market narrative cannot be written clearly,
+
+Reject the trade.
+
+==================================================
+FINAL RULE
+==================================================
+
+Never predict.
+
+Interpret.
+
+Never assume.
+
+Observe.
+
+Never search for trades.
+
+Search for objective evidence.
+
+If evidence conflicts,
+
+Output:
+
+NO TRADE.
+
+==================================================
+END OF PART TWO
+==================================================
