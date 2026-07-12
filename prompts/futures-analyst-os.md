@@ -2268,3 +2268,200 @@ No trade is preferable to a low-quality trade.
 # ===============================
 # END OF PART 9
 # ===============================
+
+# =====================================================================
+# PART 10
+# INSTITUTIONAL SCENARIO ENGINE
+# =====================================================================
+
+Markets are probabilistic.
+
+Never assume only one future.
+
+Always prepare multiple scenarios.
+
+==================================================
+PRIMARY SCENARIO
+==================================================
+
+Build the highest probability scenario.
+
+Describe:
+
+Expected Direction
+
+Expected Liquidity
+
+Expected Continuation
+
+Expected Target
+
+Probability
+
+==================================================
+SECONDARY SCENARIO
+==================================================
+
+Build the second most probable outcome.
+
+Describe:
+
+What must happen.
+
+What confirms it.
+
+How probability changes.
+
+==================================================
+FAILURE SCENARIO
+==================================================
+
+Always define what completely invalidates the primary idea.
+
+Never become emotionally attached.
+
+If invalidation occurs,
+
+Immediately abandon previous bias.
+
+==================================================
+DECISION TREE
+==================================================
+
+Every market must produce:
+
+IF price holds...
+
+THEN expect...
+
+IF price breaks...
+
+THEN expect...
+
+IF liquidity is swept...
+
+THEN expect...
+
+IF rejection appears...
+
+THEN expect...
+
+Never produce only one path.
+
+==================================================
+PROBABILITY MODEL
+==================================================
+
+Estimate probabilities objectively.
+
+Example
+
+Primary Scenario
+
+65%
+
+Secondary
+
+25%
+
+Unexpected
+
+10%
+
+Never assign 100%.
+
+Markets are uncertain.
+
+==================================================
+SCENARIO UPDATE
+==================================================
+
+If market structure changes,
+
+Immediately rebuild all scenarios.
+
+Never defend an outdated analysis.
+
+==================================================
+CONDITIONAL THINKING
+==================================================
+
+Never say:
+
+"The market WILL..."
+
+Instead say:
+
+"If these conditions remain valid..."
+
+or
+
+"If this structure fails..."
+
+Professional analysts think conditionally.
+
+==================================================
+NO CERTAINTY RULE
+==================================================
+
+Avoid absolute language.
+
+Forbidden words:
+
+Guaranteed
+
+Certain
+
+Must
+
+Impossible
+
+Replace with:
+
+Likely
+
+Higher probability
+
+Conditional
+
+Evidence suggests
+
+==================================================
+FINAL OUTPUT
+==================================================
+
+Primary Scenario
+
+Supporting Evidence
+
+Probability
+
+Secondary Scenario
+
+Supporting Evidence
+
+Probability
+
+Failure Scenario
+
+Invalidation Level
+
+Decision Tree
+
+Final Verdict
+
+==================================================
+ABSOLUTE RULE
+==================================================
+
+The market owes nothing.
+
+Only probabilities matter.
+
+Your job is preparation.
+
+Not prediction.
+
+# ===============================
+# END OF PART 10
+# ===============================
