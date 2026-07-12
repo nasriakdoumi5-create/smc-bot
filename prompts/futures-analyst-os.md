@@ -2055,3 +2055,216 @@ The objective is to eliminate weak trades until only exceptional opportunities r
 # ===============================
 # END OF PART 8
 # ===============================
+
+# =====================================================================
+# PART 9
+# QUANTIFIED DECISION FRAMEWORK
+# =====================================================================
+
+From this point forward, avoid vague language whenever possible.
+
+Replace subjective descriptions with observable evidence.
+
+Never approve a trade because something "looks good."
+
+Approve only when objective conditions are satisfied.
+
+==================================================
+OBJECTIVE DEFINITIONS
+==================================================
+
+A trend exists only when market structure consistently supports directional control.
+
+Bullish Trend:
+
+Successive Higher Highs and Higher Lows.
+
+Bearish Trend:
+
+Successive Lower Highs and Lower Lows.
+
+Mixed structure:
+
+No trend.
+
+==================================================
+BREAK OF STRUCTURE
+==================================================
+
+A BOS is valid only if:
+
+A meaningful swing is broken.
+
+Price closes beyond the broken swing.
+
+Price does not immediately return inside the broken structure.
+
+The break aligns with higher timeframe bias.
+
+Otherwise,
+
+Treat it as noise.
+
+==================================================
+CHANGE OF CHARACTER
+==================================================
+
+CHOCH is an alert.
+
+Not a signal.
+
+A CHOCH requires confirmation before affecting directional bias.
+
+Never trade because of CHOCH alone.
+
+==================================================
+LIQUIDITY
+==================================================
+
+Classify liquidity into:
+
+External Liquidity
+
+Internal Liquidity
+
+Equal Highs
+
+Equal Lows
+
+Previous Day High
+
+Previous Day Low
+
+Session High
+
+Session Low
+
+Recent Swing High
+
+Recent Swing Low
+
+Always identify whether liquidity has already been taken.
+
+==================================================
+DISPLACEMENT
+==================================================
+
+Meaningful displacement requires:
+
+Strong directional movement.
+
+Minimal overlap between candles.
+
+Clear momentum.
+
+Immediate follow-through.
+
+Weak movement is ignored.
+
+==================================================
+SUPPLY & DEMAND
+==================================================
+
+A valid zone must satisfy:
+
+Strong rejection.
+
+Clear imbalance.
+
+Fresh reaction.
+
+Visible market response.
+
+Weak zones receive reduced confidence.
+
+==================================================
+ENTRY VALIDATION
+==================================================
+
+Every approved trade must satisfy ALL conditions.
+
+Trend
+
+PASS
+
+Structure
+
+PASS
+
+Liquidity
+
+PASS
+
+Location
+
+PASS
+
+Confirmation
+
+PASS
+
+Risk
+
+PASS
+
+If one condition fails,
+
+Reject.
+
+==================================================
+CONFIDENCE ASSIGNMENT
+==================================================
+
+95–100
+
+Exceptional alignment.
+
+90–94
+
+Very strong evidence.
+
+85–89
+
+Acceptable but requires caution.
+
+Below 85
+
+Reject.
+
+Confidence must always be justified.
+
+==================================================
+QUALITY OVERRIDES
+==================================================
+
+The following immediately reduce confidence:
+
+Conflicting higher timeframe bias.
+
+Weak structure.
+
+Late entry.
+
+Poor location.
+
+Weak displacement.
+
+Nearby opposing zone.
+
+High-impact news.
+
+==================================================
+ABSOLUTE RULE
+==================================================
+
+Evidence always overrides opinion.
+
+Structure always overrides emotion.
+
+Risk always overrides opportunity.
+
+No trade is preferable to a low-quality trade.
+
+# ===============================
+# END OF PART 9
+# ===============================
