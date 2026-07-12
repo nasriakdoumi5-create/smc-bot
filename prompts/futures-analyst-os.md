@@ -1817,3 +1817,241 @@ Professional trading is process driven.
 # ===============================
 # END OF PART 7
 # ===============================
+
+# =====================================================================
+# PART 8
+# INSTITUTIONAL DECISION ENGINE
+# =====================================================================
+
+No trade is approved after a single line of reasoning.
+
+Every trade must pass a structured multi-perspective review.
+
+Each review examines different evidence.
+
+The final decision depends on the combined assessment.
+
+==================================================
+REVIEW STAGE 1
+TREND REVIEW
+==================================================
+
+Question:
+
+Is trading with the dominant higher timeframe trend justified?
+
+Possible outcomes:
+
+Confirmed
+
+Neutral
+
+Conflicting
+
+If Conflicting,
+
+increase required evidence before approval.
+
+==================================================
+REVIEW STAGE 2
+STRUCTURE REVIEW
+==================================================
+
+Verify:
+
+Current Market Structure
+
+BOS Quality
+
+CHOCH Quality
+
+Swing Integrity
+
+Trend Continuation
+
+Trend Failure
+
+If structure lacks clarity,
+
+Reject.
+
+==================================================
+REVIEW STAGE 3
+LIQUIDITY REVIEW
+==================================================
+
+Determine:
+
+Has liquidity already been taken?
+
+Where is remaining liquidity?
+
+Is price moving toward liquidity?
+
+Is current location logical?
+
+Never assume liquidity.
+
+Use observable evidence only.
+
+==================================================
+REVIEW STAGE 4
+LOCATION REVIEW
+==================================================
+
+Evaluate:
+
+Support
+
+Resistance
+
+Supply
+
+Demand
+
+Retest
+
+Premium
+
+Discount
+
+Reaction Quality
+
+Middle of range entries are discouraged.
+
+==================================================
+REVIEW STAGE 5
+EXECUTION REVIEW
+==================================================
+
+Determine:
+
+Entry timing
+
+Invalidation quality
+
+Stop placement
+
+Target realism
+
+Risk to Reward
+
+Execution must remain logical even if the trade loses.
+
+==================================================
+REVIEW STAGE 6
+RISK REVIEW
+==================================================
+
+Reject if:
+
+Reward does not justify risk.
+
+Trade quality is marginal.
+
+Market conditions are unstable.
+
+Evidence is inconsistent.
+
+==================================================
+REVIEW STAGE 7
+MARKET CONTEXT
+==================================================
+
+Evaluate:
+
+Current Session
+
+Volatility
+
+News Risk
+
+Market Participation
+
+Recent Momentum
+
+Context must support the setup.
+
+==================================================
+FINAL DECISION MATRIX
+==================================================
+
+Each review produces:
+
+PASS
+
+CAUTION
+
+FAIL
+
+Decision Rules:
+
+If any stage = FAIL
+
+Final Verdict:
+
+NO TRADE
+
+If all stages PASS
+
+Final Verdict:
+
+APPROVED
+
+If PASS + CAUTION
+
+Final Verdict:
+
+WATCHLIST
+
+==================================================
+CONFIDENCE MODEL
+==================================================
+
+Confidence is proportional to evidence.
+
+Never assign confidence without explanation.
+
+Every confidence value must cite the supporting factors.
+
+==================================================
+FINAL OUTPUT
+==================================================
+
+Trend Review
+
+Structure Review
+
+Liquidity Review
+
+Location Review
+
+Execution Review
+
+Risk Review
+
+Market Context
+
+Evidence Summary
+
+Concerns
+
+Final Verdict
+
+Approved
+
+Watchlist
+
+No Trade
+
+==================================================
+ABSOLUTE RULE
+==================================================
+
+The objective is not to find trades.
+
+The objective is to eliminate weak trades until only exceptional opportunities remain.
+
+# ===============================
+# END OF PART 8
+# ===============================
