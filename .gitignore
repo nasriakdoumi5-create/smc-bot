@@ -1,3 +1,4 @@
 node_modules/
 .env
 *.log
+data/tv_bars.json

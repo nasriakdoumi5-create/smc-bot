@@ -2,14 +2,15 @@
  * Institutional Futures Analyst — Claude API integration
  * ─────────────────────────────────────────────────────
  * System prompt : prompts/futures-analyst-os.md (18 parts)
- * Live data     : Yahoo Finance (data.js) — Daily/4H/1H/15M/5M
+ * Live data     : TradingView ONLY (data_tradingview.js) — Daily/4H/1H/15M/5M
+ *                 يُغذّى من مؤشر IFA Data Feed عبر webhook التنبيهات الموجود
  * Macro         : ForexFactory calendar (calendar.js)
  * Trigger       : Telegram commands in bot.js (/mnq /bias ... or bare symbol)
  */
 
 import Anthropic from '@anthropic-ai/sdk';
 import { readFileSync } from 'fs';
-import { get1dBars, get1hBars, get15mBars, get5mBars } from './data.js';
+import { getBars, feedStatus } from './data_tradingview.js';
 import { currentSession } from './strategy_simple.js';
 import { fetchCalendar } from './calendar.js';
 
@@ -48,24 +49,6 @@ const FULL_ANALYSIS =
 
 const client = new Anthropic(); // ANTHROPIC_API_KEY من متغيرات البيئة
 
-// ── تجميع شموع 4H من شموع 1H ─────────────────────────
-function aggregate4h(bars1h) {
-  const buckets = new Map();
-  for (const b of bars1h) {
-    const key = Math.floor(b.time / 14400) * 14400;
-    const agg = buckets.get(key);
-    if (!agg) {
-      buckets.set(key, { time: key, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume || 0 });
-    } else {
-      agg.high   = Math.max(agg.high, b.high);
-      agg.low    = Math.min(agg.low, b.low);
-      agg.close  = b.close;
-      agg.volume += b.volume || 0;
-    }
-  }
-  return [...buckets.values()].sort((a, b) => a.time - b.time);
-}
-
 // ── تنسيق الشموع بشكل مضغوط (سطر لكل شمعة) ───────────
 function fmtBars(bars, count) {
   return bars.slice(-count).map(b => {
@@ -94,40 +77,57 @@ async function upcomingEvents() {
   }
 }
 
-// ── بناء حزمة البيانات الحية ──────────────────────────
+// ── بناء حزمة البيانات الحية (من TradingView حصراً) ────
 async function buildMarketData(symbol) {
-  const [d, h1, m15, m5] = await Promise.allSettled([
-    get1dBars(symbol), get1hBars(symbol), get15mBars(symbol), get5mBars(symbol),
-  ]);
+  const status = feedStatus(symbol);
+  if (!status.hasData) {
+    throw new Error(
+      `لا توجد بيانات TradingView لـ ${symbol} بعد — ` +
+      `أضف مؤشر "IFA Data Feed" على شارت 5 دقائق وفعّل الـ Alert (انظر /setup)`
+    );
+  }
 
-  const val = r => (r.status === 'fulfilled' && r.value?.length ? r.value : null);
-  const bars1d = val(d), bars1h = val(h1), bars15 = val(m15), bars5 = val(m5);
-  const bars4h = bars1h ? aggregate4h(bars1h) : null;
+  const bars1d = getBars(symbol, '1d');
+  const bars4h = getBars(symbol, '4h');
+  const bars1h = getBars(symbol, '1h');
+  const bars15 = getBars(symbol, '15m');
+  const bars5  = getBars(symbol, '5m');
 
-  const last = bars5?.[bars5.length - 1] || bars15?.[bars15.length - 1] || bars1h?.[bars1h.length - 1];
+  const last = bars5[bars5.length - 1] || bars15[bars15.length - 1] || bars1h[bars1h.length - 1];
 
-  const tf = (name, bars, count) =>
-    `=== ${name} ===\n${bars ? fmtBars(bars, count) : 'UNAVAILABLE — data source failed for this timeframe.'}`;
+  const tf = (name, bars, target) => {
+    if (!bars.length) {
+      return `=== ${name} ===\nUNAVAILABLE — no TradingView feed data received yet for this timeframe.`;
+    }
+    const depthNote = bars.length < target
+      ? ` (only ${bars.length} of ${target} target bars accumulated so far — history is still building)`
+      : '';
+    return `=== ${name}${depthNote} ===\n${fmtBars(bars, target)}`;
+  };
+
+  const feedAge = status.lastIngest
+    ? `${Math.round((Date.now() - status.lastIngest) / 60000)} min ago`
+    : 'unknown';
 
   const calendar = await upcomingEvents();
 
   return {
     price: last?.close ?? null,
     text: [
-      `LIVE MARKET DATA — ${symbol} (continuous futures, via Yahoo Finance; delayed up to ~15 min)`,
+      `LIVE MARKET DATA — ${symbol} (TradingView live feed via webhook; last update: ${feedAge})`,
       `Current time (UTC): ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
       `Current session: ${currentSession()}`,
       `Last price: ${last ? last.close.toFixed(2) : 'UNAVAILABLE'}`,
       '',
-      tf('DAILY (last 60 bars)', bars1d, 60),
+      tf('DAILY (target 60 bars)', bars1d, 60),
       '',
-      tf('4H (last 60 bars, aggregated from 1H)', bars4h, 60),
+      tf('4H (target 60 bars)', bars4h, 60),
       '',
-      tf('1H (last 96 bars)', bars1h, 96),
+      tf('1H (target 96 bars)', bars1h, 96),
       '',
-      tf('15M (last 96 bars)', bars15, 96),
+      tf('15M (target 96 bars)', bars15, 96),
       '',
-      tf('5M (last 78 bars)', bars5, 78),
+      tf('5M (target 78 bars)', bars5, 78),
       '',
       `=== ECONOMIC CALENDAR (USD, next 48h) ===\n${calendar}`,
     ].join('\n'),

@@ -77,14 +77,6 @@ export async function get1hBars(symbol = 'MNQ') {
 }
 
 /**
- * جلب 1d bars لآخر سنة (للـ macro direction)
- */
-export async function get1dBars(symbol = 'MNQ') {
-  const ticker = SYMBOLS[symbol] || symbol;
-  return fetchYahoo(ticker, '1d', '1y');
-}
-
-/**
  * جلب آخر سعر
  */
 export async function getLastPrice(symbol = 'MNQ') {

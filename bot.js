@@ -13,6 +13,7 @@ import { createServer }   from 'http';
 import { currentSession } from './strategy_simple.js';
 import { getGEX, formatGEX } from './gex.js';
 import { runAnalysis, ANALYST_SYMBOLS, ANALYST_COMMANDS } from './analyst.js';
+import { ingestFeed, feedStatus, TIMEFRAMES } from './data_tradingview.js';
 
 const TOKEN      = process.env.TELEGRAM_TOKEN   || '8986679008:AAHmT44SZeoUzdkiaKg-OlnA3NHOonHZ2cw';
 const OWNER_ID   = process.env.TELEGRAM_CHAT_ID || '6526134897';
@@ -146,6 +147,14 @@ async function handleWebhook(rawBody) {
     return false;
   }
 
+  // ── IFA Data Feed — شموع TradingView الحية للمحلل ──
+  // (لا بث ولا cooldown — تخزين فقط)
+  if (d.src === 'ifa_feed' && d.bars) {
+    const r = ingestFeed(d);
+    if (r.added > 0) console.log(`[TV Feed] ${d.s}: +${r.added} bars`);
+    return true;
+  }
+
   console.log('[Webhook]', JSON.stringify(d));
 
   // Support legacy field names {symbol,type,price} alongside {s,t,p}
@@ -240,6 +249,7 @@ ${isOwner ? `/test    — إرسال إشارة تجريبية ✅
 /mnq /mgc /mcl — تحليل كامل (أو أرسل الرمز مباشرة)
 /bias /levels /structure /liquidity — تحليل مركّز
 /scenarios /entry /risk /news /checklist — والمزيد
+/feed — حالة تغذية بيانات TradingView
 \n🔐 <b>أنت المالك</b>` : ''}`
     );
     return;
@@ -374,9 +384,34 @@ Alert name: VWAP MNQ
 <b>المؤشر الثاني — Kill Zone Sweep Pro</b>
 Alert name: Kill Zone MNQ
 
+<b>المؤشر الثالث — IFA Data Feed</b> 🧠
+(يغذي المحلل المؤسسي بالشموع الحية)
+• ضعه على شارت 5M لكل رمز (MNQ/MGC/MCL)
+• عدّل Symbol Name في إعدادات المؤشر
+• Alert Condition: Any alert() function call
+• نفس رابط الـ Webhook أعلاه
+• تحقق بالأمر /feed
+
 <b>الخطوة 3 — اختبار</b>
 أرسل /test للتحقق أن القناة تعمل`
     );
+    return;
+  }
+
+  if (text === '/feed') {
+    const lines = ['📡 <b>حالة تغذية TradingView</b>', ''];
+    for (const sym of ANALYST_SYMBOLS) {
+      const st = feedStatus(sym);
+      const age = st.lastIngest
+        ? `آخر تحديث قبل ${Math.round((Date.now() - st.lastIngest) / 60000)} دقيقة`
+        : 'لم تصل بيانات بعد';
+      const depths = TIMEFRAMES.map(tf => `${tf}:${st.depth[tf]}`).join('  ');
+      lines.push(`<b>${sym}</b> — ${st.hasData ? '🟢' : '🔴'} ${age}`);
+      lines.push(`   ${depths}`);
+    }
+    lines.push('');
+    lines.push('<i>لتشغيل التغذية: أضف مؤشر IFA Data Feed على شارت 5M وفعّل Alert بنفس رابط الـ webhook</i>');
+    await tgSend(chat, lines.join('\n'));
     return;
   }
 

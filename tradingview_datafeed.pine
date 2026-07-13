@@ -1,0 +1,48 @@
+//@version=5
+// ═══════════════════════════════════════════════════════
+//   IFA Data Feed — TradingView → IFA-OS Analysis Engine
+//   ─────────────────────────────────────────────────────
+//   ضعه على شارت 5 دقائق لكل رمز (MNQ / MGC / MCL)
+//   وأنشئ Alert واحداً:
+//     Condition : IFA Data Feed → Any alert() function call
+//     Expiration: Open-ended
+//     Webhook   : https://<your-app>/webhook
+//   يرسل آخر الشموع لكل الأطر (5M/15M/1H/4H/D) عند إغلاق
+//   كل شمعة 5 دقائق — البوت يخزنها ويراكم التاريخ تلقائياً
+// ═══════════════════════════════════════════════════════
+indicator("IFA Data Feed — by Nasri", overlay=false, max_bars_back=500)
+
+symName = input.string("MNQ", "Symbol Name (for webhook)")
+
+// آخر n شموع مغلقة بصيغة [timeMs,open,high,low,close,volume],...
+f_bars(n) =>
+    int cnt = math.min(n, bar_index + 1)
+    string out = ""
+    for i = 0 to cnt - 1
+        int j = cnt - 1 - i
+        out += "[" + str.tostring(time[j]) + ","
+             + str.tostring(open[j],  "#.####") + ","
+             + str.tostring(high[j],  "#.####") + ","
+             + str.tostring(low[j],   "#.####") + ","
+             + str.tostring(close[j], "#.####") + ","
+             + str.tostring(nz(volume[j], 0), "#") + "]"
+        if i < cnt - 1
+            out += ","
+    out
+
+tf5  = request.security(syminfo.tickerid, "5",   f_bars(10), lookahead=barmerge.lookahead_off)
+tf15 = request.security(syminfo.tickerid, "15",  f_bars(8),  lookahead=barmerge.lookahead_off)
+tf1h = request.security(syminfo.tickerid, "60",  f_bars(8),  lookahead=barmerge.lookahead_off)
+tf4h = request.security(syminfo.tickerid, "240", f_bars(6),  lookahead=barmerge.lookahead_off)
+tf1d = request.security(syminfo.tickerid, "D",   f_bars(10), lookahead=barmerge.lookahead_off)
+
+if barstate.isconfirmed
+    string msg = '{"src":"ifa_feed","s":"' + symName + '","bars":{'
+         + '"5m":['  + tf5  + '],'
+         + '"15m":[' + tf15 + '],'
+         + '"1h":['  + tf1h + '],'
+         + '"4h":['  + tf4h + '],'
+         + '"1d":['  + tf1d + ']}}'
+    alert(msg, alert.freq_once_per_bar_close)
+
+plot(close, title="Close", display=display.none)
