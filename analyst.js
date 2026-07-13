@@ -2,15 +2,16 @@
  * Institutional Futures Analyst — Claude API integration
  * ─────────────────────────────────────────────────────
  * System prompt : prompts/futures-analyst-os.md (18 parts)
- * Live data     : TradingView ONLY (data_tradingview.js) — Daily/4H/1H/15M/5M
- *                 يُغذّى من مؤشر IFA Data Feed عبر webhook التنبيهات الموجود
+ * Live data     : TradingView raw candles ONLY (market_db.js)
+ * Market memory : market_memory.js — Structure/BOS/CHOCH/Liquidity/FVG/OB
  * Macro         : ForexFactory calendar (calendar.js)
  * Trigger       : Telegram commands in bot.js (/mnq /bias ... or bare symbol)
  */
 
 import Anthropic from '@anthropic-ai/sdk';
 import { readFileSync } from 'fs';
-import { getBars, feedStatus } from './data_tradingview.js';
+import { getCandles, dbStatus } from './market_db.js';
+import { getMemory, updateMemory } from './market_memory.js';
 import { currentSession } from './strategy_simple.js';
 import { fetchCalendar } from './calendar.js';
 
@@ -79,19 +80,19 @@ async function upcomingEvents() {
 
 // ── بناء حزمة البيانات الحية (من TradingView حصراً) ────
 async function buildMarketData(symbol) {
-  const status = feedStatus(symbol);
+  const status = dbStatus(symbol);
   if (!status.hasData) {
     throw new Error(
       `لا توجد بيانات TradingView لـ ${symbol} بعد — ` +
-      `أضف مؤشر "IFA Data Feed" على شارت 5 دقائق وفعّل الـ Alert (انظر /setup)`
+      `أضف مؤشر "IFA Data Feed V2" على شارتات الأطر الخمسة وفعّل الـ Alerts (انظر /setup)`
     );
   }
 
-  const bars1d = getBars(symbol, '1d');
-  const bars4h = getBars(symbol, '4h');
-  const bars1h = getBars(symbol, '1h');
-  const bars15 = getBars(symbol, '15m');
-  const bars5  = getBars(symbol, '5m');
+  const bars1d = getCandles(symbol, '1d');
+  const bars4h = getCandles(symbol, '4h');
+  const bars1h = getCandles(symbol, '1h');
+  const bars15 = getCandles(symbol, '15m');
+  const bars5  = getCandles(symbol, '5m');
 
   const last = bars5[bars5.length - 1] || bars15[bars15.length - 1] || bars1h[bars1h.length - 1];
 
@@ -111,10 +112,13 @@ async function buildMarketData(symbol) {
 
   const calendar = await upcomingEvents();
 
+  // لقطة ذاكرة السوق — محدثة من محرك الأحداث عند كل شمعة
+  const memory = getMemory(symbol) || updateMemory(symbol);
+
   return {
     price: last?.close ?? null,
     text: [
-      `LIVE MARKET DATA — ${symbol} (TradingView live feed via webhook; last update: ${feedAge})`,
+      `LIVE MARKET DATA — ${symbol} (TradingView raw candle feed via webhook; last update: ${feedAge})`,
       `Current time (UTC): ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
       `Current session: ${currentSession()}`,
       `Last price: ${last ? last.close.toFixed(2) : 'UNAVAILABLE'}`,
@@ -128,6 +132,11 @@ async function buildMarketData(symbol) {
       tf('15M (target 96 bars)', bars15, 96),
       '',
       tf('5M (target 78 bars)', bars5, 78),
+      '',
+      '=== MARKET MEMORY (computed by the deterministic event engine from the raw candles above) ===',
+      'Treat this as pre-computed supporting evidence. Verify it against the raw candles;',
+      'your own reading of structure always prevails over the computed snapshot.',
+      JSON.stringify(memory, null, 1),
       '',
       `=== ECONOMIC CALENDAR (USD, next 48h) ===\n${calendar}`,
     ].join('\n'),

@@ -1,4 +1,5 @@
 node_modules/
 .env
 *.log
-data/tv_bars.json
+data/market_db.json
+data/market_memory.json

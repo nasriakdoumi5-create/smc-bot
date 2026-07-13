@@ -13,7 +13,8 @@ import { createServer }   from 'http';
 import { currentSession } from './strategy_simple.js';
 import { getGEX, formatGEX } from './gex.js';
 import { runAnalysis, ANALYST_SYMBOLS, ANALYST_COMMANDS } from './analyst.js';
-import { ingestFeed, feedStatus, TIMEFRAMES } from './data_tradingview.js';
+import { ingestCandle, dbStatus, TIMEFRAMES } from './market_db.js';
+import { updateMemory, getMemory } from './market_memory.js';
 
 const TOKEN      = process.env.TELEGRAM_TOKEN   || '8986679008:AAHmT44SZeoUzdkiaKg-OlnA3NHOonHZ2cw';
 const OWNER_ID   = process.env.TELEGRAM_CHAT_ID || '6526134897';
@@ -147,11 +148,19 @@ async function handleWebhook(rawBody) {
     return false;
   }
 
-  // ── IFA Data Feed — شموع TradingView الحية للمحلل ──
-  // (لا بث ولا cooldown — تخزين فقط)
-  if (d.src === 'ifa_feed' && d.bars) {
-    const r = ingestFeed(d);
-    if (r.added > 0) console.log(`[TV Feed] ${d.s}: +${r.added} bars`);
+  // ── IFA Data Feed V2 — شمعة خام من TradingView ─────
+  // Event Engine: DB → Structure → Swings → BOS → CHOCH
+  //             → Liquidity → FVG → OB → Premium/Discount → Memory
+  if (d.src === 'ifa_candle' || (d.symbol && d.timeframe && d.close != null)) {
+    const r = ingestCandle(d);
+    if (r.ok) {
+      if (r.isNew) {
+        updateMemory(r.symbol);
+        console.log(`[Market DB] ${r.symbol} ${r.timeframe} candle stored — memory updated`);
+      }
+    } else {
+      console.error('[Market DB] rejected candle:', r.reason);
+    }
     return true;
   }
 
@@ -249,7 +258,8 @@ ${isOwner ? `/test    — إرسال إشارة تجريبية ✅
 /mnq /mgc /mcl — تحليل كامل (أو أرسل الرمز مباشرة)
 /bias /levels /structure /liquidity — تحليل مركّز
 /scenarios /entry /risk /news /checklist — والمزيد
-/feed — حالة تغذية بيانات TradingView
+/feed — حالة قاعدة بيانات الشموع
+/memory — لقطة ذاكرة السوق المحسوبة
 \n🔐 <b>أنت المالك</b>` : ''}`
     );
     return;
@@ -384,13 +394,14 @@ Alert name: VWAP MNQ
 <b>المؤشر الثاني — Kill Zone Sweep Pro</b>
 Alert name: Kill Zone MNQ
 
-<b>المؤشر الثالث — IFA Data Feed</b> 🧠
-(يغذي المحلل المؤسسي بالشموع الحية)
-• ضعه على شارت 5M لكل رمز (MNQ/MGC/MCL)
-• عدّل Symbol Name في إعدادات المؤشر
+<b>المؤشر الثالث — IFA Data Feed V2</b> 🧠
+(شموع خام فقط — كل التحليل داخل IFA-OS)
+• ضعه على شارت <b>كل إطار</b> لكل رمز:
+   MNQ/MGC/MCL × 5M/15M/1H/4H/D
+• عدّل Symbol في إعدادات المؤشر
 • Alert Condition: Any alert() function call
 • نفس رابط الـ Webhook أعلاه
-• تحقق بالأمر /feed
+• تحقق: /feed للبيانات و /memory للذاكرة
 
 <b>الخطوة 3 — اختبار</b>
 أرسل /test للتحقق أن القناة تعمل`
@@ -399,19 +410,33 @@ Alert name: Kill Zone MNQ
   }
 
   if (text === '/feed') {
-    const lines = ['📡 <b>حالة تغذية TradingView</b>', ''];
+    const lines = ['📡 <b>قاعدة بيانات السوق — TradingView Raw Feed</b>', ''];
     for (const sym of ANALYST_SYMBOLS) {
-      const st = feedStatus(sym);
+      const st = dbStatus(sym);
       const age = st.lastIngest
-        ? `آخر تحديث قبل ${Math.round((Date.now() - st.lastIngest) / 60000)} دقيقة`
-        : 'لم تصل بيانات بعد';
+        ? `آخر شمعة قبل ${Math.round((Date.now() - st.lastIngest) / 60000)} دقيقة`
+        : 'لم تصل شموع بعد';
       const depths = TIMEFRAMES.map(tf => `${tf}:${st.depth[tf]}`).join('  ');
       lines.push(`<b>${sym}</b> — ${st.hasData ? '🟢' : '🔴'} ${age}`);
       lines.push(`   ${depths}`);
     }
     lines.push('');
-    lines.push('<i>لتشغيل التغذية: أضف مؤشر IFA Data Feed على شارت 5M وفعّل Alert بنفس رابط الـ webhook</i>');
+    lines.push('<i>التغذية: مؤشر IFA Data Feed V2 على شارتات 5M/15M/1H/4H/D لكل رمز — /setup</i>');
     await tgSend(chat, lines.join('\n'));
+    return;
+  }
+
+  if (text === '/memory') {
+    const argSym = (args[0] || '').toUpperCase();
+    const sym = ANALYST_SYMBOLS.includes(argSym) ? argSym : (lastAnalystSymbol[chat] || 'MNQ');
+    const mem = getMemory(sym) || (dbStatus(sym).hasData ? updateMemory(sym) : null);
+    if (!mem) {
+      await tgSend(chat, `❌ لا توجد ذاكرة سوق لـ ${sym} — لم تصل شموع بعد (/feed)`);
+      return;
+    }
+    for (const chunk of splitMessage(`🧠 Market Memory — ${sym}\n\n${JSON.stringify(mem, null, 1)}`)) {
+      await tgSend(chat, chunk, null);
+    }
     return;
   }
 

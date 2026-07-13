@@ -1,48 +1,45 @@
 //@version=5
 // ═══════════════════════════════════════════════════════
-//   IFA Data Feed — TradingView → IFA-OS Analysis Engine
+//   IFA Data Feed V2 — Raw Market Data Only
 //   ─────────────────────────────────────────────────────
-//   ضعه على شارت 5 دقائق لكل رمز (MNQ / MGC / MCL)
-//   وأنشئ Alert واحداً:
-//     Condition : IFA Data Feed → Any alert() function call
+//   TradingView = مزوّد بيانات خام فقط.
+//   لا FVG، لا BOS، لا CHOCH، لا Order Blocks، لا إشارات.
+//   كل التحليل يتم داخل محرك IFA-OS.
+//
+//   الإعداد:
+//   ضع هذا المؤشر على شارت كل إطار زمني لكل رمز:
+//     MNQ: 5M, 15M, 1H, 4H, D   (5 تنبيهات)
+//     MGC: 5M, 15M, 1H, 4H, D   (5 تنبيهات)
+//     MCL: 5M, 15M, 1H, 4H, D   (5 تنبيهات)
+//   لكل شارت أنشئ Alert واحداً:
+//     Condition : IFA Data Feed V2 → Any alert() function call
 //     Expiration: Open-ended
 //     Webhook   : https://<your-app>/webhook
-//   يرسل آخر الشموع لكل الأطر (5M/15M/1H/4H/D) عند إغلاق
-//   كل شمعة 5 دقائق — البوت يخزنها ويراكم التاريخ تلقائياً
+//   يرسل كل شمعة مؤكدة عند إغلاقها. لا شيء آخر.
 // ═══════════════════════════════════════════════════════
-indicator("IFA Data Feed — by Nasri", overlay=false, max_bars_back=500)
+indicator("IFA Data Feed V2 — Raw Candle", overlay=true)
 
-symName = input.string("MNQ", "Symbol Name (for webhook)")
+symName = input.string("MNQ", "Symbol (MNQ / MGC / MCL)")
 
-// آخر n شموع مغلقة بصيغة [timeMs,open,high,low,close,volume],...
-f_bars(n) =>
-    int cnt = math.min(n, bar_index + 1)
-    string out = ""
-    for i = 0 to cnt - 1
-        int j = cnt - 1 - i
-        out += "[" + str.tostring(time[j]) + ","
-             + str.tostring(open[j],  "#.####") + ","
-             + str.tostring(high[j],  "#.####") + ","
-             + str.tostring(low[j],   "#.####") + ","
-             + str.tostring(close[j], "#.####") + ","
-             + str.tostring(nz(volume[j], 0), "#") + "]"
-        if i < cnt - 1
-            out += ","
-    out
-
-tf5  = request.security(syminfo.tickerid, "5",   f_bars(10), lookahead=barmerge.lookahead_off)
-tf15 = request.security(syminfo.tickerid, "15",  f_bars(8),  lookahead=barmerge.lookahead_off)
-tf1h = request.security(syminfo.tickerid, "60",  f_bars(8),  lookahead=barmerge.lookahead_off)
-tf4h = request.security(syminfo.tickerid, "240", f_bars(6),  lookahead=barmerge.lookahead_off)
-tf1d = request.security(syminfo.tickerid, "D",   f_bars(10), lookahead=barmerge.lookahead_off)
+// جلسة الشمعة حسب توقيت افتتاحها (UTC)
+f_session() =>
+    int m = hour(time, "UTC") * 60 + minute(time, "UTC")
+    m < 7 * 60 ? "Asia" : m < 13 * 60 ? "London" : m < 22 * 60 ? "NewYork" : "Off"
 
 if barstate.isconfirmed
-    string msg = '{"src":"ifa_feed","s":"' + symName + '","bars":{'
-         + '"5m":['  + tf5  + '],'
-         + '"15m":[' + tf15 + '],'
-         + '"1h":['  + tf1h + '],'
-         + '"4h":['  + tf4h + '],'
-         + '"1d":['  + tf1d + ']}}'
+    string msg = '{"src":"ifa_candle"'
+         + ',"symbol":"'    + symName + '"'
+         + ',"exchange":"'  + syminfo.prefix + '"'
+         + ',"timeframe":"' + timeframe.period + '"'
+         + ',"timestamp":'  + str.tostring(time)
+         + ',"open":'       + str.tostring(open,  "#.####")
+         + ',"high":'       + str.tostring(high,  "#.####")
+         + ',"low":'        + str.tostring(low,   "#.####")
+         + ',"close":'      + str.tostring(close, "#.####")
+         + ',"volume":'     + str.tostring(nz(volume, 0), "#")
+         + ',"session":"'   + f_session() + '"'
+         + ',"bar_index":'  + str.tostring(bar_index)
+         + '}'
     alert(msg, alert.freq_once_per_bar_close)
 
 plot(close, title="Close", display=display.none)
