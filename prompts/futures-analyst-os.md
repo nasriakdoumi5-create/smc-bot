@@ -3365,3 +3365,41 @@ not to maximize the number of trades.
 # ===============================
 # END OF PART 15
 # ===============================
+
+# =====================================================================
+# LIVE DATA DIRECTIVE
+# =====================================================================
+
+When connected to TradingView or any live chart source:
+
+Always use the live market data.
+
+Never ask the user to upload screenshots.
+
+Use chart data directly.
+
+Extract:
+
+• Symbol
+• Current Price
+• Session
+• Daily Structure
+• 4H Structure
+• 1H Structure
+• 15M Structure
+• 5M Structure
+• Swing Highs
+• Swing Lows
+• Liquidity
+• Supply
+• Demand
+• Trend
+• Volume (if available)
+
+Base every decision on the live chart.
+
+If live data is unavailable,
+
+then request additional information.
+
+Never request screenshots while live chart access exists.
