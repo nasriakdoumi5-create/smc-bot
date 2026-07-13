@@ -93,8 +93,9 @@ async function buildMarketData(symbol) {
   const bars1h = getCandles(symbol, '1h');
   const bars15 = getCandles(symbol, '15m');
   const bars5  = getCandles(symbol, '5m');
+  const bars1  = getCandles(symbol, '1m');
 
-  const last = bars5[bars5.length - 1] || bars15[bars15.length - 1] || bars1h[bars1h.length - 1];
+  const last = bars1[bars1.length - 1] || bars5[bars5.length - 1] || bars15[bars15.length - 1] || bars1h[bars1h.length - 1];
 
   const tf = (name, bars, target) => {
     if (!bars.length) {
@@ -132,6 +133,8 @@ async function buildMarketData(symbol) {
       tf('15M (target 96 bars)', bars15, 96),
       '',
       tf('5M (target 78 bars)', bars5, 78),
+      '',
+      tf('1M (execution timeframe, target 60 bars)', bars1, 60),
       '',
       '=== MARKET MEMORY (computed by the deterministic event engine from the raw candles above) ===',
       'Treat this as pre-computed supporting evidence. Verify it against the raw candles;',
@@ -186,4 +189,71 @@ export async function runAnalysis(symbol, command = null) {
 
   if (!text) throw new Error('رد فارغ من المحلل');
   return text;
+}
+
+// ── تقرير موحّد لكل الرموز (/all) ──────────────────────
+// لقطة حتمية من ذاكرة كل رمز — فورية، بلا تكلفة API، وبلا تداخل بين الرموز.
+// ليست حكم محلل كامل؛ للتقرير المؤسسي الكامل استخدم /mnq /mgc /mcl.
+function symbolSnapshot(symbol) {
+  const st = dbStatus(symbol);
+  if (!st.hasData) return { symbol, ready: false };
+
+  const m = getMemory(symbol) || updateMemory(symbol);
+  const price = m.currentPrice;
+  const htf = m.structure?.['4h']?.trend || m.bias?.daily || 'Undetermined';
+  const dir = /bull/i.test(htf) ? 'bull' : /bear/i.test(htf) ? 'bear' : 'neutral';
+
+  // منطقة مرشّحة متوافقة مع الاتجاه (من المناطق النشطة في الذاكرة) — ليست توصية دخول
+  let zone = null;
+  const pick = (arr, want, side) => {
+    for (const tf of ['15m', '1h', '4h']) {
+      for (const z of (arr?.[tf] || [])) {
+        if (z.direction !== want || price == null) continue;
+        if (side === 'below' && z.top <= price) return { top: z.top, bottom: z.bottom, tf, kind: want };
+        if (side === 'above' && z.bottom >= price) return { top: z.top, bottom: z.bottom, tf, kind: want };
+      }
+    }
+    return null;
+  };
+  if (dir === 'bull') zone = pick(m.activeOrderBlocks, 'Bullish', 'below') || pick(m.activeFVGs, 'Bullish', 'below');
+  else if (dir === 'bear') zone = pick(m.activeOrderBlocks, 'Bearish', 'above') || pick(m.activeFVGs, 'Bearish', 'above');
+
+  return {
+    symbol, ready: true, price,
+    htf,
+    dailyBias: m.bias?.daily || 'Undetermined',
+    phase: m.marketPhase?.phase || 'Undetermined',
+    pdState: m.dealingRange?.currentState || null,
+    lastSweep: m.lastLiquiditySweep || m.liquidity?.lastSweep || null,
+    zone,
+    depth5m: st.depth['5m'],
+  };
+}
+
+/**
+ * تقرير موحّد لكل الرموز — /all
+ * @returns {string} نص جاهز للإرسال (بلا استدعاء Claude)
+ */
+export function buildAllSummary() {
+  const lines = ['📊 <b>التقرير الموحّد — كل الرموز</b>', '<i>لقطة من محرك الذاكرة (ليست حكم محلل كامل — استخدم /mnq /mgc /mcl للتقرير المؤسسي)</i>', ''];
+  for (const sym of ANALYST_SYMBOLS) {
+    const s = symbolSnapshot(sym);
+    if (!s.ready) {
+      lines.push(`<b>${sym}</b> — 🔴 لا بيانات بعد (/feed)`, '');
+      continue;
+    }
+    const zoneStr = s.zone
+      ? `${Math.max(s.zone.top, s.zone.bottom).toFixed(2)}–${Math.min(s.zone.top, s.zone.bottom).toFixed(2)} (${s.zone.kind} ${s.zone.tf})`
+      : 'لا منطقة متوافقة نشطة';
+    lines.push(
+      `<b>${sym}</b>  ${s.price != null ? '@ ' + s.price.toFixed(2) : ''}`,
+      `HTF: ${s.htf}`,
+      `Daily Bias: ${s.dailyBias}  |  Phase: ${s.phase}${s.pdState ? '  |  ' + s.pdState : ''}`,
+      `Zone: ${zoneStr}`,
+      s.lastSweep ? `Last sweep: ${s.lastSweep.direction} @ ${s.lastSweep.price}` : '',
+      '',
+    );
+  }
+  lines.push('<i>⚠️ المناطق مرشّحات من الذاكرة وليست توصيات دخول معتمدة.</i>');
+  return lines.filter(l => l !== '').join('\n');
 }

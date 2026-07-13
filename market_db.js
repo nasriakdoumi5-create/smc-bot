@@ -14,14 +14,15 @@ import { dirname, join } from 'path';
 const DIR     = dirname(fileURLToPath(import.meta.url));
 const DB_PATH = join(DIR, 'data', 'market_db.json');
 
-export const TIMEFRAMES = ['5m', '15m', '1h', '4h', '1d'];
+export const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d'];
 export const DB_SYMBOLS = ['MNQ', 'MGC', 'MCL'];
 
 // أقصى عدد شموع محفوظ لكل إطار
-const MAX_BARS = { '5m': 1200, '15m': 900, '1h': 600, '4h': 400, '1d': 400 };
+const MAX_BARS = { '1m': 1500, '5m': 1200, '15m': 900, '1h': 600, '4h': 400, '1d': 400 };
 
 // تطبيع الإطار الزمني القادم من TradingView (timeframe.period)
 const TF_MAP = {
+  '1': '1m',  '1m': '1m',
   '5': '5m',  '5m': '5m',
   '15': '15m', '15m': '15m',
   '60': '1h', '1h': '1h',

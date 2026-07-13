@@ -549,6 +549,8 @@ const SECTIONS = {
 // ══════════════════════════════════════════════════════
 
 const TF_SECTIONS = {
+  // 1M هو إطار التنفيذ الأدق — يحدّث السعر والسياق فقط (الهيكل يبقى على الأطر الأعلى)
+  '1m':  ['price', 'context'],
   '5m':  ['price', 'sessions', 'liquidity', 'context'],
   '15m': ['price', ['structure', ['15m']], ['zones', ['15m']], 'liquidity', 'context'],
   '1h':  ['price', ['structure', ['1h']], ['zones', ['1h']], 'context'],

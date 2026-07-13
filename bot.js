@@ -12,7 +12,7 @@
 import { createServer }   from 'http';
 import { currentSession } from './strategy_simple.js';
 import { getGEX, formatGEX } from './gex.js';
-import { runAnalysis, ANALYST_SYMBOLS, ANALYST_COMMANDS } from './analyst.js';
+import { runAnalysis, buildAllSummary, ANALYST_SYMBOLS, ANALYST_COMMANDS } from './analyst.js';
 import { ingestCandle, dbStatus, TIMEFRAMES } from './market_db.js';
 import { updateOnCandle, updateMemory, getMemory } from './market_memory.js';
 
@@ -257,6 +257,7 @@ ${isOwner ? `/test    — إرسال إشارة تجريبية ✅
 
 <b>🧠 المحلل المؤسسي (Claude):</b>
 /mnq /mgc /mcl — تحليل كامل (أو أرسل الرمز مباشرة)
+/all — تقرير موحّد لكل الرموز (فوري)
 /bias /levels /structure /liquidity — تحليل مركّز
 /scenarios /entry /risk /news /checklist — والمزيد
 /feed — حالة قاعدة بيانات الشموع
@@ -328,6 +329,13 @@ ${srcLines}
   // Owner-only commands
   if (!isOwner) return;
 
+  // ═══ تقرير موحّد لكل الرموز — /all ═══════════════════
+  if (text === '/all') {
+    const summary = buildAllSummary();
+    for (const chunk of splitMessage(summary)) await tgSend(chat, chunk);
+    return;
+  }
+
   // ═══ Institutional Analyst (Claude) ═══════════════════
   // تحليل كامل: /mnq /mgc /mcl أو الرمز مباشرة (MNQ)
   // أوامر مركّزة: /bias /levels /structure ... + رمز اختياري (/bias MGC)
@@ -398,7 +406,8 @@ Alert name: Kill Zone MNQ
 <b>المؤشر الثالث — IFA Data Feed V2</b> 🧠
 (شموع خام فقط — كل التحليل داخل IFA-OS)
 • ضعه على شارت <b>كل إطار</b> لكل رمز:
-   MNQ/MGC/MCL × 5M/15M/1H/4H/D
+   MNQ/MGC/MCL × 1M/5M/15M/1H/4H/D
+   = 18 تنبيهاً (الرموز الثلاثة تعمل معاً بلا تعارض)
 • عدّل Symbol في إعدادات المؤشر
 • Alert Condition: Any alert() function call
 • نفس رابط الـ Webhook أعلاه
