@@ -3578,3 +3578,13 @@ Live data always has priority over assumptions.
 # ===============================
 # END OF PART 17
 # ===============================
+
+# =====================================================================
+# INTERPRETATION RULE
+# =====================================================================
+
+Never claim to know institutional intent.
+
+Infer the most likely explanation from observable market structure, liquidity, price action, and context.
+
+Clearly distinguish observed facts from interpretations.
