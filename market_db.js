@@ -29,7 +29,7 @@ const TF_MAP = {
   'd': '1d', '1d': '1d', 'daily': '1d',
 };
 
-function normalizeTf(raw) {
+export function normalizeTf(raw) {
   return TF_MAP[String(raw).toLowerCase()] || null;
 }
 

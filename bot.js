@@ -14,7 +14,7 @@ import { currentSession } from './strategy_simple.js';
 import { getGEX, formatGEX } from './gex.js';
 import { runAnalysis, ANALYST_SYMBOLS, ANALYST_COMMANDS } from './analyst.js';
 import { ingestCandle, dbStatus, TIMEFRAMES } from './market_db.js';
-import { updateMemory, getMemory } from './market_memory.js';
+import { updateOnCandle, updateMemory, getMemory } from './market_memory.js';
 
 const TOKEN      = process.env.TELEGRAM_TOKEN   || '8986679008:AAHmT44SZeoUzdkiaKg-OlnA3NHOonHZ2cw';
 const OWNER_ID   = process.env.TELEGRAM_CHAT_ID || '6526134897';
@@ -155,8 +155,9 @@ async function handleWebhook(rawBody) {
     const r = ingestCandle(d);
     if (r.ok) {
       if (r.isNew) {
-        updateMemory(r.symbol);
-        console.log(`[Market DB] ${r.symbol} ${r.timeframe} candle stored — memory updated`);
+        // تحديث تفاضلي — يحدّث أقسام الذاكرة المتأثرة بهذا الإطار فقط
+        updateOnCandle(r.symbol, r.timeframe);
+        console.log(`[Market DB] ${r.symbol} ${r.timeframe} candle stored — memory updated (${r.timeframe} sections)`);
       }
     } else {
       console.error('[Market DB] rejected candle:', r.reason);
