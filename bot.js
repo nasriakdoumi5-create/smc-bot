@@ -12,6 +12,7 @@
 import { createServer }   from 'http';
 import { currentSession } from './strategy_simple.js';
 import { getGEX, formatGEX } from './gex.js';
+import { runAnalysis, ANALYST_SYMBOLS, ANALYST_COMMANDS } from './analyst.js';
 
 const TOKEN      = process.env.TELEGRAM_TOKEN   || '8986679008:AAHmT44SZeoUzdkiaKg-OlnA3NHOonHZ2cw';
 const OWNER_ID   = process.env.TELEGRAM_CHAT_ID || '6526134897';
@@ -25,8 +26,27 @@ let stats = { date: '', total: 0, long: 0, short: 0, bySource: {} };
 const lastSig  = {};
 const COOLDOWN = 15 * 60 * 1000;
 
+// ── آخر رمز حلّله المستخدم (للأوامر المركّزة بدون رمز) ─
+const lastAnalystSymbol = {};
+
+// ── تقسيم الرسائل الطويلة (حد تيليجرام 4096 حرفاً) ────
+function splitMessage(text, max = 4000) {
+  const chunks = [];
+  let cur = '';
+  for (const line of text.split('\n')) {
+    if (cur.length + line.length + 1 > max) {
+      if (cur) chunks.push(cur);
+      cur = line.length > max ? line.slice(0, max) : line;
+    } else {
+      cur = cur ? `${cur}\n${line}` : line;
+    }
+  }
+  if (cur) chunks.push(cur);
+  return chunks;
+}
+
 // ── Telegram ─────────────────────────────────────────
-async function tgSend(chatId, text) {
+async function tgSend(chatId, text, parseMode = 'HTML') {
   if (!TOKEN) { console.log(`[TG → ${chatId}]`, text); return true; }
   const r = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
     method:  'POST',
@@ -34,7 +54,7 @@ async function tgSend(chatId, text) {
     body:    JSON.stringify({
       chat_id:                  chatId,
       text,
-      parse_mode:               'HTML',
+      ...(parseMode ? { parse_mode: parseMode } : {}),
       disable_web_page_preview: true,
     }),
   }).catch(() => null);
@@ -195,6 +215,7 @@ async function handleTgUpdate(upd) {
 
   const chat    = String(msg.chat.id);
   const text    = msg.text.trim().split(' ')[0].split('@')[0];  // strip bot name + args
+  const args    = msg.text.trim().split(/\s+/).slice(1);
   const isOwner = chat === String(OWNER_ID);
 
   if (text === '/start') {
@@ -214,6 +235,11 @@ ${isOwner ? `/test    — إرسال إشارة تجريبية ✅
 /gex     — تقرير Gamma Exposure الآن
 /setup   — خطوات إعداد TradingView Alerts
 /channel — معلومات القناة
+
+<b>🧠 المحلل المؤسسي (Claude):</b>
+/mnq /mgc /mcl — تحليل كامل (أو أرسل الرمز مباشرة)
+/bias /levels /structure /liquidity — تحليل مركّز
+/scenarios /entry /risk /news /checklist — والمزيد
 \n🔐 <b>أنت المالك</b>` : ''}`
     );
     return;
@@ -280,6 +306,36 @@ ${srcLines}
 
   // Owner-only commands
   if (!isOwner) return;
+
+  // ═══ Institutional Analyst (Claude) ═══════════════════
+  // تحليل كامل: /mnq /mgc /mcl أو الرمز مباشرة (MNQ)
+  // أوامر مركّزة: /bias /levels /structure ... + رمز اختياري (/bias MGC)
+  {
+    const bare   = text.replace('/', '').toUpperCase();
+    const isFull = ANALYST_SYMBOLS.includes(bare);
+    const cmdKey = text.startsWith('/') ? text.slice(1).toLowerCase() : null;
+    const isCmd  = cmdKey != null && ANALYST_COMMANDS[cmdKey] !== undefined;
+
+    if (isFull || isCmd) {
+      const argSym = (args[0] || '').toUpperCase();
+      const symbol = isFull ? bare
+                   : ANALYST_SYMBOLS.includes(argSym) ? argSym
+                   : (lastAnalystSymbol[chat] || 'MNQ');
+      lastAnalystSymbol[chat] = symbol;
+
+      await tgSend(chat, `🧠 جاري التحليل المؤسسي — <b>${symbol}</b>${isCmd ? ` (${text})` : ''}\n⏳ قد يستغرق حتى دقيقتين...`);
+      try {
+        const report = await runAnalysis(symbol, isCmd ? cmdKey : null);
+        for (const chunk of splitMessage(report)) {
+          await tgSend(chat, chunk, null);   // نص عادي — تقرير المحلل ليس HTML
+        }
+      } catch (e) {
+        console.error('[Analyst] ❌', e.message);
+        await tgSend(chat, `❌ فشل التحليل: ${e.message}`);
+      }
+      return;
+    }
+  }
 
   if (text === '/test') {
     // Fire a test signal to verify owner DM + channel both receive it
