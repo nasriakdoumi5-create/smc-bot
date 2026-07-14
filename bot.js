@@ -13,6 +13,7 @@ import { createServer }   from 'http';
 import { currentSession } from './strategy_simple.js';
 import { getGEX, formatGEX } from './gex.js';
 import { runAnalysis, buildAllSummary, ANALYST_SYMBOLS, ANALYST_COMMANDS } from './analyst.js';
+import { runVisionAnalysis, VISION_SYMBOLS } from './chart_vision.js';
 import { ingestCandle, dbStatus, TIMEFRAMES } from './market_db.js';
 import { updateOnCandle, updateMemory, getMemory } from './market_memory.js';
 
@@ -257,6 +258,7 @@ ${isOwner ? `/test    — إرسال إشارة تجريبية ✅
 
 <b>🧠 المحلل المؤسسي (Claude):</b>
 /mnq /mgc /mcl — تحليل كامل (أو أرسل الرمز مباشرة)
+/vision — تحليل بصري مباشر على الشارت الحي 👁️
 /all — تقرير موحّد لكل الرموز (فوري)
 /bias /levels /structure /liquidity — تحليل مركّز
 /scenarios /entry /risk /news /checklist — والمزيد
@@ -333,6 +335,23 @@ ${srcLines}
   if (text === '/all') {
     const summary = buildAllSummary();
     for (const chunk of splitMessage(summary)) await tgSend(chat, chunk);
+    return;
+  }
+
+  // ═══ تحليل بصري مباشر على الشارت — /vision ═══════════
+  // يفتح شارت TradingView الحقيقي عبر CDP، يلتقط الأطر، ويحللها بالرؤية
+  if (text === '/vision') {
+    const argSym = (args[0] || '').toUpperCase();
+    const symbol = VISION_SYMBOLS.includes(argSym) ? argSym : (lastAnalystSymbol[chat] || 'MNQ');
+    lastAnalystSymbol[chat] = symbol;
+    await tgSend(chat, `👁️ فتح شارت <b>${symbol}</b> الحي والتقاط الأطر... ⏳ قد يستغرق دقيقة–دقيقتين`);
+    try {
+      const report = await runVisionAnalysis(symbol);
+      for (const chunk of splitMessage(report)) await tgSend(chat, chunk, null);
+    } catch (e) {
+      console.error('[Vision] ❌', e.message);
+      await tgSend(chat, `❌ فشل التحليل البصري: ${e.message}`);
+    }
     return;
   }
 
