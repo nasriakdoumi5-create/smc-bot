@@ -65,9 +65,6 @@ function chromiumPath() {
 // ── التقاط لقطات الأطر لرمز واحد ──────────────────────
 async function captureCharts(symbol) {
   const sessionId = process.env.TV_SESSIONID;
-  if (!sessionId) {
-    throw new Error('TV_SESSIONID غير مضبوط — أضف كوكي جلسة TradingView (انظر تعليمات chart_vision.js)');
-  }
   const tvSym = TV_SYMBOL[symbol];
   if (!tvSym) throw new Error(`رمز غير مدعوم: ${symbol}`);
 
@@ -75,45 +72,54 @@ async function captureCharts(symbol) {
   try {
     ({ chromium } = await import('playwright'));
   } catch {
-    throw new Error('playwright غير مثبّت على الخادم — التحليل البصري يحتاج Chromium (انظر تعليمات النشر)');
+    throw new Error('playwright غير مثبّت — التحليل البصري يحتاج Chromium (انظر تعليمات النشر)');
   }
 
-  const browser = await chromium.launch({
-    executablePath: chromiumPath(),
-    headless: true,
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
-  });
+  // وضعان:
+  //  (أ) CDP_ENDPOINT مضبوط → نتصل بـ Chrome مفتوح عندك (localhost:9222)
+  //      يستخدم جلستك المسجّلة مباشرة — لا حاجة لكوكي.
+  //  (ب) وإلا → نطلق Chromium خاصاً ونسجّل الدخول بكوكي sessionid (للخادم).
+  const cdpEndpoint = process.env.CDP_ENDPOINT;
+  let browser, context, ownsBrowser;
 
-  try {
-    const context = await browser.newContext({
-      viewport: { width: 1600, height: 900 },
-      deviceScaleFactor: 1,
+  if (cdpEndpoint) {
+    browser = await chromium.connectOverCDP(cdpEndpoint);
+    context = browser.contexts()[0] || (await browser.newContext());
+    ownsBrowser = false;   // لا نغلق متصفح المستخدم
+  } else {
+    if (!sessionId) {
+      throw new Error('TV_SESSIONID غير مضبوط — أضف كوكي جلسة TradingView، أو استخدم CDP_ENDPOINT للاتصال بـ Chrome محلي');
+    }
+    browser = await chromium.launch({
+      executablePath: chromiumPath(),
+      headless: true,
+      args: ['--no-sandbox', '--disable-dev-shm-usage'],
     });
-    // تسجيل الدخول عبر كوكي الجلسة
+    context = await browser.newContext({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1 });
     await context.addCookies([{
       name: 'sessionid', value: sessionId,
-      domain: '.tradingview.com', path: '/',
-      httpOnly: true, secure: true,
+      domain: '.tradingview.com', path: '/', httpOnly: true, secure: true,
     }]);
+    ownsBrowser = true;
+  }
 
-    const page = await context.newPage();
-    const shots = [];
-
+  const page = await context.newPage();
+  const shots = [];
+  try {
     for (const [label, interval] of TF) {
       const url = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSym)}&interval=${interval}`;
       try {
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-        // انتظار رسم الشارت (canvas)
-        await page.waitForTimeout(9000);
-        const png = await page.screenshot({ type: 'png' });
-        shots.push({ label, png });
+        await page.waitForTimeout(9000);   // انتظار رسم الشارت (canvas)
+        shots.push({ label, png: await page.screenshot({ type: 'png' }) });
       } catch (e) {
         console.error(`[Vision] فشل التقاط ${symbol} ${label}:`, e.message);
       }
     }
     return shots;
   } finally {
-    await browser.close();
+    await page.close().catch(() => {});
+    if (ownsBrowser) await browser.close().catch(() => {});   // لا نغلق متصفح المستخدم في وضع CDP
   }
 }
 
