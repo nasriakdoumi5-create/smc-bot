@@ -1,0 +1,4 @@
+# خدمة جلب شموع TradingView (tv_fetcher.py)
+requests>=2.31
+# مكتبة tvdatafeed المُحدَّثة (تقرأ شموع TradingView مباشرة عبر تسجيل الدخول)
+tvdatafeed @ git+https://github.com/rongardF/tvdatafeed.git
