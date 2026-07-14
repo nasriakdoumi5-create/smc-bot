@@ -3,3 +3,7 @@ node_modules/
 *.log
 data/market_db.json
 data/market_memory.json
+
+# Python
+__pycache__/
+*.pyc
