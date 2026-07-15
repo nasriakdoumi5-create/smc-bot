@@ -1,6 +1,7 @@
 """
-update_prices.py
-Reprices all 116 NasriTools listings to market-appropriate tiers.
+update_prices.py  v2
+Reprices all NasriTools listings to market tiers.
+Verifies each update by reading back Etsy's response.
 
 Tiers:
   BUNDLE_L  €19.99 — complete systems / large bundles (5+ products)
@@ -13,7 +14,6 @@ import json, os, time, requests, urllib.parse
 from pathlib import Path
 
 CLIENT_ID  = "pluc0garrgcjzhim0hawxf0k"
-SECRET     = "hc89hlqkd6"
 SHOP_ID    = 66526082
 TOKEN_FILE = Path(os.path.expanduser("~")) / "etsy_token.json"
 API        = "https://api.etsy.com/v3/application"
@@ -38,8 +38,10 @@ def get_token():
     return t
 
 def auth_headers(token):
-    return {"Authorization": "Bearer " + token["access_token"],
-            "x-api-key": CLIENT_ID + ":" + SECRET}
+    return {
+        "Authorization": "Bearer " + token["access_token"],
+        "x-api-key": CLIENT_ID,
+    }
 
 def detect_tier(title):
     t = title.lower()
@@ -86,7 +88,7 @@ def get_all_listings(token):
                          headers=auth_headers(token),
                          params={"limit": 100, "offset": offset}, timeout=30)
         if not r.ok:
-            print(f"Error: {r.status_code}")
+            print(f"  Error fetching listings: {r.status_code} {r.text[:200]}")
             break
         results = r.json().get("results", [])
         listings.extend(results)
@@ -97,18 +99,29 @@ def get_all_listings(token):
     return listings
 
 def update_price(token, lid, new_price):
+    body = urllib.parse.urlencode({"price": f"{new_price:.2f}"})
     r = requests.patch(
         f"{API}/shops/{SHOP_ID}/listings/{lid}",
         headers={**auth_headers(token), "Content-Type": "application/x-www-form-urlencoded"},
-        data=f"price={urllib.parse.quote(str(new_price))}",
+        data=body,
         timeout=30,
     )
-    return r.ok, r.status_code
+    if not r.ok:
+        return False, r.status_code, 0
+
+    # Read the actual price Etsy stored in its response
+    try:
+        resp = r.json()
+        price_raw = resp.get("price", {})
+        actual = float(price_raw.get("amount", 0)) / max(price_raw.get("divisor", 100), 1)
+    except Exception:
+        actual = -1
+    return True, r.status_code, actual
 
 def main():
     print("=" * 65)
-    print("  NasriTools — Price Updater")
-    print("  Repricing all listings to market tiers")
+    print("  NasriTools — Price Updater v2")
+    print("  Repricing all listings + verifying Etsy response")
     print("=" * 65)
 
     token    = get_token()
@@ -116,7 +129,7 @@ def main():
     total    = len(listings)
     print(f"[*] {total} listings found\n")
 
-    updated = skipped = failed = 0
+    updated = skipped = failed = mismatch = 0
     tier_counts = {}
 
     for idx, l in enumerate(listings, 1):
@@ -130,17 +143,22 @@ def main():
 
         if abs(current - new_price) < 0.02:
             skipped += 1
-            print(f"  [{idx:3}/{total}] SKIP  €{current:.2f} ({tier}): {title[:45]}")
+            print(f"  [{idx:3}/{total}] SKIP  €{current:.2f} ({tier}): {title[:50]}")
             time.sleep(0.05)
             continue
 
-        print(f"  [{idx:3}/{total}] [{tier:8}] €{current:.2f} → €{new_price:.2f} | {title[:38]}...", end=" ", flush=True)
+        print(f"  [{idx:3}/{total}] [{tier:8}] €{current:.2f} → €{new_price:.2f} | {title[:35]}...", end=" ", flush=True)
 
         token = get_token()
-        ok, code = update_price(token, lid, new_price)
+        ok, code, actual = update_price(token, lid, new_price)
+
         if ok:
-            print("✓")
-            updated += 1
+            if actual >= 0 and abs(actual - new_price) > 0.02:
+                print(f"⚠ API stored €{actual:.2f} instead of €{new_price:.2f}!")
+                mismatch += 1
+            else:
+                print(f"✓ (Etsy confirmed €{actual:.2f})")
+                updated += 1
         else:
             print(f"✗ ({code})")
             failed += 1
@@ -153,9 +171,10 @@ def main():
                    "BUNDLE_S": BUNDLE_S, "BUNDLE_L": BUNDLE_L}
 
     print(f"\n{'=' * 65}")
-    print(f"  Updated : {updated}")
-    print(f"  Skipped : {skipped} (already correct)")
-    print(f"  Failed  : {failed}")
+    print(f"  Updated OK : {updated}")
+    print(f"  Skipped    : {skipped} (already correct)")
+    print(f"  Mismatch   : {mismatch} (API accepted but stored wrong price)")
+    print(f"  Failed     : {failed}")
     print(f"\n  Tier breakdown:")
     for tier, count in sorted(tier_counts.items()):
         print(f"    {tier:10} {count:3}  →  €{tier_prices.get(tier, 0):.2f}")
