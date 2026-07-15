@@ -93,15 +93,14 @@ def get_all_listings(token):
     return listings
 
 def update_via_inventory(token, lid, new_price):
-    """Update price through the inventory endpoint (correct way for Etsy v3)."""
+    """Update price through the inventory endpoint (correct way for Etsy v3).
+    Note: inventory endpoint is /listings/{lid}/inventory, NOT under /shops/."""
+    inv_url = f"{API}/listings/{lid}/inventory"
+
     # 1. GET current inventory
-    r = requests.get(
-        f"{API}/shops/{SHOP_ID}/listings/{lid}/inventory",
-        headers=auth_headers(token),
-        timeout=30,
-    )
+    r = requests.get(inv_url, headers=auth_headers(token), timeout=30)
     if not r.ok:
-        return False, f"GET inv {r.status_code}", 0
+        return False, f"GET inv {r.status_code}: {r.text[:80]}", 0
 
     inv = r.json()
     products = inv.get("products", [])
@@ -117,10 +116,8 @@ def update_via_inventory(token, lid, new_price):
                 "divisor": 100,
                 "currency_code": "EUR",
             }
-            # Remove read-only fields from offering
             offering.pop("offering_id", None)
             offering.pop("is_deleted", None)
-        # Remove read-only fields from product
         product.pop("product_id", None)
 
     # 3. PUT inventory back
@@ -131,7 +128,7 @@ def update_via_inventory(token, lid, new_price):
         "sku_on_property": inv.get("sku_on_property", []),
     }
     r2 = requests.put(
-        f"{API}/shops/{SHOP_ID}/listings/{lid}/inventory",
+        inv_url,
         headers={**auth_headers(token), "Content-Type": "application/json"},
         json=payload,
         timeout=30,
