@@ -1,14 +1,7 @@
 """
-update_prices.py  v2
-Reprices all NasriTools listings to market tiers.
-Verifies each update by reading back Etsy's response.
-
-Tiers:
-  BUNDLE_L  €19.99 — complete systems / large bundles (5+ products)
-  BUNDLE_S   €9.99 — small bundles / kits (2-4 products)
-  PREMIUM    €7.99 — advanced dashboards, CRM, full managers
-  STANDARD   €4.99 — multi-feature planners & trackers
-  BASIC      €2.99 — simple single-feature templates
+update_prices.py  v3
+Reprices all NasriTools listings via the inventory endpoint.
+(Etsy ignores listing-level price PATCH for listings with inventory.)
 """
 import json, os, time, requests, urllib.parse
 from pathlib import Path
@@ -99,30 +92,66 @@ def get_all_listings(token):
         time.sleep(0.3)
     return listings
 
-def update_price(token, lid, new_price):
-    body = urllib.parse.urlencode({"price": f"{new_price:.2f}"})
-    r = requests.patch(
-        f"{API}/shops/{SHOP_ID}/listings/{lid}",
-        headers={**auth_headers(token), "Content-Type": "application/x-www-form-urlencoded"},
-        data=body,
+def update_via_inventory(token, lid, new_price):
+    """Update price through the inventory endpoint (correct way for Etsy v3)."""
+    # 1. GET current inventory
+    r = requests.get(
+        f"{API}/shops/{SHOP_ID}/listings/{lid}/inventory",
+        headers=auth_headers(token),
         timeout=30,
     )
     if not r.ok:
-        return False, r.status_code, 0
+        return False, f"GET inv {r.status_code}", 0
 
-    # Read the actual price Etsy stored in its response
+    inv = r.json()
+    products = inv.get("products", [])
+    if not products:
+        return False, "no products in inventory", 0
+
+    # 2. Update every offering's price
+    amount_cents = int(round(new_price * 100))
+    for product in products:
+        for offering in product.get("offerings", []):
+            offering["price"] = {
+                "amount": amount_cents,
+                "divisor": 100,
+                "currency_code": "EUR",
+            }
+            # Remove read-only fields from offering
+            offering.pop("offering_id", None)
+            offering.pop("is_deleted", None)
+        # Remove read-only fields from product
+        product.pop("product_id", None)
+
+    # 3. PUT inventory back
+    payload = {
+        "products": products,
+        "price_on_property": inv.get("price_on_property", []),
+        "quantity_on_property": inv.get("quantity_on_property", []),
+        "sku_on_property": inv.get("sku_on_property", []),
+    }
+    r2 = requests.put(
+        f"{API}/shops/{SHOP_ID}/listings/{lid}/inventory",
+        headers={**auth_headers(token), "Content-Type": "application/json"},
+        json=payload,
+        timeout=30,
+    )
+    if not r2.ok:
+        return False, f"PUT {r2.status_code}: {r2.text[:120]}", 0
+
+    # 4. Read back the actual stored price
     try:
-        resp = r.json()
-        price_raw = resp.get("price", {})
-        actual = float(price_raw.get("amount", 0)) / max(price_raw.get("divisor", 100), 1)
+        resp = r2.json()
+        prods = resp.get("products", [])
+        pr = prods[0]["offerings"][0]["price"] if prods else {}
+        actual = float(pr.get("amount", 0)) / max(pr.get("divisor", 100), 1)
     except Exception:
         actual = -1
-    return True, r.status_code, actual
+    return True, "ok", actual
 
 def main():
     print("=" * 65)
-    print("  NasriTools — Price Updater v2")
-    print("  Repricing all listings + verifying Etsy response")
+    print("  NasriTools — Price Updater v3 (inventory endpoint)")
     print("=" * 65)
 
     token    = get_token()
@@ -148,24 +177,24 @@ def main():
             time.sleep(0.05)
             continue
 
-        print(f"  [{idx:3}/{total}] [{tier:8}] €{current:.2f} → €{new_price:.2f} | {title[:35]}...", end=" ", flush=True)
+        print(f"  [{idx:3}/{total}] [{tier:8}] €{current:.2f} → €{new_price:.2f} | {title[:33]}...", end=" ", flush=True)
 
         token = get_token()
-        ok, code, actual = update_price(token, lid, new_price)
+        ok, msg, actual = update_via_inventory(token, lid, new_price)
 
         if ok:
             if actual >= 0 and abs(actual - new_price) > 0.02:
-                print(f"⚠ API stored €{actual:.2f} instead of €{new_price:.2f}!")
+                print(f"⚠ still €{actual:.2f}! ({msg})")
                 mismatch += 1
             else:
-                print(f"✓ (Etsy confirmed €{actual:.2f})")
+                print(f"✓ €{actual:.2f}")
                 updated += 1
         else:
-            print(f"✗ ({code})")
+            print(f"✗ {msg}")
             failed += 1
 
-        time.sleep(0.8)
-        if idx % 20 == 0:
+        time.sleep(1.0)
+        if idx % 15 == 0:
             token = get_token()
 
     tier_prices = {"BASIC": BASIC, "STANDARD": STANDARD, "PREMIUM": PREMIUM,
@@ -174,7 +203,7 @@ def main():
     print(f"\n{'=' * 65}")
     print(f"  Updated OK : {updated}")
     print(f"  Skipped    : {skipped} (already correct)")
-    print(f"  Mismatch   : {mismatch} (API accepted but stored wrong price)")
+    print(f"  Mismatch   : {mismatch}")
     print(f"  Failed     : {failed}")
     print(f"\n  Tier breakdown:")
     for tier, count in sorted(tier_counts.items()):
