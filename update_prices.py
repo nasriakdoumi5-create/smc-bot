@@ -14,6 +14,7 @@ import json, os, time, requests, urllib.parse
 from pathlib import Path
 
 CLIENT_ID  = "pluc0garrgcjzhim0hawxf0k"
+SECRET     = "hc89hlqkd6"
 SHOP_ID    = 66526082
 TOKEN_FILE = Path(os.path.expanduser("~")) / "etsy_token.json"
 API        = "https://api.etsy.com/v3/application"
@@ -40,7 +41,7 @@ def get_token():
 def auth_headers(token):
     return {
         "Authorization": "Bearer " + token["access_token"],
-        "x-api-key": CLIENT_ID,
+        "x-api-key": CLIENT_ID + ":" + SECRET,
     }
 
 def detect_tier(title):
