@@ -107,22 +107,33 @@ def update_via_inventory(token, lid, new_price):
     if not products:
         return False, "no products in inventory", 0
 
-    # 2. Update every offering's price
-    amount_cents = int(round(new_price * 100))
+    # 2. Rebuild a clean payload with ONLY the writable fields.
+    #    PUT expects price as a plain float, not the money object GET returns.
+    clean_products = []
     for product in products:
+        clean_offerings = []
         for offering in product.get("offerings", []):
-            offering["price"] = {
-                "amount": amount_cents,
-                "divisor": 100,
-                "currency_code": "EUR",
-            }
-            offering.pop("offering_id", None)
-            offering.pop("is_deleted", None)
-        product.pop("product_id", None)
+            clean_offerings.append({
+                "price": float(new_price),
+                "quantity": offering.get("quantity", 998),
+                "is_enabled": offering.get("is_enabled", True),
+            })
+        clean_props = []
+        for pv in product.get("property_values", []):
+            clean_props.append({
+                "property_id": pv.get("property_id"),
+                "value_ids": pv.get("value_ids", []),
+                "values": pv.get("values", []),
+            })
+        clean_products.append({
+            "sku": product.get("sku", "") or "",
+            "property_values": clean_props,
+            "offerings": clean_offerings,
+        })
 
     # 3. PUT inventory back
     payload = {
-        "products": products,
+        "products": clean_products,
         "price_on_property": inv.get("price_on_property", []),
         "quantity_on_property": inv.get("quantity_on_property", []),
         "sku_on_property": inv.get("sku_on_property", []),
