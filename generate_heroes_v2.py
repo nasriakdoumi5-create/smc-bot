@@ -15,8 +15,47 @@ from datetime import date
 
 OUTPUT = Path(__file__).parent / "output"
 
-PILL_STYLES = [
-    ("({}DCFCE7)", "#166534"), ]  # placeholder, replaced below
+# ── category color themes ───────────────────────────────────────────────
+# accent, accent_dark, bg tints (two radial gradients + linear), badge label
+THEMES = {
+    "finance":  {"a": "#16A34A", "a2": "#15803D", "t1": "#D9F5E3", "t2": "#E8FAEE", "label": "FINANCE TEMPLATE"},
+    "business": {"a": "#4F46E5", "a2": "#4338CA", "t1": "#E0E1FD", "t2": "#EEEEFE", "label": "BUSINESS TEMPLATE"},
+    "health":   {"a": "#E11D48", "a2": "#BE123C", "t1": "#FDE1E7", "t2": "#FDEEF1", "label": "HEALTH & FITNESS"},
+    "food":     {"a": "#D97706", "a2": "#B45309", "t1": "#FDEED3", "t2": "#FDF5E5", "label": "FOOD & MEAL PLANNING"},
+    "planner":  {"a": "#9333EA", "a2": "#7E22CE", "t1": "#F0E2FC", "t2": "#F7EFFE", "label": "PLANNER TEMPLATE"},
+    "education":{"a": "#2563EB", "a2": "#1D4ED8", "t1": "#DCE8FD", "t2": "#EBF2FE", "label": "STUDENT & LEARNING"},
+    "travel":   {"a": "#0891B2", "a2": "#0E7490", "t1": "#D5F1F7", "t2": "#E6F8FB", "label": "TRAVEL TEMPLATE"},
+    "creator":  {"a": "#DB2777", "a2": "#BE185D", "t1": "#FCE0ED", "t2": "#FDEFF6", "label": "CREATOR TEMPLATE"},
+    "home":     {"a": "#F97316", "a2": "#EA580C", "t1": "#FFE8D6", "t2": "#FFEDD5", "label": "GOOGLE SHEETS TEMPLATE"},
+}
+
+THEME_WORDS = [
+    ("finance",  ["budget", "expense", "debt", "invoice", "billing", "money", "saving",
+                  "financial", "cash", "fund", "retirement", "tax", "payroll", "loan", "profit"]),
+    ("health",   ["workout", "fitness", "gym", "weight", "sleep", "habit", "health",
+                  "wellness", "medication", "baby", "pregnancy", "mental"]),
+    ("food",     ["meal", "recipe", "grocery", "keto", "nutrition", "restaurant", "cafe", "food"]),
+    ("education",["student", "school", "study", "thesis", "course", "homeschool",
+                  "certification", "skill", "scholarship", "teacher", "tutor", "grade"]),
+    ("travel",   ["travel", "trip", "vacation", "itinerary", "packing", "airbnb"]),
+    ("creator",  ["content", "social media", "youtube", "instagram", "tiktok", "blog",
+                  "podcast", "influencer", "creator", "photography", "artist", "author", "musician"]),
+    ("business", ["kpi", "crm", "dashboard", "inventory", "lead", "sales", "client",
+                  "employee", "hr ", "hiring", "supply", "ecommerce", "dropshipping",
+                  "amazon", "etsy", "real estate", "law firm", "construction", "marketing",
+                  "startup", "agency", "coaching", "consulting", "freelance", "business",
+                  "project", "stock", "affiliate", "virtual assistant", "print on demand"]),
+    ("planner",  ["planner", "productivity", "goal", "weekly", "daily", "annual",
+                  "review", "time", "task", "wedding", "event", "car", "home", "pet",
+                  "garden", "cleaning", "gift", "christmas", "job application"]),
+]
+
+def detect_theme(cfg):
+    text = (cfg.get("slug", "") + " " + cfg.get("name", "")).lower().replace("_", " ")
+    for key, words in THEME_WORDS:
+        if any(w in text for w in words):
+            return THEMES[key]
+    return THEMES["home"]
 
 def esc(s):
     return html.escape(str(s))
@@ -26,9 +65,17 @@ def kpi_value(label, i):
     if "rate" in l or "%" in l or "progress" in l:
         return ["50%", "68%", "82%"][i % 3]
     if any(w in l for w in ("count", "clients", "tasks", "items", "orders",
-                            "total #", "active", "open", "done", "guests", "leads")):
-        return ["24", "12", "38"][i % 3]
-    return ["€2,930", "€1,458", "€1,472"][i % 3]
+                            "total #", "active", "open", "done", "guests", "leads",
+                            "workout", "session", "streak", "days", "habit", "meal",
+                            "trip", "post", "student", "volume", "chapters", "words",
+                            "skills", "low stock", "pending #", "applications",
+                            "classes", "courses", "events", "projects", "deals")):
+        return ["24", "12", "1,850"][i % 3]
+    if any(w in l for w in ("billed", "paid", "revenue", "income", "spent", "profit",
+                            "budget", "expense", "value", "balance", "saved", "cost",
+                            "pending", "month", "total")):
+        return ["€2,930", "€1,458", "€1,472"][i % 3]
+    return ["24", "€1,458", "82%"][i % 3]
 
 def short_subtitle(cfg):
     intro = cfg.get("description_intro", "") or cfg.get("subtitle", "")
@@ -71,13 +118,16 @@ def table_html(cfg):
         rows.append("<tr>" + "".join(tds) + "</tr>")
     return f"<table><tr>{ths}</tr>{''.join(rows)}</table>"
 
-def kpis_html(cfg):
+def kpis_html(cfg, theme=None):
     tab = next((t for t in cfg.get("tabs", []) if t.get("type") == "dashboard"), None)
     kpis = (tab or {}).get("kpis", [])[:3]
     if not kpis:
         kpis = [{"label": "This Month"}, {"label": "Total"}, {"label": "Rate"}]
-    grads = ["linear-gradient(135deg,#22C55E,#16A34A)",
-             "linear-gradient(135deg,#F97316,#EA580C)",
+    a  = (theme or THEMES["home"])["a"]
+    a2 = (theme or THEMES["home"])["a2"]
+    grads = [f"linear-gradient(135deg,{a},{a2})",
+             "linear-gradient(135deg,#22C55E,#16A34A)" if a != "#16A34A"
+                 else "linear-gradient(135deg,#F97316,#EA580C)",
              "linear-gradient(135deg,#1A1A2E,#343456)"]
     out = []
     for i, k in enumerate(kpis):
@@ -106,6 +156,7 @@ def chips_html(cfg):
     return "".join(f'<div class="chip">{c}</div>' for c in defaults[:3])
 
 def build_html(cfg):
+    th = detect_theme(cfg)
     first, last = split_title(cfg["name"])
     title_len = len(cfg["name"])
     tsize = 120 if title_len <= 22 else (96 if title_len <= 30 else 76)
@@ -113,16 +164,16 @@ def build_html(cfg):
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{width:2000px;height:2000px;font-family:'Liberation Sans',Arial,sans-serif;
-background:radial-gradient(1200px 900px at 85% -10%,#FFE8D6 0%,transparent 60%),
-radial-gradient(1000px 800px at -10% 110%,#FFEDD5 0%,transparent 55%),
+background:radial-gradient(1200px 900px at 85% -10%,{th["t1"]} 0%,transparent 60%),
+radial-gradient(1000px 800px at -10% 110%,{th["t2"]} 0%,transparent 55%),
 linear-gradient(160deg,#FFFBF7 0%,#FFF4EA 100%);
 overflow:hidden;position:relative;display:flex;flex-direction:column;align-items:center}}
-.topbar{{position:absolute;top:0;left:0;right:0;height:22px;background:linear-gradient(90deg,#F97316,#FB923C)}}
-.badge{{margin-top:100px;background:#1A1A2E;color:#FFD166;font-size:34px;font-weight:bold;
-letter-spacing:6px;padding:18px 44px;border-radius:999px}}
+.topbar{{position:absolute;top:0;left:0;right:0;height:22px;background:linear-gradient(90deg,{th["a"]},{th["a2"]})}}
+.badge{{margin-top:100px;background:#1A1A2E;color:#fff;font-size:34px;font-weight:bold;
+letter-spacing:6px;padding:18px 44px;border-radius:999px;border-bottom:6px solid {th["a"]}}}
 h1{{margin-top:44px;font-size:{tsize}px;font-weight:800;color:#1A1A2E;text-align:center;
 line-height:1.05;letter-spacing:-2px;max-width:1700px}}
-h1 span{{color:#F97316}}
+h1 span{{color:{th["a"]}}}
 .sub{{margin-top:26px;font-size:42px;color:#8B7E74;max-width:1600px;text-align:center}}
 .mockup{{margin-top:70px;width:1560px;background:#fff;border-radius:36px;overflow:hidden;
 box-shadow:0 60px 120px rgba(26,26,46,.22),0 20px 40px rgba(249,115,22,.12);transform:rotate(-1.2deg)}}
@@ -134,14 +185,14 @@ box-shadow:0 60px 120px rgba(26,26,46,.22),0 20px 40px rgba(249,115,22,.12);tran
 .kpi .l{{font-size:25px;opacity:.85;letter-spacing:2px}}
 .kpi .v{{font-size:54px;font-weight:800;margin-top:10px}}
 table{{width:calc(100% - 96px);margin:34px 48px 46px;border-collapse:collapse;font-size:29px}}
-th{{background:#F97316;color:#fff;padding:20px 24px;text-align:left;font-size:25px;letter-spacing:1px}}
+th{{background:{th["a"]};color:#fff;padding:20px 24px;text-align:left;font-size:25px;letter-spacing:1px}}
 td{{padding:19px 24px;border-bottom:2px solid #F4EDE6;color:#3A3530}}
 tr:nth-child(even) td{{background:#FFFAF4}}
 .pill{{display:inline-block;padding:7px 20px;border-radius:999px;font-size:23px;font-weight:bold}}
 .chips{{margin-top:64px;display:flex;gap:26px}}
 .chip{{background:#fff;border:3px solid #F1E5D8;border-radius:999px;font-size:34px;font-weight:bold;
 color:#1A1A2E;padding:22px 42px;box-shadow:0 8px 24px rgba(26,26,46,.06)}}
-.chip b{{color:#F97316}}
+.chip b{{color:{th["a"]}}}
 .footer{{position:absolute;bottom:0;left:0;right:0;height:150px;background:#1A1A2E;
 display:flex;align-items:center;justify-content:center;gap:30px}}
 .logo{{width:64px;height:64px;background:#F97316;border-radius:14px;display:grid;
@@ -153,7 +204,7 @@ grid-template-columns:repeat(3,1fr);gap:5px;padding:10px}}
 .footer small{{color:#8B90A5;font-size:30px}}
 </style></head><body>
 <div class="topbar"></div>
-<div class="badge">GOOGLE SHEETS TEMPLATE</div>
+<div class="badge">{th["label"]}</div>
 <h1>{esc(first)} <span>{esc(last)}</span></h1>
 <div class="sub">{esc(short_subtitle(cfg))}</div>
 <div class="mockup">
@@ -163,7 +214,7 @@ grid-template-columns:repeat(3,1fr);gap:5px;padding:10px}}
     <div class="dot" style="background:#22C55E"></div>
     <div class="mock-title">{emoji} {esc(cfg['name'])} — Dashboard</div>
   </div>
-  <div class="kpis">{kpis_html(cfg)}</div>
+  <div class="kpis">{kpis_html(cfg, th)}</div>
   {table_html(cfg)}
 </div>
 <div class="chips">{chips_html(cfg)}</div>
