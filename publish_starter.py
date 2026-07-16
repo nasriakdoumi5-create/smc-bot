@@ -7,15 +7,20 @@ Run:  python publish_starter.py
 import json, os, time, requests
 from pathlib import Path
 
-from build_starter import STARTER
-
 CLIENT_ID  = "pluc0garrgcjzhim0hawxf0k"
 SECRET     = "hc89hlqkd6"
 SHOP_ID    = 66526082
 TOKEN_FILE = Path(os.path.expanduser("~")) / "etsy_token.json"
 API        = "https://api.etsy.com/v3/application"
 
-SLUG       = STARTER["slug"]
+SLUG       = "starter_budget_tracker"
+TITLE      = ("Budget Template Google Sheets | Simple Budget Tracker | "
+              "Monthly Budget Spreadsheet | Easy Expense Tracker | Starter Finance Planner")
+TAGS       = ["budget template", "budget tracker", "google sheets budget",
+              "monthly budget", "expense tracker", "simple budget",
+              "budget spreadsheet", "finance tracker", "money tracker",
+              "budget planner", "spending tracker", "beginner budget",
+              "easy budget"]
 FOLDER     = Path(__file__).parent / "output" / SLUG
 PRICE      = 0.99
 TAXONOMY   = 2078          # Templates (digital downloads)
@@ -100,13 +105,13 @@ def main():
 
     # 1. Create draft listing
     print("  [1/4] Creating listing...")
-    tags = [t.strip()[:20] for t in STARTER["tags"][:13]]
+    tags = [t.strip()[:20] for t in TAGS[:13]]
     r = requests.post(
         f"{API}/shops/{SHOP_ID}/listings",
         headers={**auth_headers(token), "Content-Type": "application/json"},
         json={
             "quantity": 999,
-            "title": STARTER["listing_title"][:140],
+            "title": TITLE[:140],
             "description": build_description(),
             "price": PRICE,
             "who_made": "i_did",
