@@ -1,0 +1,15 @@
+{
+  "slug": "starter_budget_tracker",
+  "name": "Starter Budget Tracker",
+  "excel": "/home/user/smc-bot/output/starter_budget_tracker/starter_budget_tracker.xlsx",
+  "images": [
+    "/home/user/smc-bot/output/starter_budget_tracker/starter_budget_tracker_01_hero.jpg",
+    "/home/user/smc-bot/output/starter_budget_tracker/starter_budget_tracker_02_included.jpg",
+    "/home/user/smc-bot/output/starter_budget_tracker/starter_budget_tracker_03_how.jpg",
+    "/home/user/smc-bot/output/starter_budget_tracker/starter_budget_tracker_04_features.jpg",
+    "/home/user/smc-bot/output/starter_budget_tracker/starter_budget_tracker_05_cta.jpg"
+  ],
+  "pdf": "/home/user/smc-bot/output/starter_budget_tracker/starter_budget_tracker_guide.pdf",
+  "listing": "/home/user/smc-bot/output/starter_budget_tracker/starter_budget_tracker_listing.txt",
+  "built_at": "2026-07-16T14:30:52.915570"
+}
