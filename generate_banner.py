@@ -92,9 +92,9 @@ draw.text((tx+2, ty+162), '"Good tools don\'t expire."', font=fn_tag, fill=GREY)
 
 # right cards
 cards = [
-    ("116 Templates",    ORANGE),
-    ("No Subscription",  GREEN),
-    ("from €1.21",       BLUE),
+    ("116 Templates",        ORANGE),
+    ("No Subscription",      GREEN),
+    ("Buy Once, Own Forever", BLUE),
 ]
 cx2 = W - 780
 sy  = H//2 - 115
