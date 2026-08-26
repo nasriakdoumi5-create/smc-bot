@@ -55,22 +55,31 @@ def main():
     except Exception:
         pass
     print(f"\n  If the browser didn't open, paste this URL manually:\n  {url}\n")
-    print("  Waiting for approval (120s)...")
+    print("  In the browser: verify your identity if Etsy asks, then click")
+    print("  'Allow Access'. Waiting up to 5 minutes...")
 
     server = HTTPServer(("", 3003), _Handler)
-    server.timeout = 120
+    server.timeout = 300          # 5 minutes — time for identity verification
     server.handle_request()
     code = _auth_code
 
-    if not code:
-        print("\n  Auto-catch failed. After clicking Allow, the browser goes to")
-        print("  a localhost page. Copy the FULL address bar URL and paste here:")
+    # Manual fallback — loop so an accidental empty Enter doesn't quit
+    while not code:
+        print("\n  Auto-catch didn't fire. After clicking 'Allow Access', the")
+        print("  browser lands on a localhost page (may show 'can't be reached'")
+        print("  — that's fine). Copy the FULL address bar URL and paste it here.")
+        print("  (or press Enter on an empty line to give up)")
         raw = input("\n  URL: ").strip()
+        if not raw:
+            break
         if "code=" in raw:
             code = raw.split("code=")[-1].split("&")[0]
+        else:
+            print("  ⚠ That URL has no 'code=' in it — make sure you finished")
+            print("    clicking Allow first, then copy the address it redirected to.")
 
     if not code:
-        print("\n  ✗ No authorization code received. Try again.")
+        print("\n  ✗ No authorization code received. Run the script again.")
         return
 
     print("\n  Exchanging code for token...")
