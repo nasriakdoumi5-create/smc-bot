@@ -1,0 +1,613 @@
+<title>Etsy — رفع المنتجات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=JetBrains+Mono:wght@400;500&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+:root{--bg:#E9ECF0;--surface:#fff;--surface-2:#F4F6F8;--ink:#0F151C;--ink-2:#48545F;--ink-3:#7B8794;
+--line:#D3DAE1;--line-2:#BCC5CE;--go:#0F6B3D;--go-bg:#DDF2E5;--go-line:#8CCBA8;--amber:#B26A00;
+--amber-bg:#FDF1DC;--amber-line:#EBC183;--shadow:0 1px 2px rgba(15,21,28,.05),0 4px 14px rgba(15,21,28,.06);
+--shadow-lg:0 2px 5px rgba(15,21,28,.08),0 14px 34px rgba(15,21,28,.11)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0C1116;--surface:#151C24;
+--surface-2:#1B242D;--ink:#E7ECF1;--ink-2:#A2AEBA;--ink-3:#717E8B;--line:#25313C;--line-2:#334252;
+--go:#4FBE84;--go-bg:#0D2C1B;--go-line:#245C3B;--amber:#E0A03E;--amber-bg:#2E220C;--amber-line:#5C4718;
+--shadow:0 1px 2px rgba(0,0,0,.45),0 4px 14px rgba(0,0,0,.35);--shadow-lg:0 2px 5px rgba(0,0,0,.5),0 14px 34px rgba(0,0,0,.45)}}
+:root[data-theme="dark"]{--bg:#0C1116;--surface:#151C24;--surface-2:#1B242D;--ink:#E7ECF1;--ink-2:#A2AEBA;
+--ink-3:#717E8B;--line:#25313C;--line-2:#334252;--go:#4FBE84;--go-bg:#0D2C1B;--go-line:#245C3B;
+--amber:#E0A03E;--amber-bg:#2E220C;--amber-line:#5C4718;
+--shadow:0 1px 2px rgba(0,0,0,.45),0 4px 14px rgba(0,0,0,.35);--shadow-lg:0 2px 5px rgba(0,0,0,.5),0 14px 34px rgba(0,0,0,.45)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Source Sans 3",system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:"Archivo",system-ui,sans-serif;margin:0;line-height:1.15}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.wrap{max-width:900px;margin:0 auto;padding:0 18px}
+button{font-family:inherit;cursor:pointer}
+.top{background:var(--ink);color:#fff;padding:26px 0 24px}
+.top h1{font-size:clamp(25px,5vw,34px);font-weight:800;letter-spacing:-.02em;color:#fff}
+.top .sub{color:#A2AEBA;font-size:15px;margin-top:6px}
+.top .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.pill{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:5px 11px;border-radius:20px;background:rgba(255,255,255,.09);color:#C8D2DC;border:1px solid rgba(255,255,255,.13)}
+.pill.hot{background:rgba(224,160,62,.18);color:#E8B968;border-color:rgba(224,160,62,.35)}
+.alert{background:var(--amber-bg);border:1px solid var(--amber-line);border-left:4px solid var(--amber);border-radius:10px;padding:15px 17px;margin:22px 0;font-size:14.5px}
+.alert h3{font-size:16px;color:var(--amber);margin-bottom:5px}
+.alert p{margin:0;color:var(--ink-2)}.alert b{color:var(--ink)}
+h2.sec{font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin:32px 0 14px;display:flex;align-items:center;gap:10px}
+h2.sec::after{content:"";flex:1;height:1px;background:var(--line)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden;transition:opacity .2s}
+.card.done{opacity:.5}
+.chead{padding:16px 18px;display:flex;align-items:center;gap:13px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.ck{width:26px;height:26px;border-radius:8px;border:2px solid var(--line-2);background:var(--surface);flex:none;display:grid;place-items:center;transition:.15s;padding:0}
+.ck:hover{border-color:var(--go)}.ck.on{background:var(--go);border-color:var(--go)}
+.ck svg{width:14px;height:14px;stroke:#fff;fill:none;stroke-width:3;opacity:0}.ck.on svg{opacity:1}
+.ct{flex:1;min-width:0}.ct h3{font-size:19px;font-weight:700}
+.ct .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+.tag{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding:3px 8px;border-radius:5px;background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line)}
+.tag.p{background:var(--go-bg);color:var(--go);border-color:var(--go-line)}
+.price{font-family:"Archivo",sans-serif;font-size:24px;font-weight:800;color:var(--go);flex:none}
+.cb{padding:16px 18px}
+.lbl{font-family:"JetBrains Mono",monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);margin-bottom:7px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.copy{font-family:inherit;font-size:12px;font-weight:600;text-transform:none;letter-spacing:0;padding:4px 12px;border-radius:6px;border:1px solid var(--line-2);background:var(--surface-2);color:var(--ink-2);transition:.15s}
+.copy:hover{border-color:var(--ink-3);color:var(--ink)}
+.copy.ok{background:var(--go-bg);border-color:var(--go-line);color:var(--go)}
+.box{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:13px 14px;font-size:14px;line-height:1.6;white-space:pre-wrap;margin-bottom:15px;max-height:230px;overflow:auto}
+.box.sm{font-size:13.5px}
+.files{display:grid;gap:7px;margin-top:4px}
+.f{display:flex;align-items:center;gap:9px;font-size:13px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.f .ic{font-size:15px}.f .n{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.f .o{font-size:11px;color:var(--ink-3)}
+footer{text-align:center;padding:34px 18px 48px;color:var(--ink-3);font-size:13px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(80px);background:var(--ink);color:var(--bg);padding:11px 20px;border-radius:24px;font-size:14px;font-weight:600;box-shadow:var(--shadow-lg);opacity:0;transition:transform .28s cubic-bezier(.2,.8,.3,1),opacity .28s;z-index:50}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+@media(max-width:560px){.cb{padding:14px}.chead{padding:14px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+:focus-visible{outline:2.5px solid var(--go);outline-offset:2px;border-radius:4px}
+</style>
+
+<div class="top"><div class="wrap">
+  <h1>رفع منتجات Etsy</h1>
+  <div class="sub">كل ما تحتاجه لكل منتج — بزرّ نسخ واحد</div>
+  <div class="meta"><span class="pill hot">ابدأ بثلاثة فقط</span><span class="pill">7 منتجات جاهزة</span><span class="pill">NasriTools</span></div>
+</div></div>
+
+<div class="wrap">
+  <div class="alert">
+    <h3>⚠️ خطتك أنت — والتزم بها</h3>
+    <p>كتبتَ في خطة الإطلاق: <b>"لا ترفع كل شيء دفعة واحدة — 3 منتجات ممتازة تكفي للبداية."</b><br>
+    ابدأ بالثلاثة المعلَّمة <b>"ابدأ بهذا"</b> · راقب المشاهدات أسبوعين · ثم ارفع الباقي.</p>
+  </div>
+
+  <div class="alert" style="background:var(--surface);border-color:var(--line);border-left-color:var(--go)">
+    <h3 style="color:var(--go)">📋 لكل منتج في Etsy</h3>
+    <p><b>1)</b> Listings → Add a listing → <b>Digital</b><br>
+    <b>2)</b> ارفع الصور (الأولى = لوحة التحكّم) ثم الفيديو<br>
+    <b>3)</b> الصق العنوان ← الوصف ← الوسوم<br>
+    <b>4)</b> السعر · Quantity: <b>999</b> · Type: <b>Digital</b><br>
+    <b>5)</b> ارفع ملف <b>.xlsx</b><br>
+    <b>6)</b> <b>Save as draft</b> — راجع، ثم انشر</p>
+  </div>
+
+  <h2 class="sec">المنتجات</h2>
+  
+<div class="card" id="c1">
+  <div class="chead">
+    <button class="ck" data-ck="c1" aria-label="تم"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
+    <div class="ct">
+      <h3>Trading Journal</h3>
+      <div class="tags"><span class="tag p">ابدأ بهذا</span><span class="tag">13 وسماً</span><span class="tag">1604 حرفاً</span></div>
+    </div>
+    <div class="price">$19.99</div>
+  </div>
+  <div class="cb">
+    <div class="lbl">العنوان · 124/140 حرفاً <button class="copy" data-c="t1">نسخ</button></div>
+    <div class="box sm" id="t1">Options Trading Journal Google Sheets &amp; Excel | Trade Tracker with Win Rate, Profit Factor &amp; Equity Curve | Instant Download</div>
+    <div class="lbl">الوصف <button class="copy" data-c="d1">نسخ</button></div>
+    <div class="box" id="d1">★ Options Trading Journal — Google Sheets &amp; Excel Template ★
+
+Stop juggling messy notes and half-finished spreadsheets. This template helps you log every trade and see your real win rate, P&amp;L and best strategies.
+
+Built for options and day traders who want to improve, not guess.
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHAT&#x27;S INCLUDED
+━━━━━━━━━━━━━━━━━━━━
+✓ Trade Log
+✓ P&amp;L Dashboard
+✓ Win Rate Analytics
+✓ Strategy Breakdown
+✓ Risk Calculator
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHY YOU&#x27;LL LOVE IT
+━━━━━━━━━━━━━━━━━━━━
+✔ Automatic calculations — no formulas to write
+✔ Visual charts update as you type
+✔ Works in Google Sheets (free) AND Microsoft Excel
+✔ Fully editable — change categories, colors, currency
+✔ Works on phone, tablet and desktop
+✔ No subscription, no sign-up, no watermarks
+✔ Buy once, own forever
+
+━━━━━━━━━━━━━━━━━━━━
+✦ HOW IT WORKS
+━━━━━━━━━━━━━━━━━━━━
+1. Purchase → instant download (no waiting)
+2. Open in Google Sheets: File → Import → Upload
+   (or open the .xlsx directly in Excel)
+3. Fill in the highlighted cells
+4. Your dashboard updates automatically ✨
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHAT YOU GET
+━━━━━━━━━━━━━━━━━━━━
+• 1 x .xlsx file (Google Sheets + Excel compatible)
+• Step-by-step setup guide
+• Free lifetime updates
+• Friendly support — I reply within 24h
+
+━━━━━━━━━━━━━━━━━━━━
+✦ PLEASE NOTE
+━━━━━━━━━━━━━━━━━━━━
+This is a DIGITAL product. No physical item will be shipped.
+Due to the instant-download nature, all sales are final —
+but if anything doesn&#x27;t work, message me and I&#x27;ll fix it fast.
+
+Questions? Send me a message — happy to help! 🧡
+
+#GoogleSheets #ExcelTemplate #Spreadsheet #DigitalDownload</div>
+    <div class="lbl">الوسوم الـ13 <button class="copy" data-c="g1">نسخ</button></div>
+    <div class="box sm" id="g1">trading journal, options trading, trade tracker, day trading, google sheets, excel template, profit loss tracker, investment tracker, trading log, portfolio tracker, risk calculator, stock tracker, instant download</div>
+    <div class="lbl">الملفات (من مجلد etsy)</div>
+    <div class="files"><div class="f"><span class="ic">🖼️</span><span class="n">01_Trading_Journal.png</span><span class="o">صورة 1</span></div><div class="f"><span class="ic">🖼️</span><span class="n">included_trading.png</span><span class="o">صورة 2</span></div><div class="f"><span class="ic">🖼️</span><span class="n">00_How_It_Works.png</span><span class="o">صورة 3</span></div><div class="f"><span class="ic">🎬</span><span class="n">demo_trading.mp4</span><span class="o">فيديو</span></div><div class="f"><span class="ic">📊</span><span class="n">PREMIUM_Trading_Journal.xlsx</span><span class="o">الملف الرقمي</span></div></div>
+  </div>
+</div>
+<div class="card" id="c2">
+  <div class="chead">
+    <button class="ck" data-ck="c2" aria-label="تم"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
+    <div class="ct">
+      <h3>Business KPI Dashboard</h3>
+      <div class="tags"><span class="tag p">ابدأ بهذا</span><span class="tag">13 وسماً</span><span class="tag">1565 حرفاً</span></div>
+    </div>
+    <div class="price">$19.99</div>
+  </div>
+  <div class="cb">
+    <div class="lbl">العنوان · 130/140 حرفاً <button class="copy" data-c="t2">نسخ</button></div>
+    <div class="box sm" id="t2">Business KPI Dashboard Google Sheets &amp; Excel | Small Business Revenue, Profit &amp; ROAS Tracker | Automatic Charts | Instant Download</div>
+    <div class="lbl">الوصف <button class="copy" data-c="d2">نسخ</button></div>
+    <div class="box" id="d2">★ Business KPI Dashboard — Google Sheets &amp; Excel Template ★
+
+Stop juggling messy notes and half-finished spreadsheets. This template helps you track revenue, growth and key metrics on one visual dashboard.
+
+Built for small business owners and startup founders.
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHAT&#x27;S INCLUDED
+━━━━━━━━━━━━━━━━━━━━
+✓ KPI Dashboard
+✓ Revenue Tracker
+✓ Growth Charts
+✓ Monthly Reports
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHY YOU&#x27;LL LOVE IT
+━━━━━━━━━━━━━━━━━━━━
+✔ Automatic calculations — no formulas to write
+✔ Visual charts update as you type
+✔ Works in Google Sheets (free) AND Microsoft Excel
+✔ Fully editable — change categories, colors, currency
+✔ Works on phone, tablet and desktop
+✔ No subscription, no sign-up, no watermarks
+✔ Buy once, own forever
+
+━━━━━━━━━━━━━━━━━━━━
+✦ HOW IT WORKS
+━━━━━━━━━━━━━━━━━━━━
+1. Purchase → instant download (no waiting)
+2. Open in Google Sheets: File → Import → Upload
+   (or open the .xlsx directly in Excel)
+3. Fill in the highlighted cells
+4. Your dashboard updates automatically ✨
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHAT YOU GET
+━━━━━━━━━━━━━━━━━━━━
+• 1 x .xlsx file (Google Sheets + Excel compatible)
+• Step-by-step setup guide
+• Free lifetime updates
+• Friendly support — I reply within 24h
+
+━━━━━━━━━━━━━━━━━━━━
+✦ PLEASE NOTE
+━━━━━━━━━━━━━━━━━━━━
+This is a DIGITAL product. No physical item will be shipped.
+Due to the instant-download nature, all sales are final —
+but if anything doesn&#x27;t work, message me and I&#x27;ll fix it fast.
+
+Questions? Send me a message — happy to help! 🧡
+
+#GoogleSheets #ExcelTemplate #Spreadsheet #DigitalDownload</div>
+    <div class="lbl">الوسوم الـ13 <button class="copy" data-c="g2">نسخ</button></div>
+    <div class="box sm" id="g2">kpi dashboard, business dashboard, sales tracker, revenue tracker, google sheets, excel dashboard, business planner, small business, metrics tracker, startup tools, profit tracker, roas tracker, instant download</div>
+    <div class="lbl">الملفات (من مجلد etsy)</div>
+    <div class="files"><div class="f"><span class="ic">🖼️</span><span class="n">02_Business_KPI.png</span><span class="o">صورة 1</span></div><div class="f"><span class="ic">🖼️</span><span class="n">included_business.png</span><span class="o">صورة 2</span></div><div class="f"><span class="ic">🖼️</span><span class="n">00_How_It_Works.png</span><span class="o">صورة 3</span></div><div class="f"><span class="ic">🎬</span><span class="n">demo_business.mp4</span><span class="o">فيديو</span></div><div class="f"><span class="ic">📊</span><span class="n">PREMIUM_Business_KPI.xlsx</span><span class="o">الملف الرقمي</span></div></div>
+  </div>
+</div>
+<div class="card" id="c3">
+  <div class="chead">
+    <button class="ck" data-ck="c3" aria-label="تم"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
+    <div class="ct">
+      <h3>Monthly Budget Tracker</h3>
+      <div class="tags"><span class="tag p">ابدأ بهذا</span><span class="tag">13 وسماً</span><span class="tag">1585 حرفاً</span></div>
+    </div>
+    <div class="price">$12.99</div>
+  </div>
+  <div class="cb">
+    <div class="lbl">العنوان · 124/140 حرفاً <button class="copy" data-c="t3">نسخ</button></div>
+    <div class="box sm" id="t3">Monthly Budget Tracker Google Sheets &amp; Excel | Automatic Expense Dashboard with Charts | Track Every Euro | Instant Download</div>
+    <div class="lbl">الوصف <button class="copy" data-c="d3">نسخ</button></div>
+    <div class="box" id="d3">★ Monthly Budget &amp; Expense Tracker — Google Sheets &amp; Excel Template ★
+
+Stop juggling messy notes and half-finished spreadsheets. This template helps you see exactly where every euro goes with automatic charts.
+
+Built for couples, families, and anyone tired of overspending.
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHAT&#x27;S INCLUDED
+━━━━━━━━━━━━━━━━━━━━
+✓ Monthly Budget Dashboard
+✓ Expense Log
+✓ Category Charts
+✓ Savings Goals
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHY YOU&#x27;LL LOVE IT
+━━━━━━━━━━━━━━━━━━━━
+✔ Automatic calculations — no formulas to write
+✔ Visual charts update as you type
+✔ Works in Google Sheets (free) AND Microsoft Excel
+✔ Fully editable — change categories, colors, currency
+✔ Works on phone, tablet and desktop
+✔ No subscription, no sign-up, no watermarks
+✔ Buy once, own forever
+
+━━━━━━━━━━━━━━━━━━━━
+✦ HOW IT WORKS
+━━━━━━━━━━━━━━━━━━━━
+1. Purchase → instant download (no waiting)
+2. Open in Google Sheets: File → Import → Upload
+   (or open the .xlsx directly in Excel)
+3. Fill in the highlighted cells
+4. Your dashboard updates automatically ✨
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHAT YOU GET
+━━━━━━━━━━━━━━━━━━━━
+• 1 x .xlsx file (Google Sheets + Excel compatible)
+• Step-by-step setup guide
+• Free lifetime updates
+• Friendly support — I reply within 24h
+
+━━━━━━━━━━━━━━━━━━━━
+✦ PLEASE NOTE
+━━━━━━━━━━━━━━━━━━━━
+This is a DIGITAL product. No physical item will be shipped.
+Due to the instant-download nature, all sales are final —
+but if anything doesn&#x27;t work, message me and I&#x27;ll fix it fast.
+
+Questions? Send me a message — happy to help! 🧡
+
+#GoogleSheets #ExcelTemplate #Spreadsheet #DigitalDownload</div>
+    <div class="lbl">الوسوم الـ13 <button class="copy" data-c="g3">نسخ</button></div>
+    <div class="box sm" id="g3">budget template, monthly budget, expense tracker, google sheets, excel budget, budget planner, money tracker, personal finance, budget spreadsheet, family budget, savings tracker, paycheck budget, instant download</div>
+    <div class="lbl">الملفات (من مجلد etsy)</div>
+    <div class="files"><div class="f"><span class="ic">🖼️</span><span class="n">04_Budget_Tracker.png</span><span class="o">صورة 1</span></div><div class="f"><span class="ic">🖼️</span><span class="n">included_budget.png</span><span class="o">صورة 2</span></div><div class="f"><span class="ic">🖼️</span><span class="n">00_How_It_Works.png</span><span class="o">صورة 3</span></div><div class="f"><span class="ic">🎬</span><span class="n">demo_budget.mp4</span><span class="o">فيديو</span></div><div class="f"><span class="ic">📊</span><span class="n">PREMIUM_Budget_Tracker.xlsx</span><span class="o">الملف الرقمي</span></div></div>
+  </div>
+</div>
+<div class="card" id="c4">
+  <div class="chead">
+    <button class="ck" data-ck="c4" aria-label="تم"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
+    <div class="ct">
+      <h3>Invoice &amp; Client Tracker</h3>
+      <div class="tags"><span class="tag">13 وسماً</span><span class="tag">1580 حرفاً</span></div>
+    </div>
+    <div class="price">$14.99</div>
+  </div>
+  <div class="cb">
+    <div class="lbl">العنوان · 126/140 حرفاً <button class="copy" data-c="t4">نسخ</button></div>
+    <div class="box sm" id="t4">Invoice Tracker Google Sheets &amp; Excel | Freelancer Client Manager with Payment Status &amp; Outstanding Balance | Instant Download</div>
+    <div class="lbl">الوصف <button class="copy" data-c="d4">نسخ</button></div>
+    <div class="box" id="d4">★ Freelancer Invoice Tracker — Google Sheets &amp; Excel Template ★
+
+Stop juggling messy notes and half-finished spreadsheets. This template helps you send professional invoices and never lose track of who owes you.
+
+Built for freelancers, consultants and service providers.
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHAT&#x27;S INCLUDED
+━━━━━━━━━━━━━━━━━━━━
+✓ Invoice Generator
+✓ Client Database
+✓ Payment Tracker
+✓ Income Summary
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHY YOU&#x27;LL LOVE IT
+━━━━━━━━━━━━━━━━━━━━
+✔ Automatic calculations — no formulas to write
+✔ Visual charts update as you type
+✔ Works in Google Sheets (free) AND Microsoft Excel
+✔ Fully editable — change categories, colors, currency
+✔ Works on phone, tablet and desktop
+✔ No subscription, no sign-up, no watermarks
+✔ Buy once, own forever
+
+━━━━━━━━━━━━━━━━━━━━
+✦ HOW IT WORKS
+━━━━━━━━━━━━━━━━━━━━
+1. Purchase → instant download (no waiting)
+2. Open in Google Sheets: File → Import → Upload
+   (or open the .xlsx directly in Excel)
+3. Fill in the highlighted cells
+4. Your dashboard updates automatically ✨
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHAT YOU GET
+━━━━━━━━━━━━━━━━━━━━
+• 1 x .xlsx file (Google Sheets + Excel compatible)
+• Step-by-step setup guide
+• Free lifetime updates
+• Friendly support — I reply within 24h
+
+━━━━━━━━━━━━━━━━━━━━
+✦ PLEASE NOTE
+━━━━━━━━━━━━━━━━━━━━
+This is a DIGITAL product. No physical item will be shipped.
+Due to the instant-download nature, all sales are final —
+but if anything doesn&#x27;t work, message me and I&#x27;ll fix it fast.
+
+Questions? Send me a message — happy to help! 🧡
+
+#GoogleSheets #ExcelTemplate #Spreadsheet #DigitalDownload</div>
+    <div class="lbl">الوسوم الـ13 <button class="copy" data-c="g4">نسخ</button></div>
+    <div class="box sm" id="g4">invoice template, freelance invoice, client tracker, payment tracker, google sheets, excel invoice, small business, self employed, billing template, income tracker, consultant tools, invoice system, instant download</div>
+    <div class="lbl">الملفات (من مجلد etsy)</div>
+    <div class="files"><div class="f"><span class="ic">🖼️</span><span class="n">03_Invoice_Client.png</span><span class="o">صورة 1</span></div><div class="f"><span class="ic">🖼️</span><span class="n">included_invoice.png</span><span class="o">صورة 2</span></div><div class="f"><span class="ic">🖼️</span><span class="n">00_How_It_Works.png</span><span class="o">صورة 3</span></div><div class="f"><span class="ic">🎬</span><span class="n">demo_invoice.mp4</span><span class="o">فيديو</span></div><div class="f"><span class="ic">📊</span><span class="n">PREMIUM_Invoice_Client.xlsx</span><span class="o">الملف الرقمي</span></div></div>
+  </div>
+</div>
+<div class="card" id="c5">
+  <div class="chead">
+    <button class="ck" data-ck="c5" aria-label="تم"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
+    <div class="ct">
+      <h3>Habit Tracker</h3>
+      <div class="tags"><span class="tag">13 وسماً</span><span class="tag">1606 حرفاً</span></div>
+    </div>
+    <div class="price">$12.99</div>
+  </div>
+  <div class="cb">
+    <div class="lbl">العنوان · 127/140 حرفاً <button class="copy" data-c="t5">نسخ</button></div>
+    <div class="box sm" id="t5">Habit Tracker Google Sheets &amp; Excel | 30-Day Challenge with Streak Counter &amp; Progress Charts | Daily Routine | Instant Download</div>
+    <div class="lbl">الوصف <button class="copy" data-c="d5">نسخ</button></div>
+    <div class="box" id="d5">★ Habit Tracker &amp; 30-Day Challenge — Google Sheets &amp; Excel Template ★
+
+Stop juggling messy notes and half-finished spreadsheets. This template helps you build lasting habits with streaks and visual progress you can actually see.
+
+Built for anyone building a new routine or breaking an old one.
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHAT&#x27;S INCLUDED
+━━━━━━━━━━━━━━━━━━━━
+✓ 30-Day Challenge Grid
+✓ Streak Counter
+✓ Progress Charts
+✓ Monthly Review
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHY YOU&#x27;LL LOVE IT
+━━━━━━━━━━━━━━━━━━━━
+✔ Automatic calculations — no formulas to write
+✔ Visual charts update as you type
+✔ Works in Google Sheets (free) AND Microsoft Excel
+✔ Fully editable — change categories, colors, currency
+✔ Works on phone, tablet and desktop
+✔ No subscription, no sign-up, no watermarks
+✔ Buy once, own forever
+
+━━━━━━━━━━━━━━━━━━━━
+✦ HOW IT WORKS
+━━━━━━━━━━━━━━━━━━━━
+1. Purchase → instant download (no waiting)
+2. Open in Google Sheets: File → Import → Upload
+   (or open the .xlsx directly in Excel)
+3. Fill in the highlighted cells
+4. Your dashboard updates automatically ✨
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHAT YOU GET
+━━━━━━━━━━━━━━━━━━━━
+• 1 x .xlsx file (Google Sheets + Excel compatible)
+• Step-by-step setup guide
+• Free lifetime updates
+• Friendly support — I reply within 24h
+
+━━━━━━━━━━━━━━━━━━━━
+✦ PLEASE NOTE
+━━━━━━━━━━━━━━━━━━━━
+This is a DIGITAL product. No physical item will be shipped.
+Due to the instant-download nature, all sales are final —
+but if anything doesn&#x27;t work, message me and I&#x27;ll fix it fast.
+
+Questions? Send me a message — happy to help! 🧡
+
+#GoogleSheets #ExcelTemplate #Spreadsheet #DigitalDownload</div>
+    <div class="lbl">الوسوم الـ13 <button class="copy" data-c="g5">نسخ</button></div>
+    <div class="box sm" id="g5">habit tracker, 30 day challenge, routine planner, daily planner, google sheets, excel template, productivity tracker, goal tracker, self improvement, streak tracker, morning routine, habit builder, instant download</div>
+    <div class="lbl">الملفات (من مجلد etsy)</div>
+    <div class="files"><div class="f"><span class="ic">🖼️</span><span class="n">05_Habit_Tracker.png</span><span class="o">صورة 1</span></div><div class="f"><span class="ic">🖼️</span><span class="n">included_habit.png</span><span class="o">صورة 2</span></div><div class="f"><span class="ic">🖼️</span><span class="n">00_How_It_Works.png</span><span class="o">صورة 3</span></div><div class="f"><span class="ic">🎬</span><span class="n">demo_habit.mp4</span><span class="o">فيديو</span></div><div class="f"><span class="ic">📊</span><span class="n">PREMIUM_Habit_Tracker.xlsx</span><span class="o">الملف الرقمي</span></div></div>
+  </div>
+</div>
+<div class="card" id="c6">
+  <div class="chead">
+    <button class="ck" data-ck="c6" aria-label="تم"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
+    <div class="ct">
+      <h3>Student Planner + GPA</h3>
+      <div class="tags"><span class="tag">13 وسماً</span><span class="tag">1579 حرفاً</span></div>
+    </div>
+    <div class="price">$12.99</div>
+  </div>
+  <div class="cb">
+    <div class="lbl">العنوان · 128/140 حرفاً <button class="copy" data-c="t6">نسخ</button></div>
+    <div class="box sm" id="t6">Student Planner Google Sheets &amp; Excel | Assignment Tracker with Automatic GPA Calculator | Academic Organizer | Instant Download</div>
+    <div class="lbl">الوصف <button class="copy" data-c="d6">نسخ</button></div>
+    <div class="box" id="d6">★ Student Planner &amp; GPA Calculator — Google Sheets &amp; Excel Template ★
+
+Stop juggling messy notes and half-finished spreadsheets. This template helps you track every assignment and calculate your GPA automatically.
+
+Built for college and high school students.
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHAT&#x27;S INCLUDED
+━━━━━━━━━━━━━━━━━━━━
+✓ Class Schedule
+✓ Assignment Tracker
+✓ GPA Calculator
+✓ Study Log
+✓ Exam Countdown
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHY YOU&#x27;LL LOVE IT
+━━━━━━━━━━━━━━━━━━━━
+✔ Automatic calculations — no formulas to write
+✔ Visual charts update as you type
+✔ Works in Google Sheets (free) AND Microsoft Excel
+✔ Fully editable — change categories, colors, currency
+✔ Works on phone, tablet and desktop
+✔ No subscription, no sign-up, no watermarks
+✔ Buy once, own forever
+
+━━━━━━━━━━━━━━━━━━━━
+✦ HOW IT WORKS
+━━━━━━━━━━━━━━━━━━━━
+1. Purchase → instant download (no waiting)
+2. Open in Google Sheets: File → Import → Upload
+   (or open the .xlsx directly in Excel)
+3. Fill in the highlighted cells
+4. Your dashboard updates automatically ✨
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHAT YOU GET
+━━━━━━━━━━━━━━━━━━━━
+• 1 x .xlsx file (Google Sheets + Excel compatible)
+• Step-by-step setup guide
+• Free lifetime updates
+• Friendly support — I reply within 24h
+
+━━━━━━━━━━━━━━━━━━━━
+✦ PLEASE NOTE
+━━━━━━━━━━━━━━━━━━━━
+This is a DIGITAL product. No physical item will be shipped.
+Due to the instant-download nature, all sales are final —
+but if anything doesn&#x27;t work, message me and I&#x27;ll fix it fast.
+
+Questions? Send me a message — happy to help! 🧡
+
+#GoogleSheets #ExcelTemplate #Spreadsheet #DigitalDownload</div>
+    <div class="lbl">الوسوم الـ13 <button class="copy" data-c="g6">نسخ</button></div>
+    <div class="box sm" id="g6">student planner, gpa calculator, academic planner, assignment tracker, college planner, google sheets, excel template, study planner, grade tracker, school organizer, semester planner, homework tracker, instant download</div>
+    <div class="lbl">الملفات (من مجلد etsy)</div>
+    <div class="files"><div class="f"><span class="ic">🖼️</span><span class="n">06_Student_Planner.png</span><span class="o">صورة 1</span></div><div class="f"><span class="ic">🖼️</span><span class="n">included_student.png</span><span class="o">صورة 2</span></div><div class="f"><span class="ic">🖼️</span><span class="n">00_How_It_Works.png</span><span class="o">صورة 3</span></div><div class="f"><span class="ic">🎬</span><span class="n">demo_student.mp4</span><span class="o">فيديو</span></div><div class="f"><span class="ic">📊</span><span class="n">PREMIUM_Student_Planner.xlsx</span><span class="o">الملف الرقمي</span></div></div>
+  </div>
+</div>
+<div class="card" id="c7">
+  <div class="chead">
+    <button class="ck" data-ck="c7" aria-label="تم"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
+    <div class="ct">
+      <h3>Meal Planner + Grocery</h3>
+      <div class="tags"><span class="tag">13 وسماً</span><span class="tag">1574 حرفاً</span></div>
+    </div>
+    <div class="price">$12.99</div>
+  </div>
+  <div class="cb">
+    <div class="lbl">العنوان · 120/140 حرفاً <button class="copy" data-c="t7">نسخ</button></div>
+    <div class="box sm" id="t7">Meal Planner Google Sheets &amp; Excel | Weekly Menu with Auto Grocery List &amp; Calorie Tracker | Meal Prep | Instant Download</div>
+    <div class="lbl">الوصف <button class="copy" data-c="d7">نسخ</button></div>
+    <div class="box" id="d7">★ Meal Planner &amp; Grocery List — Google Sheets &amp; Excel Template ★
+
+Stop juggling messy notes and half-finished spreadsheets. This template helps you plan a week of meals and get your grocery list generated automatically.
+
+Built for busy families and meal preppers.
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHAT&#x27;S INCLUDED
+━━━━━━━━━━━━━━━━━━━━
+✓ Weekly Meal Plan
+✓ Auto Grocery List
+✓ Recipe Library
+✓ Calorie Tracker
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHY YOU&#x27;LL LOVE IT
+━━━━━━━━━━━━━━━━━━━━
+✔ Automatic calculations — no formulas to write
+✔ Visual charts update as you type
+✔ Works in Google Sheets (free) AND Microsoft Excel
+✔ Fully editable — change categories, colors, currency
+✔ Works on phone, tablet and desktop
+✔ No subscription, no sign-up, no watermarks
+✔ Buy once, own forever
+
+━━━━━━━━━━━━━━━━━━━━
+✦ HOW IT WORKS
+━━━━━━━━━━━━━━━━━━━━
+1. Purchase → instant download (no waiting)
+2. Open in Google Sheets: File → Import → Upload
+   (or open the .xlsx directly in Excel)
+3. Fill in the highlighted cells
+4. Your dashboard updates automatically ✨
+
+━━━━━━━━━━━━━━━━━━━━
+✦ WHAT YOU GET
+━━━━━━━━━━━━━━━━━━━━
+• 1 x .xlsx file (Google Sheets + Excel compatible)
+• Step-by-step setup guide
+• Free lifetime updates
+• Friendly support — I reply within 24h
+
+━━━━━━━━━━━━━━━━━━━━
+✦ PLEASE NOTE
+━━━━━━━━━━━━━━━━━━━━
+This is a DIGITAL product. No physical item will be shipped.
+Due to the instant-download nature, all sales are final —
+but if anything doesn&#x27;t work, message me and I&#x27;ll fix it fast.
+
+Questions? Send me a message — happy to help! 🧡
+
+#GoogleSheets #ExcelTemplate #Spreadsheet #DigitalDownload</div>
+    <div class="lbl">الوسوم الـ13 <button class="copy" data-c="g7">نسخ</button></div>
+    <div class="box sm" id="g7">meal planner, grocery list, meal prep, weekly menu, google sheets, excel template, recipe organizer, food planner, nutrition tracker, family meal plan, shopping list, diet planner, instant download</div>
+    <div class="lbl">الملفات (من مجلد etsy)</div>
+    <div class="files"><div class="f"><span class="ic">🖼️</span><span class="n">07_Meal_Planner.png</span><span class="o">صورة 1</span></div><div class="f"><span class="ic">🖼️</span><span class="n">included_meal.png</span><span class="o">صورة 2</span></div><div class="f"><span class="ic">🖼️</span><span class="n">00_How_It_Works.png</span><span class="o">صورة 3</span></div><div class="f"><span class="ic">🎬</span><span class="n">demo_meal.mp4</span><span class="o">فيديو</span></div><div class="f"><span class="ic">📊</span><span class="n">PREMIUM_Meal_Planner.xlsx</span><span class="o">الملف الرقمي</span></div></div>
+  </div>
+</div>
+</div>
+
+<footer>NasriTools · مجلد الملفات: <span class="mono">scratchpad\etsy</span><br>
+<span style="font-size:12px">علّم ✓ على ما رفعته</span></footer>
+<div class="toast" id="toast">تم النسخ ✓</div>
+
+<script>
+const toast=document.getElementById('toast');let tmr;
+function say(t){toast.textContent=t;toast.classList.add('show');clearTimeout(tmr);tmr=setTimeout(()=>toast.classList.remove('show'),1500);}
+document.querySelectorAll('.copy').forEach(b=>{
+  b.addEventListener('click',async()=>{
+    const txt=document.getElementById(b.dataset.c).textContent;
+    try{await navigator.clipboard.writeText(txt);}
+    catch(e){const ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';
+      document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(_){};document.body.removeChild(ta);}
+    const o=b.textContent;b.textContent='تم ✓';b.classList.add('ok');say('تم النسخ ✓');
+    setTimeout(()=>{b.textContent=o;b.classList.remove('ok');},1600);
+  });
+});
+document.querySelectorAll('.ck').forEach(b=>{
+  b.addEventListener('click',()=>{b.classList.toggle('on');
+    document.getElementById(b.dataset.ck).classList.toggle('done',b.classList.contains('on'));
+    if(b.classList.contains('on'))say('تم الرفع ✓');});
+});
+</script>
