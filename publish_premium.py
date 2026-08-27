@@ -54,6 +54,17 @@ def local(path_from_json):
     name = str(path_from_json).replace("\\", "/").split("/")[-1]
     return FILES / name
 
+def clean_title(title):
+    """Etsy allows each of & % : ; @ only ONCE in a title.
+    Keep the first occurrence, spell out the rest."""
+    words = {"&": "and", "%": "percent", ":": "-", ";": "-", "@": "at"}
+    for ch, word in words.items():
+        if title.count(ch) > 1:
+            first = title.index(ch)
+            head, tail = title[:first + 1], title[first + 1:]
+            title = head + tail.replace(ch, word)
+    return title[:140]
+
 def should_publish(name):
     if PUBLISH == "ALL":
         return True
@@ -63,7 +74,7 @@ def should_publish(name):
 
 def publish_one(p, token, done):
     name  = p["product"]
-    title = p["title"][:140]
+    title = clean_title(p["title"])
     tags  = [t.strip()[:20] for t in p.get("tags", [])[:13]]
     price = float(p["price"])
     xlsx  = local(p["file"])
