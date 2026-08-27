@@ -13,7 +13,8 @@ import requests
 
 CLIENT_ID  = "pluc0garrgcjzhim0hawxf0k"
 REDIRECT   = "http://localhost:3003/callback"
-SCOPES     = "listings_w listings_r listings_d shops_r"
+SCOPES     = ("listings_w listings_r listings_d shops_r shops_w "
+              "transactions_r billing_r profile_r")
 AUTH_URL   = "https://www.etsy.com/oauth/connect"
 TOKEN_URL  = "https://api.etsy.com/v3/public/oauth/token"
 TOKEN_FILE = Path(os.path.expanduser("~")) / "etsy_token.json"   # <-- home dir
