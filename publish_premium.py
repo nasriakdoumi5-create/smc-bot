@@ -28,7 +28,7 @@ TAXONOMY   = 2078
 #   "ALL"   → publish all 7
 #   "STARS" → Trading Journal, Business KPI, Budget Tracker
 #   or list exact product names, e.g. ["Trading Journal"]
-PUBLISH = "STARS"
+PUBLISH = "ALL"
 
 STARS = ["Trading Journal", "Business KPI Dashboard", "Monthly Budget Tracker"]
 
