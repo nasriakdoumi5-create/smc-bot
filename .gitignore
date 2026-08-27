@@ -4,3 +4,6 @@ node_modules/
 __pycache__/
 *.pyc
 *.pyo
+
+agent_reports/
+agent_state.json
